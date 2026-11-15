@@ -1,0 +1,32 @@
+{
+  "height": 1009,
+  "page": "page_0009",
+  "panels": [
+    {
+      "confidence": 0.62,
+      "h": 956,
+      "id": "p1",
+      "locked": false,
+      "order": 1,
+      "w": 641,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "confidence": 0.42,
+      "h": 51,
+      "id": "p2",
+      "locked": false,
+      "order": 2,
+      "w": 604,
+      "x": 37,
+      "y": 958
+    }
+  ],
+  "reading_direction": "rtl",
+  "source": "auto",
+  "warnings": [
+    "dropped 1 empty gutter strip(s)"
+  ],
+  "width": 663
+}

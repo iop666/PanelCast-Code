@@ -1,0 +1,30 @@
+{
+  "height": 1009,
+  "page": "page_0008",
+  "panels": [
+    {
+      "confidence": 0.69,
+      "h": 1009,
+      "id": "p1",
+      "locked": false,
+      "order": 1,
+      "w": 640,
+      "x": 15,
+      "y": 0
+    },
+    {
+      "confidence": 0.69,
+      "h": 1009,
+      "id": "p2",
+      "locked": false,
+      "order": 2,
+      "w": 13,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "reading_direction": "rtl",
+  "source": "auto",
+  "warnings": [],
+  "width": 655
+}

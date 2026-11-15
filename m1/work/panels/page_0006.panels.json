@@ -1,0 +1,49 @@
+{
+  "height": 1009,
+  "page": "page_0006",
+  "panels": [
+    {
+      "confidence": 0.8,
+      "h": 435,
+      "id": "p1",
+      "locked": false,
+      "order": 1,
+      "w": 624,
+      "x": 4,
+      "y": 0
+    },
+    {
+      "confidence": 0.8,
+      "h": 565,
+      "id": "p2",
+      "locked": false,
+      "order": 2,
+      "w": 206,
+      "x": 422,
+      "y": 440
+    },
+    {
+      "confidence": 0.8,
+      "h": 565,
+      "id": "p3",
+      "locked": false,
+      "order": 3,
+      "w": 206,
+      "x": 214,
+      "y": 440
+    },
+    {
+      "confidence": 0.8,
+      "h": 565,
+      "id": "p4",
+      "locked": false,
+      "order": 4,
+      "w": 208,
+      "x": 4,
+      "y": 440
+    }
+  ],
+  "reading_direction": "rtl",
+  "source": "manual",
+  "width": 632
+}

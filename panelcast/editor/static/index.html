@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>PanelCast M1 分格编辑器</title>
+<style>
+  :root { --line: #d0d4dc; --accent: #1a73e8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; color: #222; }
+  header { display: flex; gap: 16px; align-items: center; padding: 8px 14px;
+           border-bottom: 1px solid var(--line); background: #f7f8fa; }
+  header .rtl { background: #1a73e8; color: #fff; padding: 2px 10px; border-radius: 10px; font-weight: 600; }
+  header .stats { font-weight: 600; }
+  header .hint { color: #777; margin-left: auto; font-size: 12px; }
+  button { padding: 4px 12px; border: 1px solid var(--line); background: #fff;
+           border-radius: 4px; cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  #layout { display: flex; height: calc(100vh - 46px); }
+  #page-list { width: 200px; margin: 0; padding: 8px; list-style: none;
+               overflow-y: auto; border-right: 1px solid var(--line); }
+  #page-list li { padding: 6px 10px; margin: 2px 0; border-radius: 4px; cursor: pointer;
+                  display: flex; justify-content: space-between; }
+  #page-list li:hover { background: #eef3fe; }
+  #page-list li.current { background: var(--accent); color: #fff; }
+  #page-list li .mark { font-weight: 700; }
+  #page-list li .mark.ok { color: #1a8f3c; }
+  #page-list li.current .mark.ok { color: #c8f7d2; }
+  #viewport { flex: 1; overflow: auto; background: #525659; position: relative; }
+  #stage { position: relative; margin: 20px auto; background: #fff;
+           box-shadow: 0 2px 14px rgba(0,0,0,.5); }
+  #stage img { display: block; width: 100%; height: 100%; user-select: none;
+               -webkit-user-drag: none; }
+  .box { position: absolute; border: 2px solid #ff3b30; cursor: move; }
+  .box.selected { border-color: #ff9500; box-shadow: 0 0 0 2px #ff950055; }
+  .box .badge { position: absolute; top: -14px; left: -2px; background: #ff3b30; color: #fff;
+                font-size: 11px; padding: 0 6px; border-radius: 3px; font-weight: 700; }
+  .box.selected .badge { background: #ff9500; }
+  .box .badge.first { background: #1a8f3c; }
+  .box .handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px;
+                 background: #fff; border: 2px solid currentColor; border-radius: 2px;
+                 cursor: nwse-resize; }
+  .box .ctl { position: absolute; top: -14px; right: -2px; display: none; }
+  .box .ctl button { padding: 0 5px; font-size: 11px; line-height: 16px; }
+  .box:hover .ctl, .box.selected .ctl { display: flex; }
+  .creating { position: absolute; border: 2px dashed var(--accent); background: #1a73e822; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+           background: #333; color: #fff; padding: 6px 16px; border-radius: 4px;
+           opacity: 0; transition: opacity .25s; pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <span class="rtl">RTL ▶ 从右往左读 · 1 号应在右上</span>
+  <span class="stats" id="stats">候选 – / 当前框 –</span>
+  <button id="save-btn">保存 (S)</button>
+  <span class="hint">←/→ 切页 · S 保存 · D 删除选中框 · 空白处拖拽新建 · 拖角缩放</span>
+</header>
+<div id="layout">
+  <ul id="page-list"></ul>
+  <div id="viewport"><div id="stage"><img id="page-img" alt=""></div></div>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { pages: [], current: null, meta: null, boxes: [], selected: -1,
+                candidates: 0, isManual: false };
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.style.opacity = 1;
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.opacity = 0, 1600);
+}
+function api(path, opts) { return fetch(path, opts).then(r => r.json().then(j => ({status: r.status, body: j}))); }
+
+async function loadPages() {
+  const {body} = await api("/api/pages");
+  state.pages = body.pages || [];
+  const ul = $("page-list"); ul.innerHTML = "";
+  for (const p of state.pages) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${p.name}</span><span class="mark ${p.confirmed ? "ok" : ""}">${p.confirmed ? "✓" : "○"}</span>`;
+    li.dataset.name = p.name;
+    if (p.name === state.current) li.classList.add("current");
+    li.onclick = () => loadPage(p.name);
+    ul.appendChild(li);
+  }
+}
+
+async function loadPage(name) {
+  const {status, body} = await api(`/api/page/${name}/panels`);
+  if (status !== 200) { toast(body.error || "load failed"); return; }
+  state.current = name; state.isManual = body.is_manual;
+  state.meta = body.data;
+  state.boxes = (body.data.panels || []).map(p => ({...p}));
+  state.selected = -1;
+  const img = $("page-img");
+  img.onload = () => { layoutStage(); renderBoxes(); };
+  img.src = `/api/page/${name}/image?ts=${Date.now()}`;
+  const info = state.pages.find(p => p.name === name) || {};
+  state.candidates = info.candidates ?? 0;
+  [...$("page-list").children].forEach(li =>
+    li.classList.toggle("current", li.dataset.name === name));
+  updateStats();
+}
+
+function layoutStage() {
+  const img = $("page-img"), st = $("stage");
+  const maxW = $("viewport").clientWidth - 48;
+  const maxH = $("viewport").clientHeight - 48;
+  const scale = Math.min(maxW / state.meta.width, maxH / state.meta.height, 1);
+  st.style.width = Math.round(state.meta.width * scale) + "px";
+  st.style.height = Math.round(state.meta.height * scale) + "px";
+}
+
+function updateStats() {
+  $("stats").textContent =
+    `候选 ${state.candidates} / 当前框 ${state.boxes.length}` +
+    (state.isManual ? " · 已确认(manual)" : " · 未确认(auto)");
+}
+
+function renderBoxes() {
+  const st = $("stage");
+  st.querySelectorAll(".box").forEach(b => b.remove());
+  const mw = state.meta.width, mh = state.meta.height;
+  const sorted = [...state.boxes].sort((a, b) => a.order - b.order);
+  for (const box of sorted) {
+    const d = document.createElement("div");
+    d.className = "box" + (state.boxes.indexOf(box) === state.selected ? " selected" : "");
+    d.style.left = (box.x / mw * 100) + "%";
+    d.style.top = (box.y / mh * 100) + "%";
+    d.style.width = (box.w / mw * 100) + "%";
+    d.style.height = (box.h / mh * 100) + "%";
+    d.dataset.idx = state.boxes.indexOf(box);
+    const isFirst = box.order === 1;
+    d.innerHTML = `<span class="badge ${isFirst ? "first" : ""}">${box.order}</span>` +
+      `<span class="ctl"><button data-act="up" title="顺序上移">▲</button>` +
+      `<button data-act="down" title="顺序下移">▼</button></span>` +
+      `<span class="handle" title="拖角缩放"></span>`;
+    st.appendChild(d);
+  }
+}
+
+function renumber() {
+  [...state.boxes].sort((a, b) => a.order - b.order)
+    .forEach((b, i) => b.order = i + 1);
+}
+
+function select(idx) {
+  state.selected = idx;
+  renderBoxes();
+}
+
+function boxesFromEvent(ev, mode) {
+  const st = $("stage"), r = st.getBoundingClientRect();
+  const sx = state.meta.width / r.width, sy = state.meta.height / r.height;
+  return {
+    x: Math.round((ev.clientX - r.left) * sx),
+    y: Math.round((ev.clientY - r.top) * sy),
+    sx, sy,
+  };
+}
+
+let drag = null;
+$("stage").addEventListener("pointerdown", (ev) => {
+  const boxEl = ev.target.closest(".box");
+  const st = $("stage");
+  const pt = boxesFromEvent(ev);
+  if (ev.target.classList.contains("handle") && boxEl) {
+    const box = state.boxes[+boxEl.dataset.idx];
+    drag = {mode: "resize", idx: +boxEl.dataset.idx, ox: pt.x, oy: pt.y,
+            w0: box.w, h0: box.h};
+  } else if (boxEl) {
+    const idx = +boxEl.dataset.idx;
+    select(idx);
+    const box = state.boxes[idx];
+    drag = {mode: "move", idx, ox: pt.x, oy: pt.y, bx: box.x, by: box.y};
+  } else {
+    drag = {mode: "create", ox: pt.x, oy: pt.y};
+    const ghost = document.createElement("div");
+    ghost.className = "creating"; ghost.id = "ghost";
+    st.appendChild(ghost);
+  }
+  st.setPointerCapture(ev.pointerId);
+});
+$("stage").addEventListener("pointermove", (ev) => {
+  if (!drag) return;
+  const pt = boxesFromEvent(ev);
+  if (drag.mode === "move") {
+    const box = state.boxes[drag.idx];
+    box.x = Math.max(0, Math.min(state.meta.width - box.w, Math.round(drag.bx + (pt.x - drag.ox))));
+    box.y = Math.max(0, Math.min(state.meta.height - box.h, Math.round(drag.by + (pt.y - drag.oy))));
+    renderBoxes();
+  } else if (drag.mode === "resize") {
+    const box = state.boxes[drag.idx];
+    box.w = Math.max(8, Math.min(state.meta.width - box.x, drag.w0 + Math.round(pt.x - drag.ox)));
+    box.h = Math.max(8, Math.min(state.meta.height - box.y, drag.h0 + Math.round(pt.y - drag.oy)));
+    renderBoxes();
+  } else if (drag.mode === "create") {
+    const g = $("ghost");
+    if (!g) return;
+    const x = Math.min(drag.ox, pt.x), y = Math.min(drag.oy, pt.y);
+    const w = Math.abs(pt.x - drag.ox), h = Math.abs(pt.y - drag.oy);
+    const st = $("stage");
+    g.style.left = (x / state.meta.width * 100) + "%";
+    g.style.top = (y / state.meta.height * 100) + "%";
+    g.style.width = (w / state.meta.width * 100) + "%";
+    g.style.height = (h / state.meta.height * 100) + "%";
+  }
+});
+$("stage").addEventListener("pointerup", (ev) => {
+  if (drag && drag.mode === "create") {
+    const pt = boxesFromEvent(ev);
+    const x = Math.min(drag.ox, pt.x), y = Math.min(drag.oy, pt.y);
+    const w = Math.abs(pt.x - drag.ox), h = Math.abs(pt.y - drag.oy);
+    $("ghost")?.remove();
+    if (w >= 8 && h >= 8) {
+      const maxOrder = state.boxes.reduce((m, b) => Math.max(m, b.order), 0);
+      state.boxes.push({
+        id: "p" + (Math.max(0, ...state.boxes.map(b => +String(b.id).replace(/\D/g, "") || 0)) + 1),
+        order: maxOrder + 1, x, y, w, h, confidence: 0.5, locked: false,
+      });
+      state.selected = state.boxes.length - 1;
+      state.isManual = true;
+      renderBoxes(); updateStats();
+    }
+  }
+  drag = null;
+});
+
+$("stage").addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".ctl button");
+  if (!btn) return;
+  const boxEl = ev.target.closest(".box");
+  const idx = +boxEl.dataset.idx;
+  const dir = btn.dataset.act === "up" ? -1 : 1;
+  const cur = state.boxes[idx];
+  const other = state.boxes.find(b => b.order === cur.order + dir);
+  if (other) { [cur.order, other.order] = [other.order, cur.order]; }
+  renumber(); renderBoxes();
+});
+
+async function save() {
+  if (!state.current || !state.boxes.length) { toast("没有可保存的框"); return; }
+  const {status, body} = await api(`/api/page/${state.current}/panels`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({panels: state.boxes}),
+  });
+  if (status === 200) {
+    toast(`已保存 ${body.count} 框（source=manual）`);
+    state.isManual = true;
+    await loadPages();
+    updateStats();
+  } else { toast(body.error || "save failed"); }
+}
+$("save-btn").onclick = save;
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "s" || ev.key === "S") { save(); return; }
+  if (ev.key === "d" || ev.key === "D") {
+    if (state.selected >= 0) {
+      state.boxes.splice(state.selected, 1);
+      state.selected = -1; renumber(); renderBoxes(); updateStats();
+    }
+    return;
+  }
+  if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+    const idx = state.pages.findIndex(p => p.name === state.current);
+    const next = ev.key === "ArrowLeft" ? idx - 1 : idx + 1;
+    if (next >= 0 && next < state.pages.length) loadPage(state.pages[next].name);
+  }
+});
+
+window.addEventListener("resize", () => { if (state.meta) { layoutStage(); renderBoxes(); } });
+loadPages().then(() => { if (state.pages.length) loadPage(state.pages[0].name); });
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+{
+  "height": 1009,
+  "page": "page_0005",
+  "panels": [
+    {
+      "confidence": 0.42,
+      "h": 140,
+      "id": "p1",
+      "locked": false,
+      "order": 1,
+      "w": 287,
+      "x": 369,
+      "y": 64
+    },
+    {
+      "confidence": 0.69,
+      "h": 57,
+      "id": "p2",
+      "locked": false,
+      "order": 2,
+      "w": 260,
+      "x": 0,
+      "y": 64
+    },
+    {
+      "confidence": 0.83,
+      "h": 37,
+      "id": "p3",
+      "locked": false,
+      "order": 3,
+      "w": 260,
+      "x": 0,
+      "y": 123
+    },
+    {
+      "confidence": 0.69,
+      "h": 43,
+      "id": "p4",
+      "locked": false,
+      "order": 4,
+      "w": 260,
+      "x": 0,
+      "y": 161
+    },
+    {
+      "confidence": 0.56,
+      "h": 38,
+      "id": "p5",
+      "locked": false,
+      "order": 5,
+      "w": 287,
+      "x": 369,
+      "y": 222
+    },
+    {
+      "confidence": 0.69,
+      "h": 38,
+      "id": "p6",
+      "locked": false,
+      "order": 6,
+      "w": 260,
+      "x": 0,
+      "y": 222
+    },
+    {
+      "confidence": 0.69,
+      "h": 242,
+      "id": "p7",
+      "locked": false,
+      "order": 7,
+      "w": 393,
+      "x": 263,
+      "y": 295
+    },
+    {
+      "confidence": 0.83,
+      "h": 242,
+      "id": "p8",
+      "locked": false,
+      "order": 8,
+      "w": 260,
+      "x": 0,
+      "y": 295
+    },
+    {
+      "confidence": 0.69,
+      "h": 397,
+      "id": "p9",
+      "locked": false,
+      "order": 9,
+      "w": 287,
+      "x": 369,
+      "y": 584
+    },
+    {
+      "confidence": 0.9,
+      "h": 68,
+      "id": "p10",
+      "locked": false,
+      "order": 10,
+      "w": 104,
+      "x": 263,
+      "y": 584
+    },
+    {
+      "confidence": 0.83,
+      "h": 68,
+      "id": "p11",
+      "locked": false,
+      "order": 11,
+      "w": 260,
+      "x": 0,
+      "y": 584
+    },
+    {
+      "confidence": 0.83,
+      "h": 327,
+      "id": "p12",
+      "locked": false,
+      "order": 12,
+      "w": 367,
+      "x": 0,
+      "y": 654
+    }
+  ],
+  "reading_direction": "rtl",
+  "source": "auto",
+  "warnings": [],
+  "width": 656
+}

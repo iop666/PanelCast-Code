@@ -143,6 +143,98 @@ def cmd_ingest(args):
         shutil.rmtree(stage, ignore_errors=True)
 
 
+def cmd_m1(args):
+    """M1 最小闭环：panels（S1 生成候选）/ edit（S2 编辑器）/ run（S6 闭环）。"""
+    try:
+        if args.m1_command == "panels":
+            from .panels import generate_candidates
+            results = generate_candidates(args.work)
+            for page, status in results:
+                print(f"{page}: {status}")
+            return 0
+        if args.m1_command == "edit":
+            from .editor.server import serve
+            serve(args.work, args.port)
+            return 0
+        if args.m1_command == "run":
+            return _m1_run(args)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 4
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 4
+    return 2
+
+
+def _m1_run(args):
+    """S6：确认检查(缺 panels.json → 退出码 3) → TTS → timeline → render。"""
+    import json as _json
+
+    from .panels import find_ffmpeg
+    from .render import render
+    from .timeline import (
+        build_srt,
+        build_timeline,
+        load_script,
+        write_text_atomic,
+    )
+    from .tts import probe_backend, synth_segments
+
+    work = Path(args.work)
+    out = Path(args.out)
+    pages_dir = work / "pages"
+    panels_dir = work / "panels"
+    pages = sorted(p.stem for p in pages_dir.glob("*.jpg"))
+    if not pages:
+        print(f"error: no pages in {pages_dir}", file=sys.stderr)
+        return 3
+    missing = [p for p in pages
+               if not (panels_dir / f"{p}.panels.json").exists()]
+    if missing:
+        print(
+            "error: unconfirmed pages (no *.panels.json): "
+            + ", ".join(missing),
+            file=sys.stderr,
+        )
+        return 3
+    confirmed = {}
+    for p in pages:
+        doc = _json.loads(
+            (panels_dir / f"{p}.panels.json").read_text(encoding="utf-8")
+        )
+        if doc.get("source") != "manual":
+            confirmed.setdefault("not_manual", []).append(p)
+        else:
+            confirmed[p] = doc
+    if "not_manual" in confirmed:
+        print(
+            "error: pages not manually confirmed (source != manual): "
+            + ", ".join(confirmed["not_manual"]),
+            file=sys.stderr,
+        )
+        return 3
+
+    script = load_script(work, set(confirmed))
+    backend = probe_backend()
+    print(f"tts: {backend['backend']} (voice={backend['voice']})")
+    audios = synth_segments(work, script, backend)
+    ffmpeg = find_ffmpeg()
+    timeline = build_timeline(script, audios, backend, ffmpeg)
+    write_text_atomic(work / "timeline.json", _json.dumps(
+        timeline, ensure_ascii=False, indent=2, sort_keys=True))
+    print(
+        f"timeline: {len(timeline['segments'])} segments, "
+        f"total {timeline['total_duration']:.1f}s -> {work / 'timeline.json'}"
+    )
+    info = render(work, out, timeline, ffmpeg=ffmpeg)
+    print(
+        f"render: {info['width']}x{info['height']} {info['fps']}fps "
+        f"{info['duration']:.1f}s -> {out / 'sample.mp4'} (+ sample.srt)"
+    )
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="panelcast", description="PanelCast source ingestion (stdlib only)"
@@ -160,9 +252,27 @@ def main(argv=None):
         "-o", "--output", default=str(DEFAULT_OUTPUT),
         help=f"output directory (default: {DEFAULT_OUTPUT})",
     )
+    m1 = sub.add_parser(
+        "m1", help="M1 minimal loop: panel candidates / editor / render",
+    )
+    m1sub = m1.add_subparsers(dest="m1_command", required=True)
+    m1panels = m1sub.add_parser(
+        "panels", help="generate *.candidates.json for pages lacking one",
+    )
+    m1panels.add_argument("--work", default="m1/work")
+    m1edit = m1sub.add_parser("edit", help="local panel-review editor")
+    m1edit.add_argument("--work", default="m1/work")
+    m1edit.add_argument("--port", type=int, default=8642)
+    m1run = m1sub.add_parser(
+        "run", help="confirmed pages -> TTS -> timeline -> MP4+SRT",
+    )
+    m1run.add_argument("--work", default="m1/work")
+    m1run.add_argument("--out", default="m1/out")
     args = parser.parse_args(argv)
     if args.command == "ingest":
         sys.exit(cmd_ingest(args))
+    if args.command == "m1":
+        sys.exit(cmd_m1(args))
 
 
 if __name__ == "__main__":

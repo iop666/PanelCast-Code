@@ -1,0 +1,52 @@
+{
+  "height": 1009,
+  "page": "page_0006",
+  "panels": [
+    {
+      "confidence": 0.76,
+      "h": 435,
+      "id": "p1",
+      "locked": false,
+      "order": 1,
+      "w": 628,
+      "x": 4,
+      "y": 0
+    },
+    {
+      "confidence": 0.83,
+      "h": 91,
+      "id": "p2",
+      "locked": false,
+      "order": 2,
+      "w": 628,
+      "x": 4,
+      "y": 438
+    },
+    {
+      "confidence": 0.69,
+      "h": 408,
+      "id": "p3",
+      "locked": false,
+      "order": 3,
+      "w": 628,
+      "x": 4,
+      "y": 547
+    },
+    {
+      "confidence": 0.76,
+      "h": 20,
+      "id": "p4",
+      "locked": false,
+      "order": 4,
+      "w": 628,
+      "x": 4,
+      "y": 989
+    }
+  ],
+  "reading_direction": "rtl",
+  "source": "auto",
+  "warnings": [
+    "dropped 1 empty gutter strip(s)"
+  ],
+  "width": 632
+}

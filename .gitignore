@@ -9,6 +9,12 @@ m0/pages/
 m0/novel_excerpt.txt
 m0/drafts/
 
+# M1 workspace: copied pages, synthesized audio and render scratch stay local.
+# Tracked: capability_report.md, panels/*.json, script.json, timeline.json.
+m1/work/pages/
+m1/work/audio/
+m1/work/cache/
+
 # Local pipeline artifacts
 .local/
 

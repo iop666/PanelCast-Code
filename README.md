@@ -104,6 +104,28 @@ python -m panelcast ingest "この素晴らしい世界に祝福を！/1.epub" "
 | `sha256` | 图像字节 SHA-256 |
 | `duplicate_of` | 与之重复的首页文件名；无重复为 `null` |
 
+## M1 最小闭环（8 页样片）
+
+在 `ingest` 之外，`m1` 子命令把 M0 取样的 8 页漫画变成一条带 AI 旁白的
+1080p MP4（**不引入任何 Python 第三方依赖**，媒体处理全部依赖本机 ffmpeg）：
+
+```bash
+python -m panelcast m1 panels --work m1/work     # S1 生成候选格（只写一次，不覆盖）
+python -m panelcast m1 edit   --work m1/work     # S2 本地编辑器人工修正/确认（默认 127.0.0.1:8642）
+python -m panelcast m1 run    --work m1/work --out m1/out   # S6 闭环：确认门禁→TTS→时间轴→渲染
+```
+
+- 讲稿放在 `m1/work/script.json`（段 → 文本 + 页面 1–3 页）；
+- TTS 优先 edge-tts（已装且联网），否则 Windows SAPI5（Microsoft Huihui Desktop）；
+  都不可用即报错退出，不生成静音视频；音频时长读 WAV 头，**禁止估算**；
+- `m1 run` 要求全部页面已人工确认（`*.panels.json` 且 source=manual），
+  有未确认页则逐个列出并以**退出码 3** 退出，不用候选凑数；
+- 产物：`m1/out/sample.mp4` + `m1/out/sample.srt`（一段一条字幕）；
+  改一句稿重跑，只重算受影响的段（TTS 缓存按 sha256(text+voice+rate+backend)）。
+
+`m1` 退出码：0 成功；3 有未确认页面；4 输入/合成/渲染失败（一行 `error:`）。
+设计细节见 [docs/ADR-002-m1-render-stack.md](docs/ADR-002-m1-render-stack.md)。
+
 ## 测试
 
 ```bash
@@ -117,11 +139,14 @@ CLI 行为（单类型 ingest、多同类型拒绝）、输出目录一致性回
 （pair→仅 EPUB 清理旧 MOBI 子树、pair→仅 MOBI 清理旧 EPUB 子树、
 页数减少清除多余 JPEG、失败运行逐字节保留旧输出与 manifest）、
 空摄取守卫与干净错误出口（退出码 3 / 4 区分、stderr 无 traceback、
-失败无 staging 残留），以及真实文件冒烟测试（源文件存在时）。
+失败无 staging 残留）、M1 分格器（确定性 / 边界页 / RTL / 候选不可覆盖 /
+性能）、时间轴累加与 SRT 派生、TTS WAV 头时长与缓存局部重算、渲染
+（ffconcat 清单 + 小样真渲染），以及真实文件冒烟测试（源文件存在时）。
 
 ## 文档
 
 - [docs/ADR-001-source-ingestion.md](docs/ADR-001-source-ingestion.md) — 摄取方案决策记录
+- [docs/ADR-002-m1-render-stack.md](docs/ADR-002-m1-render-stack.md) — M1 渲染栈决策记录
 
 ## 边界
 

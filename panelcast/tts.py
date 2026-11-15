@@ -77,10 +77,13 @@ def _edge_synthesize(text, voice, out_path, ffmpeg):
     """edge-tts → mp3 → ffmpeg 转 WAV（仅当 edge-tts 已安装且网络通时可达）。"""
     import edge_tts  # noqa: 仅探测成功后才 import
 
-    async def _save():
-        await edge_tts.Communicate(text, voice).save(str(out_path))
-
     tmp_mp3 = out_path.with_suffix(".tmp.mp3")
+
+    async def _save():
+        # 必须写到 tmp_mp3：edge-tts 产出的是 mp3，直接写 out_path 会让下面的
+        # ffmpeg 找不到输入（曾因此静默回退到 SAPI5）。
+        await edge_tts.Communicate(text, voice).save(str(tmp_mp3))
+
     try:
         asyncio.run(asyncio.wait_for(_save(), timeout=60))
         conv = subprocess.run(

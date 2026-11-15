@@ -111,5 +111,43 @@ class TestSynthSegments(unittest.TestCase):
             tts.synth_segments(self.work, self._script(["  "]), BACKEND)
 
 
+class TestEdgeSynthesize(unittest.TestCase):
+    """回归：edge-tts 必须写 .tmp.mp3，否则 ffmpeg 找不到输入、静默回退 SAPI5。"""
+
+    def test_edge_writes_temp_mp3_not_wav_path(self):
+        import sys
+        import types
+        from unittest import mock
+
+        saved = {}
+
+        class FakeCommunicate:
+            def __init__(self, text, voice):
+                self.text, self.voice = text, voice
+
+            async def save(self, path):
+                saved["path"] = path
+                Path(path).write_bytes(b"fake-mp3")
+
+        fake = types.ModuleType("edge_tts")
+        fake.Communicate = FakeCommunicate
+
+        def fake_run(cmd, **kwargs):
+            # 输入必须是 .tmp.mp3，且文件真实存在（这正是原 bug 的失败点）
+            src = Path(cmd[cmd.index("-i") + 1])
+            self.assertTrue(src.name.endswith(".tmp.mp3"), f"unexpected input {src}")
+            self.assertTrue(src.exists(), "ffmpeg input missing: save() went elsewhere")
+            Path(cmd[-1]).write_bytes(b"\x00" * 100)
+            return mock.Mock(returncode=0, stderr="")
+
+        with mock.patch.dict(sys.modules, {"edge_tts": fake}), \
+                mock.patch.object(tts.subprocess, "run", side_effect=fake_run):
+            out = Path(tempfile.mkdtemp()) / "seg.wav"
+            tts._edge_synthesize("测试", "zh-CN-XiaoxiaoNeural", out, Path("ffmpeg"))
+
+        self.assertTrue(saved["path"].endswith(".tmp.mp3"))
+        self.assertFalse(out.with_suffix(".tmp.mp3").exists(), "temp mp3 not cleaned up")
+
+
 if __name__ == "__main__":
     unittest.main()

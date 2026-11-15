@@ -1,0 +1,23 @@
+{
+  "schema": "chapter-work/v1",
+  "series": "为美好的世界献上祝福！",
+  "volume": "漫画 第2卷",
+  "id": "ch02",
+  "number": "第七章",
+  "title": "遭到梦幻竹笋偷袭！",
+  "label": "第七章 遭到梦幻竹笋偷袭！",
+  "start_page": 31,
+  "end_page": 38,
+  "page_count": 8,
+  "pages": [
+    "page_0031",
+    "page_0032",
+    "page_0033",
+    "page_0034",
+    "page_0035",
+    "page_0036",
+    "page_0037",
+    "page_0038"
+  ],
+  "source_work": "m1\\v2\\work"
+}

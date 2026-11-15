@@ -51,5 +51,8 @@ m1/v*/out/
 m1/**/work/pages/
 m1/**/work/audio/
 m1/**/work/cache/
+# 章级 panels 是 --skip-panel-gate 留下的整页占位框，没有信息量；只有 m1/work/panels
+# 里的自动检测结果（含人工修正）值得入库，所以下面一行把那个目录挖回来。
 m1/**/work/panels/
+!m1/work/panels/
 m1/**/out/

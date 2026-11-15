@@ -1,0 +1,31 @@
+{
+  "schema": "chapter-work/v1",
+  "series": "为美好的世界献上祝福！",
+  "volume": "漫画 第2卷",
+  "id": "ch04",
+  "number": "第九章",
+  "title": "对恐怖的无头骑士发动反击！",
+  "label": "第九章 对恐怖的无头骑士发动反击！",
+  "start_page": 67,
+  "end_page": 82,
+  "page_count": 16,
+  "pages": [
+    "page_0067",
+    "page_0068",
+    "page_0069",
+    "page_0070",
+    "page_0071",
+    "page_0072",
+    "page_0073",
+    "page_0074",
+    "page_0075",
+    "page_0076",
+    "page_0077",
+    "page_0078",
+    "page_0079",
+    "page_0080",
+    "page_0081",
+    "page_0082"
+  ],
+  "source_work": "m1\\v2\\work"
+}

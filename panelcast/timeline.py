@@ -211,13 +211,24 @@ def build_cues(timeline, max_chars=16):
     return cues
 
 
-def build_srt_from_cues(cues):
+STRIP_CHARS = "，。"
+
+
+def clean_display(text, strip=STRIP_CHARS):
+    """字幕显示用：去掉逗号/句号这类纯停顿标点（句读靠换条表达）。
+
+    只影响**显示文本**，不影响分句与时长计算。
+    """
+    return "".join(ch for ch in text if ch not in strip)
+
+
+def build_srt_from_cues(cues, strip=STRIP_CHARS):
     """字幕条 → SRT（与烧进画面的分行一致，供外部播放器用）。"""
     blocks = []
     for i, cue in enumerate(cues, 1):
         blocks.append(
             f"{i}\n{format_ts(cue['start'])} --> {format_ts(cue['end'])}\n"
-            f"{cue['text']}\n"
+            f"{clean_display(cue['text'], strip)}\n"
         )
     return "\n".join(blocks)
 
@@ -232,15 +243,16 @@ def format_ass_ts(sec):
 
 
 def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
-              margin_v=None):
+              margin_v=None, strip=STRIP_CHARS):
     """生成 ASS 字幕（白字黑描边，底部居中）。
 
-    字号/边距按画布高度比例给默认值：竖屏 1920 高约 62px 字、MarginV 150；
-    横屏 1080 高约 44px 字、MarginV 60。
+    字号/边距按画布高度比例给默认值：竖屏 1920 高约 77px 字、MarginV 144；
+    横屏 1080 高约 43px 字、MarginV 81。strip 里的标点不进画面。
     """
-    font_size = font_size or max(28, round(height * 0.0325))
+    font_size = font_size or max(28, round(height * 0.040))
     margin_v = margin_v or round(height * 0.075)
     outline = max(2, round(font_size * 0.075))
+    margin_h = round(width * 0.03)
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -257,7 +269,7 @@ def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Default,{font},{font_size},&H00FFFFFF,&H00FFFFFF,"
         f"&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,{outline},0,2,"
-        f"60,60,{margin_v},1\n"
+        f"{margin_h},{margin_h},{margin_v},1\n"
         "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
@@ -265,7 +277,8 @@ def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
     )
     lines = []
     for cue in cues:
-        text = cue["text"].replace("\n", " ").replace("{", "(").replace("}", ")")
+        text = clean_display(cue["text"], strip)
+        text = text.replace("\n", " ").replace("{", "(").replace("}", ")")
         lines.append(
             f"Dialogue: 0,{format_ass_ts(cue['start'])},"
             f"{format_ass_ts(cue['end'])},Default,,0,0,0,,{text}"

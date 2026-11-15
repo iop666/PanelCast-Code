@@ -24,21 +24,24 @@ from .timeline import (
 
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 1920, 1080
 FIT_MODES = ("letterbox", "cover", "blurpad")
+BG_MODES = ("blur", "white")
 # blurpad：底部留给字幕的带状区域（占画布高度比例）与四周边距（像素）
-SUBTITLE_BAND_RATIO = 0.19
-BLURPAD_MARGIN = 18
+SUBTITLE_BAND_RATIO = 0.14
+BLURPAD_MARGIN = 10
 
 
-def fit_filter(width, height, fit="letterbox", band=0, margin=0):
+def fit_filter(width, height, fit="letterbox", band=0, margin=0, bg="blur"):
     """构造 ffmpeg 缩放滤镜。
 
     letterbox: 整页可见，四周补白（信息完整，但画面填不满）。
     cover:     铺满画布，超出部分居中裁掉（填满画面，边缘会被裁）。
-    blurpad:   整页缩小放入画面（不裁切），四周用同页模糊放大版填充；
-               底部预留字幕带，适合竖屏。
+    blurpad:   整页缩小放入画面（不裁切），底部预留字幕带；
+               bg="blur" 用同页模糊放大版填底，bg="white" 用纯白底。
     """
     if fit not in FIT_MODES:
         raise RuntimeError(f"error: unknown fit mode {fit!r}, want {FIT_MODES}")
+    if bg not in BG_MODES:
+        raise RuntimeError(f"error: unknown bg mode {bg!r}, want {BG_MODES}")
     if fit == "cover":
         return (
             f"scale={width}:{height}:force_original_aspect_ratio=increase,"
@@ -48,6 +51,11 @@ def fit_filter(width, height, fit="letterbox", band=0, margin=0):
         fg_h = height - band - margin * 2
         if fg_h <= 0:
             raise RuntimeError(f"error: subtitle band {band} too tall for {height}")
+        if bg == "white":
+            return (
+                f"scale={width}:{fg_h}:force_original_aspect_ratio=decrease,"
+                f"pad={width}:{height}:(ow-iw)/2:{margin}:color=white"
+            )
         return (
             f"split=2[bg][fg];"
             f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,"
@@ -73,17 +81,18 @@ def _run(cmd, what, cwd=None):
 
 def prepare_frames(ffmpeg, work, pages_seq, width=DEFAULT_WIDTH,
                    height=DEFAULT_HEIGHT, fit="letterbox", ffprobe=None,
-                   trim=True):
+                   trim=True, bg="blur"):
     """每个出场页生成目标画布的 PNG（重复页只做一次）。
 
-    缓存按 <宽>x<高>-<fit> 分目录，切换画布/填充方式不会误用旧帧。
+    缓存按 <宽>x<高>-<fit>-<bg> 分目录，切换画布/填充/底色不会误用旧帧。
     trim=True 时先自动裁掉页面四周的纯色扫描边（黑边/白边），再缩放。
     """
-    frames_dir = Path(work) / "cache" / "frames" / f"{width}x{height}-{fit}"
+    frames_dir = (Path(work) / "cache" / "frames"
+                  / f"{width}x{height}-{fit}-{bg}")
     frames_dir.mkdir(parents=True, exist_ok=True)
     band = round(height * SUBTITLE_BAND_RATIO) if fit == "blurpad" else 0
     margin = BLURPAD_MARGIN if fit == "blurpad" else 0
-    base_vf = fit_filter(width, height, fit, band=band, margin=margin)
+    base_vf = fit_filter(width, height, fit, band=band, margin=margin, bg=bg)
     for page in dict.fromkeys(pages_seq):  # 保序去重
         src = Path(work) / "pages" / f"{page}.jpg"
         dst = frames_dir / f"{page}.png"
@@ -162,7 +171,7 @@ def probe_video(ffprobe, path):
 
 def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
            width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fit="letterbox",
-           burn_subs=True):
+           burn_subs=True, bg="blur"):
     """timeline → sample.mp4 + sample.srt + sample.ass。失败抛 RuntimeError。"""
     from .panels import find_ffmpeg, find_ffprobe
     ffmpeg = ffmpeg or find_ffmpeg()
@@ -170,7 +179,7 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
     work = Path(work_dir)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    fit_filter(width, height, fit)  # 提前校验 fit 取值
+    fit_filter(width, height, fit, bg=bg)  # 提前校验 fit/bg 取值
 
     if not all((work / "pages" / f"{p}.jpg").exists()
                for p in {e[0] for e in page_entries(timeline)}):
@@ -181,7 +190,7 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
     entries = page_entries(timeline)
     frames_dir = prepare_frames(ffmpeg, work, [p for p, _ in entries],
                                 width=width, height=height, fit=fit,
-                                ffprobe=ffprobe)
+                                ffprobe=ffprobe, bg=bg)
     ffconcat = build_ffconcat(entries, frames_dir)
     write_text_atomic(frames_dir / "video.ffconcat", ffconcat)
 

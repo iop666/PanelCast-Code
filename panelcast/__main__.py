@@ -231,12 +231,14 @@ def _m1_run(args):
     )
     width, height = _parse_size(getattr(args, "size", None))
     fit = getattr(args, "fit", "letterbox")
+    bg = getattr(args, "bg", "blur")
     burn = getattr(args, "subs", "burn") == "burn"
     info = render(work, out, timeline, ffmpeg=ffmpeg,
-                  width=width, height=height, fit=fit, burn_subs=burn)
+                  width=width, height=height, fit=fit, burn_subs=burn, bg=bg)
     print(
         f"render: {info['width']}x{info['height']} {info['fps']}fps "
-        f"{info['duration']:.1f}s fit={fit} subs={'burn' if burn else 'none'} "
+        f"{info['duration']:.1f}s fit={fit} bg={bg} "
+        f"subs={'burn' if burn else 'none'} "
         f"-> {out / 'sample.mp4'} (+ sample.srt/ass)"
     )
     return 0
@@ -306,6 +308,10 @@ def main(argv=None):
         "--fit", default="letterbox", choices=["letterbox", "cover", "blurpad"],
         help="letterbox=整页可见留白；cover=铺满裁切；"
              "blurpad=缩小整页+模糊背景填充+底部字幕带（竖屏推荐）",
+    )
+    m1run.add_argument(
+        "--bg", default="blur", choices=["blur", "white"],
+        help="blurpad 底色：blur=同页模糊填充；white=纯白底",
     )
     m1run.add_argument(
         "--subs", default="burn", choices=["burn", "none"],

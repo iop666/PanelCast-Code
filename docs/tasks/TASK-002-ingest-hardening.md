@@ -63,11 +63,19 @@ class IngestError(Exception):
 
 ### 2.3 CLI 干净错误出口
 
-在 `cmd_ingest` 的 staging 区块外加一层 `try/except`，捕获
-`(IngestError, zipfile.BadZipFile, ValueError, KeyError, ElementTree.ParseError, OSError)`：
+在 `cmd_ingest` 的 staging 区块外加两层 `except`（顺序不能反，`IngestError` 在前）：
 
-- 向 **stderr** 打印单行：`error: <原因>`（不要 traceback，不要多行堆栈）
-- 返回退出码 **4**
+```python
+except IngestError as exc:        # 能打开但没内容 -> 3
+    print(f"error: {exc}", file=sys.stderr)
+    return 3
+except (zipfile.BadZipFile, ElementTree.ParseError, ValueError,
+        KeyError, OSError) as exc:  # 根本读不了 -> 4
+    print(f"error: {exc}", file=sys.stderr)
+    return 4
+```
+
+- 只打印**单行** `error: <原因>`，不要 traceback，不要多行堆栈
 - `finally` 中的 staging 清理必须保留（失败不得残留 `.panelcast-stage-*`）
 - 不得捕获 `SystemExit` / `KeyboardInterrupt`
 

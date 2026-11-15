@@ -72,6 +72,8 @@ def build_timeline(script, audio_results, backend_info, ffmpeg_path):
             "start": start,
             "end": end,
             "pages": list(seg["pages"]),
+            # 真实句边界（edge-tts 提供）；SAPI5 没有，为空时字幕按字数比例
+            "sentences": list(audio.get("sentences") or []),
         })
         clock += duration
     total = round(clock, 3)
@@ -192,12 +194,81 @@ def split_cues(text, max_chars=16, min_chars=6):
     return merged
 
 
+def _anchors(text, seg_start, sentences):
+    """用真实句边界建 (字符位置, 时间) 锚点表；数据不可用时返回 None。
+
+    每句给出两个锚点：句首（前一句之后的停顿结束）与句尾。锚点之间线性插值，
+    等于把"句内按字数"和"句间按真实停顿"两件事分开处理——这正是按字数比例
+    分配会跑偏的地方（长停顿被平摊掉了）。
+    """
+    if not text or not sentences:
+        return None
+    anchors, cum = [], 0
+    for sent in sentences:
+        stext = sent.get("text") or ""
+        if not stext:
+            continue
+        try:
+            off = float(sent["offset"])
+            dur = float(sent["duration"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        anchors.append((cum, seg_start + off))
+        cum += len(stext)
+        anchors.append((cum, seg_start + off + dur))
+    if not anchors or cum <= 0:
+        return None
+    if cum != len(text):
+        # 句文本长度之和与整段不一致（数字/标点被 TTS 归一化过）→ 拉伸字符轴
+        scale = len(text) / cum
+        anchors = [(round(c * scale), t) for c, t in anchors]
+    # 同一字符位置可能出两个锚点（句尾与下句句首），保留较晚的时间
+    merged = []
+    for c, t in anchors:
+        if merged and c <= merged[-1][0]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], t))
+        else:
+            merged.append((c, t))
+    # 时间必须单调（句间偶尔有 1~2 帧重叠，夹紧即可，不要整段放弃）
+    for i in range(1, len(merged)):
+        if merged[i][1] < merged[i - 1][1]:
+            merged[i] = (merged[i][0], merged[i - 1][1])
+    return merged
+
+
+def _char_time(anchors, x):
+    """锚点表插值：字符位置 → 时间。"""
+    if x <= anchors[0][0]:
+        return anchors[0][1]
+    for (c0, t0), (c1, t1) in zip(anchors, anchors[1:]):
+        if c0 <= x <= c1:
+            return t1 if c1 == c0 else t0 + (t1 - t0) * (x - c0) / (c1 - c0)
+    return anchors[-1][1]
+
+
 def build_cues(timeline, max_chars=16):
-    """段 → 字幕条：段内按字符占比切分该段真实时长（不改总时长）。"""
+    """段 → 字幕条：优先按真实句边界对时，缺失时退回按字数占比。
+
+    两种方式都不改总时长：首条起于段首、末条止于段尾，条与条首尾相接。
+    """
     cues = []
     for seg in timeline["segments"]:
         parts = split_cues(seg["text"], max_chars=max_chars)
         if not parts:
+            continue
+        anchors = _anchors(seg["text"], seg["start"], seg.get("sentences"))
+        if anchors:
+            bounds = [seg["start"]]
+            pos = 0
+            for part in parts[:-1]:
+                pos += len(part)
+                bounds.append(_char_time(anchors, pos))
+            bounds.append(seg["end"])
+            for i in range(1, len(bounds)):      # 夹紧，防零/负长度
+                bounds[i] = max(bounds[i], bounds[i - 1])
+            for i, part in enumerate(parts):
+                cues.append({"start": bounds[i], "end": bounds[i + 1],
+                             "text": part})
             continue
         total = sum(len(p) for p in parts)
         start = seg["start"]
@@ -246,11 +317,11 @@ def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
               margin_v=None, strip=STRIP_CHARS):
     """生成 ASS 字幕（白字黑描边，底部居中）。
 
-    字号/边距按画布高度比例给默认值：竖屏 1920 高约 77px 字、MarginV 144；
-    横屏 1080 高约 43px 字、MarginV 81。strip 里的标点不进画面。
+    字号/边距按画布高度比例给默认值：竖屏 1920 高约 77px 字、MarginV 100；
+    横屏 1080 高约 43px 字、MarginV 56。strip 里的标点不进画面。
     """
     font_size = font_size or max(28, round(height * 0.040))
-    margin_v = margin_v or round(height * 0.075)
+    margin_v = margin_v if margin_v is not None else round(height * 0.052)
     outline = max(2, round(font_size * 0.075))
     margin_h = round(width * 0.03)
     header = (

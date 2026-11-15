@@ -108,7 +108,7 @@ class TestSynthSegments(unittest.TestCase):
             (self.work / "audio" / "seg_0002.wav").read_bytes(), bytes_1
         )
         # 索引已落盘，且音频按内容哈希存放（换语速不会互相覆盖）
-        index = (self.work / "cache" / "tts_index_v2.json").read_text(
+        index = (self.work / "cache" / "tts_index_v3.json").read_text(
             encoding="utf-8")
         self.assertIn("tts/", index)
         self.assertEqual(len(json.loads(index)), 3)   # 第一段 / 第二段 / 第二段改
@@ -138,40 +138,82 @@ class TestSynthSegments(unittest.TestCase):
 class TestEdgeSynthesize(unittest.TestCase):
     """回归：edge-tts 必须写 .tmp.mp3，否则 ffmpeg 找不到输入、静默回退 SAPI5。"""
 
-    def test_edge_writes_temp_mp3_not_wav_path(self):
+    def _fake_edge(self, saved, marks=(("第一句。", 1000000, 47104164),)):
+        """假 edge_tts：stream() 吐音频块 + SentenceBoundary（单位 100ns）。"""
         import sys
         import types
-        from unittest import mock
-
-        saved = {}
 
         class FakeCommunicate:
             def __init__(self, text, voice, rate="+0%"):
                 self.text, self.voice, self.rate = text, voice, rate
                 saved["rate"] = rate
 
-            async def save(self, path):
-                saved["path"] = path
-                Path(path).write_bytes(b"fake-mp3")
+            async def stream(self):
+                yield {"type": "audio", "data": b"fake-mp3"}
+                for text, offset, duration in marks:
+                    yield {"type": "SentenceBoundary", "offset": offset,
+                           "duration": duration, "text": text}
 
         fake = types.ModuleType("edge_tts")
         fake.Communicate = FakeCommunicate
+        return fake
+
+    def test_edge_writes_temp_mp3_not_wav_path(self):
+        from unittest import mock
+
+        saved = {}
 
         def fake_run(cmd, **kwargs):
             # 输入必须是 .tmp.mp3，且文件真实存在（这正是原 bug 的失败点）
             src = Path(cmd[cmd.index("-i") + 1])
             self.assertTrue(src.name.endswith(".tmp.mp3"), f"unexpected input {src}")
-            self.assertTrue(src.exists(), "ffmpeg input missing: save() went elsewhere")
+            self.assertTrue(src.exists(), "ffmpeg input missing: stream() went elsewhere")
+            saved["mp3"] = src
             Path(cmd[-1]).write_bytes(b"\x00" * 100)
             return mock.Mock(returncode=0, stderr="")
 
-        with mock.patch.dict(sys.modules, {"edge_tts": fake}), \
+        fake = self._fake_edge(saved)
+        with mock.patch.dict(__import__("sys").modules, {"edge_tts": fake}), \
                 mock.patch.object(tts.subprocess, "run", side_effect=fake_run):
             out = Path(tempfile.mkdtemp()) / "seg.wav"
-            tts._edge_synthesize("测试", "zh-CN-XiaoxiaoNeural", out, Path("ffmpeg"))
+            marks = tts._edge_synthesize("测试", "zh-CN-XiaoxiaoNeural", out,
+                                         Path("ffmpeg"))
 
-        self.assertTrue(saved["path"].endswith(".tmp.mp3"))
+        self.assertTrue(saved["mp3"].name.endswith(".tmp.mp3"))
         self.assertFalse(out.with_suffix(".tmp.mp3").exists(), "temp mp3 not cleaned up")
+        # 句边界必须带回：offset/duration 由 100ns 换算成秒
+        self.assertEqual(len(marks), 1)
+        self.assertAlmostEqual(marks[0]["offset"], 0.1, places=3)
+        self.assertAlmostEqual(marks[0]["duration"], 4.71, places=3)
+        self.assertEqual(marks[0]["text"], "第一句。")
+
+
+class TestSentenceMarksCache(unittest.TestCase):
+    """句边界要进索引，命中缓存时也要带回来（否则字幕退回按字数猜）。"""
+
+    def test_sentences_persisted_and_reused(self):
+        marks = [{"offset": 0.1, "duration": 1.5, "text": "第一段"}]
+
+        def fake_edge(text, voice, out_path, ffmpeg, rate="+0%"):
+            _write_wav(out_path, seconds=0.5, rate=8000)
+            return marks
+
+        orig = tts._edge_synthesize
+        tts._edge_synthesize = fake_edge
+        self.addCleanup(setattr, tts, "_edge_synthesize", orig)
+
+        backend = {"backend": "edge-tts:zh-CN-YunxiNeural",
+                   "voice": "zh-CN-YunxiNeural", "rate": "+20%"}
+        script = {"segments": [{"id": "seg_0001", "text": "第一段",
+                                "pages": ["page_0005"]}]}
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            first = tts.synth_segments(work, script, backend)[0]
+            self.assertFalse(first["cached"])
+            self.assertEqual(first["sentences"], marks)
+            second = tts.synth_segments(work, script, backend)[0]
+            self.assertTrue(second["cached"])
+            self.assertEqual(second["sentences"], marks)
 
 
 if __name__ == "__main__":

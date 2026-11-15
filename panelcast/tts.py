@@ -74,15 +74,34 @@ def _sapi_synthesize(text, voice, rate, out_path):
 
 
 def _edge_synthesize(text, voice, out_path, ffmpeg, rate="+0%"):
-    """edge-tts → mp3 → ffmpeg 转 WAV（仅当 edge-tts 已安装且网络通时可达）。"""
+    """edge-tts → mp3 → ffmpeg 转 WAV。返回句级时间标记（供字幕对时）。
+
+    标记结构 [{offset, duration, text}]，单位秒，offset 从音频开头算。
+    edge-tts 对中文**不吐 WordBoundary**（全 0），但 SentenceBoundary 是真实
+    偏移；用它给字幕定锚点，段内按字数比例分配的累计漂移（实测段尾差 1.6s）
+    可以降到 0.3s 以内。
+    """
     import edge_tts  # noqa: 仅探测成功后才 import
 
     tmp_mp3 = out_path.with_suffix(".tmp.mp3")
+    marks = []
 
     async def _save():
+        # 用 stream() 而不是 save()：save() 只落音频，拿不到 SentenceBoundary。
         # 必须写到 tmp_mp3：edge-tts 产出的是 mp3，直接写 out_path 会让下面的
         # ffmpeg 找不到输入（曾因此静默回退到 SAPI5）。
-        await edge_tts.Communicate(text, voice, rate=rate).save(str(tmp_mp3))
+        with open(tmp_mp3, "wb") as fh:
+            async for chunk in edge_tts.Communicate(
+                    text, voice, rate=rate).stream():
+                if chunk["type"] == "audio":
+                    fh.write(chunk["data"])
+                elif chunk["type"] == "SentenceBoundary":
+                    # offset/duration 单位是 100ns
+                    marks.append({
+                        "offset": round(chunk["offset"] / 1e7, 3),
+                        "duration": round(chunk["duration"] / 1e7, 3),
+                        "text": chunk["text"],
+                    })
 
     try:
         asyncio.run(asyncio.wait_for(_save(), timeout=60))
@@ -96,6 +115,7 @@ def _edge_synthesize(text, voice, out_path, ffmpeg, rate="+0%"):
     finally:
         with contextlib.suppress(OSError):
             tmp_mp3.unlink()
+    return marks
 
 
 def wav_duration(path):
@@ -163,10 +183,10 @@ def cache_key(text, backend, voice, rate):
 
 
 def _load_index(cache_dir):
-    # v2：音频按内容哈希存到 cache/tts/<key>.wav。v1 把音频直接写成
+    # v3：条目里多存 sentences（真实句边界，供字幕对时）。v1 把音频直接写成
     # audio/seg_XXXX.wav，换 voice/rate 后同名文件被覆盖、旧索引仍指向它，
-    # 会命中到**别的语速**的音频，故废弃旧索引。
-    path = cache_dir / "tts_index_v2.json"
+    # 会命中到**别的语速**的音频；v2 无句边界，字幕只能按字数猜。
+    path = cache_dir / "tts_index_v3.json"
     if path.exists():
         try:
             return json.loads(path.read_text(encoding="utf-8")), path
@@ -225,12 +245,14 @@ def synth_segments(work_dir, script, backend_info, ffmpeg=None):
                 results.append({
                     "id": seg_id, "text": text, "file": target,
                     "duration": duration, "cached": True,
+                    "sentences": list(entry.get("sentences") or []),
                 })
                 continue
         # 未命中 → 真实合成到缓存路径，再复制到本次运行的工作文件名
+        sentences = []
         if backend.startswith("edge-tts:"):
-            _edge_synthesize(text, voice, cached, ffmpeg or _lazy_ffmpeg(),
-                             rate=str(rate))
+            sentences = _edge_synthesize(
+                text, voice, cached, ffmpeg or _lazy_ffmpeg(), rate=str(rate))
         else:
             _sapi_synthesize(text, voice, rate, cached)
         if not cached.exists() or cached.stat().st_size <= 44:
@@ -245,12 +267,14 @@ def synth_segments(work_dir, script, backend_info, ffmpeg=None):
             "backend": backend,
             "voice": voice,
             "chars": len(text),
+            "sentences": sentences,
             "synthesized_at": datetime.now(UTC).isoformat(timespec="seconds"),
         }
         dirty = True
         results.append({
             "id": seg_id, "text": text, "file": target,
             "duration": duration, "cached": False,
+            "sentences": sentences,
         })
     if dirty:
         _save_index(index_path, index)

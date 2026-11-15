@@ -7,7 +7,14 @@ import wave
 from pathlib import Path
 
 from panelcast.panels import _KNOWN_BIN, find_ffprobe
-from panelcast.render import build_ffconcat, probe_video, render
+from panelcast.render import (
+    BLURPAD_TOP_MARGIN,
+    build_ffconcat,
+    fit_filter,
+    probe_video,
+    render,
+    video_filters,
+)
 
 FFMPEG = _KNOWN_BIN / "ffmpeg.exe"
 _FFMPEG_OK = FFMPEG.exists()
@@ -53,6 +60,45 @@ class TestFfconcat(unittest.TestCase):
         self.assertEqual(text.count("file 'page_0002.png'"), 2)
 
 
+class TestBlurpadLayout(unittest.TestCase):
+    """blurpad 顶部留白：只平移、不缩尺寸。"""
+
+    def test_top_margin_shifts_page_down_without_resizing(self):
+        vf = fit_filter(1080, 1920, "blurpad", band=269, margin=10,
+                        bg="white", top=50)
+        # fg_h 仍是 1920-269-20=1631（尺寸不变）
+        self.assertIn("scale=1080:1631:", vf)
+        # 但纵向落点是 50，不是 10
+        self.assertIn(":(ow-iw)/2:50:color=white", vf)
+
+    def test_default_top_equals_margin(self):
+        vf = fit_filter(1080, 1920, "blurpad", band=269, margin=10, bg="white")
+        self.assertIn(":(ow-iw)/2:10:color=white", vf)
+
+    def test_top_margin_overflow_rejected(self):
+        with self.assertRaises(RuntimeError):
+            fit_filter(1080, 1920, "blurpad", band=100, margin=10, top=1800)
+
+    def test_constant_is_a_real_downshift(self):
+        # 顶部留白必须大于四周边距，否则等于没下沉
+        self.assertGreater(BLURPAD_TOP_MARGIN, 10)
+
+
+class TestVideoFilters(unittest.TestCase):
+    """滤镜链顺序是修复"字幕只在换页时变 / 字幕不白"的关键，锁死它。"""
+
+    def test_fps_first_scale_before_ass(self):
+        chain = video_filters("sample.ass")
+        parts = chain.split(",")
+        self.assertEqual(parts[0], "fps=30")
+        self.assertLess(chain.index("scale="), chain.index("ass=sample.ass"))
+
+    def test_no_ass_when_subs_off(self):
+        chain = video_filters(None)
+        self.assertNotIn("ass=", chain)
+        self.assertTrue(chain.startswith("fps=30,scale="))
+
+
 @unittest.skipUnless(FFMPEG.exists(), "ffmpeg not available")
 class TestRenderSmoke(unittest.TestCase):
     def test_two_frame_render_with_real_audio(self):
@@ -79,9 +125,31 @@ class TestRenderSmoke(unittest.TestCase):
             self.assertAlmostEqual(info["duration"], 0.5, delta=0.2)
             self.assertTrue((out / "sample.mp4").exists())
             self.assertTrue((out / "sample.srt").exists())
+            # 视频轨不能短于音频（曾出现 90s 成片只出 83s 的静默截断）
+            self.assertAlmostEqual(info["video_duration"], 0.5, delta=0.2)
             # ffprobe 独立复验
             params = probe_video(find_ffprobe(), out / "sample.mp4")
             self.assertEqual(params["width"], 1920)
+            self.assertAlmostEqual(params["video_duration"], 0.5, delta=0.2)
+
+    def test_video_track_not_truncated(self):
+        """concat 末帧没有 duration 时视频轨会提前收尾（真事故：90s→83s）。"""
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td) / "work"
+            out = Path(td) / "out"
+            (work / "pages").mkdir(parents=True)
+            (work / "audio").mkdir()
+            for i in (1, 2):
+                subprocess.run(
+                    [str(FFMPEG), "-v", "error", "-y", "-f", "lavfi",
+                     "-i", "color=gray:size=8x8", "-frames:v", "1",
+                     str(work / "pages" / f"page_{i:04d}.jpg")],
+                    capture_output=True, check=True)
+            _write_wav(work / "audio" / "seg_0001.wav", 0.6)
+            _write_wav(work / "audio" / "seg_0002.wav", 1.4)
+            tl = _timeline(((0.6, ("page_0001",)), (1.4, ("page_0002",))))
+            info = render(work, out, tl, ffmpeg=FFMPEG, ffprobe=find_ffprobe())
+            self.assertAlmostEqual(info["video_duration"], 2.0, delta=0.2)
 
     def test_render_fails_on_missing_audio(self):
         with tempfile.TemporaryDirectory() as td:

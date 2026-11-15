@@ -19,6 +19,7 @@ from .timeline import (
     build_cues,
     build_srt_from_cues,
     page_entries,
+    plan_page_windows,
     write_text_atomic,
 )
 
@@ -231,10 +232,13 @@ def probe_video(ffprobe, path):
 
 def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
            width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fit="letterbox",
-           burn_subs=True, bg="blur", chapter=None, name="sample"):
+           burn_subs=True, bg="blur", chapter=None, name="sample",
+           balance_pages=True):
     """timeline → <name>.mp4 + <name>.srt + <name>.ass。失败抛 RuntimeError。
 
     chapter 非空时在右上角常驻一行章节标签（章节号 + 章节名）。
+    balance_pages=True 时按 `plan_page_windows` 全局均衡页面停留（默认）；
+    False 时退回旧的"段内均分"（仅用于复现历史产物）。
     """
     from .panels import find_ffmpeg, find_ffprobe
     ffmpeg = ffmpeg or find_ffmpeg()
@@ -244,13 +248,13 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
     out.mkdir(parents=True, exist_ok=True)
     fit_filter(width, height, fit, bg=bg)  # 提前校验 fit/bg 取值
 
-    if not all((work / "pages" / f"{p}.jpg").exists()
-               for p in {e[0] for e in page_entries(timeline)}):
-        missing = [p for p in {e[0] for e in page_entries(timeline)}
-                   if not (work / "pages" / f"{p}.jpg").exists()]
+    entries = (plan_page_windows(timeline) if balance_pages
+               else page_entries(timeline))
+    missing = [p for p in dict.fromkeys(e[0] for e in entries)
+               if not (work / "pages" / f"{p}.jpg").exists()]
+    if missing:
         raise RuntimeError(f"error: missing page images: {', '.join(missing)}")
 
-    entries = page_entries(timeline)
     frames_dir = prepare_frames(ffmpeg, work, [p for p, _ in entries],
                                 width=width, height=height, fit=fit,
                                 ffprobe=ffprobe, bg=bg)

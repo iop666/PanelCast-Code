@@ -1,0 +1,13 @@
+{
+  "series": "为美好的世界献上祝福！",
+  "volume": "漫画 第1卷",
+  "source_file": "1卷.mobi",
+  "note": "边界全部来自人工逐页读横幅。本卷印刷版没有第三章标题页（p45 直接接第四章 p105），黑页+波点页分隔只有 3 对：p43/44、p103/104、p135/136。",
+  "chapters": [
+    {"number": "第一章", "title": "与自称是女神的家伙一起转生到异世界！", "start_page": 5},
+    {"number": "第二章", "title": "替华美的高阶职业带来愉悦！", "start_page": 45},
+    {"number": "第四章", "title": "让爆裂之道获得指引！", "start_page": 105},
+    {"number": "第五章", "title": "让可怜的女神获得救济！", "start_page": 137}
+  ],
+  "back_matter_start": 156
+}

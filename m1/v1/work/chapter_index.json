@@ -1,0 +1,65 @@
+{
+  "schema": "chapter-index/v1",
+  "series": "为美好的世界献上祝福！",
+  "volume": "漫画 第1卷",
+  "page_count": 169,
+  "source": "labels",
+  "detected_starts": [
+    45,
+    105,
+    137
+  ],
+  "warnings": [
+    "first chapter starts at page 5, before the first divider pair (page 45); it cannot be auto-detected"
+  ],
+  "front_matter": {
+    "start_page": 1,
+    "end_page": 4
+  },
+  "back_matter": {
+    "start_page": 156,
+    "end_page": 169
+  },
+  "chapters": [
+    {
+      "id": "ch01",
+      "number": "第一章",
+      "title": "与自称是女神的家伙一起转生到异世界！",
+      "label_zh": "第一章 与自称是女神的家伙一起转生到异世界！",
+      "start_page": 5,
+      "end_page": 42,
+      "page_count": 38,
+      "confirmed": true
+    },
+    {
+      "id": "ch02",
+      "number": "第二章",
+      "title": "替华美的高阶职业带来愉悦！",
+      "label_zh": "第二章 替华美的高阶职业带来愉悦！",
+      "start_page": 45,
+      "end_page": 102,
+      "page_count": 58,
+      "confirmed": true
+    },
+    {
+      "id": "ch03",
+      "number": "第四章",
+      "title": "让爆裂之道获得指引！",
+      "label_zh": "第四章 让爆裂之道获得指引！",
+      "start_page": 105,
+      "end_page": 134,
+      "page_count": 30,
+      "confirmed": true
+    },
+    {
+      "id": "ch04",
+      "number": "第五章",
+      "title": "让可怜的女神获得救济！",
+      "label_zh": "第五章 让可怜的女神获得救济！",
+      "start_page": 137,
+      "end_page": 155,
+      "page_count": 19,
+      "confirmed": true
+    }
+  ]
+}

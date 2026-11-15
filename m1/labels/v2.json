@@ -1,0 +1,14 @@
+{
+  "series": "为美好的世界献上祝福！",
+  "volume": "漫画 第2卷",
+  "source_file": "2卷.mobi",
+  "note": "边界全部来自人工逐页读横幅。本卷只有 p162 一个全黑页、没有波点页，所以分隔页检测完全失效（detected_starts 为空）。p3 是卷头彩页兼第六章标题页；p83 的横幅只有「第十章」没有标题。七、八两章的标题页在本扫描件里不存在，p4..p67 全部归入第六章，不猜边界。",
+  "chapters": [
+    {"number": "第六章", "title": "为这片湖献上自称女神的圣水！", "start_page": 3},
+    {"number": "第九章", "title": "对恐怖的无头骑士发动反击！", "start_page": 68},
+    {"number": "第十章", "title": "", "start_page": 83},
+    {"number": "第十一章", "title": "让这场毫无意义的战斗分出胜负！", "start_page": 108},
+    {"number": "第十二章", "title": "为这次的转生赋予幸运！", "start_page": 138}
+  ],
+  "back_matter_start": 149
+}

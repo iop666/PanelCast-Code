@@ -117,6 +117,92 @@ def page_entries(timeline):
     return entries
 
 
+#: 页面停留的硬边界：低于 MIN 会闪、高于 MAX 会闷（§1.2 与 §13 坑 12）
+MIN_DWELL = 3.5
+MAX_DWELL = 18.0
+#: 切页点吸附到句子边界的最大位移（秒）
+SNAP_WINDOW = 2.0
+
+
+def _snap_points(timeline):
+    """可吸附的时间点：段边界 + 每句的句首/句尾。"""
+    pts = set()
+    for seg in timeline["segments"]:
+        pts.add(round(seg["start"], 3))
+        pts.add(round(seg["end"], 3))
+        for sent in seg.get("sentences") or []:
+            try:
+                off = float(sent["offset"])
+                dur = float(sent["duration"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            pts.add(round(seg["start"] + off, 3))
+            pts.add(round(seg["start"] + off + dur, 3))
+    return sorted(pts)
+
+
+def plan_page_windows(timeline, snap=SNAP_WINDOW, min_dwell=MIN_DWELL,
+                      max_dwell=MAX_DWELL, strict=False):
+    """整片页面停留均衡：每页 ≈ 总时长/页数，切页点吸附到句子边界。
+
+    为什么要它：按段分配页时长时，一段只挂 1 页但字数多，那页就停留 15–18 秒
+    （实测第一章有 4 页超过 17s），观感发闷；反过来短段只停 2 秒会闪。
+    这里改成全局均衡——页序不变，但**切页时刻独立于段边界**，允许一页跨段、
+    一段换多页。字幕仍按段走，两者互不干扰。
+
+    页数太少（每页 > max_dwell）时不硬报错：这是内容问题不是代码问题，
+    由 S9 第 12 条如实报出来。`strict=True` 才会抛错（给 CI 用）。
+
+    返回 [(page, duration)]，总长严格等于 total_duration。
+    """
+    pages = [p for seg in timeline["segments"] for p in seg["pages"]]
+    total = round(timeline["total_duration"], 3)
+    n = len(pages)
+    if n == 0:
+        raise RuntimeError("error: timeline has no pages")
+
+    nominal = total / n
+    if nominal > max_dwell and strict:
+        raise RuntimeError(
+            f"error: {n} pages over {total:.1f}s = {nominal:.1f}s per page, "
+            f"above the {max_dwell:.0f}s ceiling; add pages or cut text"
+        )
+    if n == 1:
+        return [(pages[0], total)]
+
+    pts = _snap_points(timeline)
+    bounds = [0.0]
+    for i in range(1, n):
+        ideal = total * i / n
+        if pts and snap > 0:
+            near = min(pts, key=lambda c: abs(c - ideal))
+            if abs(near - ideal) <= snap:
+                ideal = near
+        bounds.append(ideal)
+    bounds.append(total)
+
+    # 单调 + 最小停留：吸附可能把两个切点挤到一起，挤到就退回均分
+    for i in range(1, len(bounds)):
+        if bounds[i] - bounds[i - 1] < min_dwell:
+            bounds[i] = bounds[i - 1] + nominal
+    bounds[-1] = total
+    if any(bounds[i] <= bounds[i - 1] for i in range(1, len(bounds))):
+        bounds = [total * i / n for i in range(n)] + [total]
+
+    entries = []
+    for i, page in enumerate(pages):
+        dur = round(bounds[i + 1] - bounds[i], 3)
+        if i == n - 1:
+            dur = round(total - sum(d for _, d in entries), 3)
+        entries.append((page, dur))
+    drift = abs(round(sum(d for _, d in entries), 3) - total)
+    if drift >= 0.05:
+        raise RuntimeError(
+            f"error: balanced page windows drift {drift:.3f}s from timeline"
+        )
+    return entries
+
+
 def format_ts(sec):
     """SRT 时间戳 HH:MM:SS,mmm。"""
     ms = int(round(sec * 1000))

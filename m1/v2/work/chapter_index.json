@@ -1,0 +1,71 @@
+{
+  "schema": "chapter-index/v1",
+  "series": "为美好的世界献上祝福！",
+  "volume": "漫画 第2卷",
+  "page_count": 167,
+  "source": "labels",
+  "detected_starts": [],
+  "warnings": [
+    "no divider pairs found in this volume; every boundary comes from the labels file, nothing was verified by geometry"
+  ],
+  "front_matter": {
+    "start_page": 1,
+    "end_page": 2
+  },
+  "back_matter": {
+    "start_page": 149,
+    "end_page": 167
+  },
+  "chapters": [
+    {
+      "id": "ch01",
+      "number": "第六章",
+      "title": "为这片湖献上自称女神的圣水！",
+      "label_zh": "第六章 为这片湖献上自称女神的圣水！",
+      "start_page": 3,
+      "end_page": 67,
+      "page_count": 65,
+      "confirmed": true
+    },
+    {
+      "id": "ch02",
+      "number": "第九章",
+      "title": "对恐怖的无头骑士发动反击！",
+      "label_zh": "第九章 对恐怖的无头骑士发动反击！",
+      "start_page": 68,
+      "end_page": 82,
+      "page_count": 15,
+      "confirmed": true
+    },
+    {
+      "id": "ch03",
+      "number": "第十章",
+      "title": "",
+      "label_zh": "第十章",
+      "start_page": 83,
+      "end_page": 107,
+      "page_count": 25,
+      "confirmed": true
+    },
+    {
+      "id": "ch04",
+      "number": "第十一章",
+      "title": "让这场毫无意义的战斗分出胜负！",
+      "label_zh": "第十一章 让这场毫无意义的战斗分出胜负！",
+      "start_page": 108,
+      "end_page": 137,
+      "page_count": 30,
+      "confirmed": true
+    },
+    {
+      "id": "ch05",
+      "number": "第十二章",
+      "title": "为这次的转生赋予幸运！",
+      "label_zh": "第十二章 为这次的转生赋予幸运！",
+      "start_page": 138,
+      "end_page": 148,
+      "page_count": 11,
+      "confirmed": true
+    }
+  ]
+}

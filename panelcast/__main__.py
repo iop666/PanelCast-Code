@@ -144,7 +144,7 @@ def cmd_ingest(args):
 
 
 def cmd_m1(args):
-    """M1 最小闭环：panels（S1 生成候选）/ edit（S2 编辑器）/ run（S6 闭环）。"""
+    """M1 最小闭环：panels / edit / run，以及 S2 chapter、S3 profile、S9 verify。"""
     try:
         if args.m1_command == "panels":
             from .panels import generate_candidates
@@ -156,6 +156,12 @@ def cmd_m1(args):
             from .editor.server import serve
             serve(args.work, args.port)
             return 0
+        if args.m1_command == "chapter":
+            return _m1_chapter(args)
+        if args.m1_command == "profile":
+            return _m1_profile(args)
+        if args.m1_command == "verify":
+            return _m1_verify(args)
         if args.m1_command == "run":
             return _m1_run(args)
     except RuntimeError as exc:
@@ -165,6 +171,94 @@ def cmd_m1(args):
         print(f"error: {exc}", file=sys.stderr)
         return 4
     return 2
+
+
+def _m1_chapter(args):
+    """S2：测量每页 → 分隔页检测 + labels → chapter_index.json。"""
+    from .chapters import (
+        build_index,
+        load_labels,
+        measure_pages,
+        require_confirmed,
+        write_index,
+    )
+
+    work = Path(args.work)
+    rows = measure_pages(work)
+    labels = load_labels(args.labels) if args.labels else None
+    index = build_index(rows, labels=labels,
+                        series=getattr(args, "series", "") or "",
+                        volume=getattr(args, "volume", "") or "")
+    path = write_index(work, index)
+    for ch in index["chapters"]:
+        mark = "" if ch["confirmed"] else "  (未确认)"
+        print(f"{ch['id']} {ch['label_zh'] or '?'} "
+              f"p{ch['start_page']}-{ch['end_page']} "
+              f"({ch['page_count']}p){mark}")
+    print(f"detected divider starts: {index['detected_starts']}")
+    print(f"chapter_index -> {path}")
+    if getattr(args, "require_confirmed", False):
+        try:
+            require_confirmed(index)
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 3
+    return 0
+
+
+def _m1_profile(args):
+    """S3：几何字段自动填，语义字段留占位（reviewed=false）。"""
+    from .chapters import load_index, require_confirmed
+    from .profile_auto import generate
+
+    work = Path(args.work)
+    index = load_index(work)
+    if not getattr(args, "allow_unconfirmed", False):
+        require_confirmed(index)
+    written, failed, skipped = generate(
+        work, index,
+        series=getattr(args, "series", "") or "",
+        volume=getattr(args, "volume", "") or "",
+        mobi_name=getattr(args, "mobi", "") or "",
+        chapter_id=getattr(args, "chapter", None),
+        limit=getattr(args, "limit", None),
+    )
+    for page, err in failed:
+        print(f"error: {page}: {err}", file=sys.stderr)
+    print(f"profiles: {len(written)} written, {len(skipped)} skipped "
+          f"(front/back matter), {len(failed)} failed -> {work / 'profiles'}")
+    if failed:
+        return 4
+    return 0
+
+
+def _m1_verify(args):
+    """S9：13 条验收 → run_report.json；任一不过退出码 4。"""
+    import json as _json
+
+    from .verify import verify_run, write_report
+
+    work = Path(args.work)
+    out = Path(args.out)
+    timeline_path = work / "timeline.json"
+    script_path = work / "script.json"
+    for p in (timeline_path, script_path):
+        if not p.exists():
+            print(f"error: {p} not found", file=sys.stderr)
+            return 3
+    timeline = _json.loads(timeline_path.read_text(encoding="utf-8"))
+    script = _json.loads(script_path.read_text(encoding="utf-8"))
+    pages = [p for seg in script["segments"] for p in seg.get("pages") or []]
+    width, height = _parse_size(getattr(args, "size", None) or "1080x1920")
+    report = verify_run(work, out, args.name, timeline["total_duration"], pages,
+                        width=width, height=height)
+    path = write_report(out, report)
+    for c in report["checks"]:
+        flag = "OK  " if c["pass"] else "FAIL"
+        print(f"[{flag}] {c['id']:2d} {c['item']}: {c['actual']}")
+    print(f"verify: {report['passed']}/{len(report['checks'])} passed "
+          f"-> {path}")
+    return 0 if report["ok"] else 4
 
 
 def _m1_run(args):
@@ -327,6 +421,39 @@ def main(argv=None):
         "--name", default="sample",
         help="产物文件名（不含扩展名），如 第一章 -> 第一章.mp4/.srt/.ass",
     )
+    m1chapter = m1sub.add_parser(
+        "chapter", help="S2: measure pages, detect chapter dividers, confirm labels",
+    )
+    m1chapter.add_argument("--work", default="m1/work")
+    m1chapter.add_argument("--labels", default=None,
+                           help="章节标签 JSON（人工确认过的边界与标题）")
+    m1chapter.add_argument("--series", default="", help="系列名，写进 index")
+    m1chapter.add_argument("--volume", default="", help="卷名，写进 index")
+    m1chapter.add_argument("--require-confirmed", action="store_true",
+                           help="有未确认章时退出码 3")
+
+    m1profile = m1sub.add_parser(
+        "profile", help="S3: geometry-only page profiles (semantic fields left blank)",
+    )
+    m1profile.add_argument("--work", default="m1/work")
+    m1profile.add_argument("--series", default="")
+    m1profile.add_argument("--volume", default="")
+    m1profile.add_argument("--mobi", default="", help="源 mobi 文件名，写进 source.file")
+    m1profile.add_argument("--chapter", default=None,
+                           help="只做这一章（如 ch01）")
+    m1profile.add_argument("--limit", type=int, default=None,
+                           help="只做前 N 页（调试用）")
+    m1profile.add_argument("--allow-unconfirmed", action="store_true",
+                           help="章节未确认也继续（仅调试）")
+
+    m1verify = m1sub.add_parser(
+        "verify", help="S9: run the 13 acceptance checks -> run_report.json",
+    )
+    m1verify.add_argument("--work", default="m1/work")
+    m1verify.add_argument("--out", default="m1/out")
+    m1verify.add_argument("--name", default="sample")
+    m1verify.add_argument("--size", default=None,
+                          help="画布尺寸 WIDTHxHEIGHT，默认 1080x1920")
     args = parser.parse_args(argv)
     if args.command == "ingest":
         sys.exit(cmd_ingest(args))

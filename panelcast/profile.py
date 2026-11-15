@@ -47,6 +47,8 @@ _TYPE_CHECKS = {
 
 #: 规范 §6.6 —— 黑白页的 palette 各通道极差上限。
 MAX_GRAY_SPREAD = 8
+#: 自动草稿的占位标签。出现它 = 语义字段还没补全，不许出片。
+PLACEHOLDER_TAG = "meta.unassigned"
 
 
 def _type_ok(value, spec) -> bool:
@@ -199,6 +201,17 @@ def check_characters(profile, known_names=None):
     return errors
 
 
+def check_placeholders(profile):
+    """占位符 = 语义字段没填。只有出片门禁关心它（草稿允许存在）。"""
+    tags = (profile.get("reuse") or {}).get("scene_tags") or []
+    if PLACEHOLDER_TAG in tags:
+        return [
+            f"$.reuse.scene_tags: 仍是占位符 {PLACEHOLDER_TAG}，"
+            f"语义字段（beat/summary/characters/scene_tags）还没补全"
+        ]
+    return []
+
+
 def check_shippable(profile):
     """§6.6 已审才可出片。"""
     if not (profile.get("provenance") or {}).get("reviewed"):
@@ -216,6 +229,7 @@ def check_profile(profile, schema, known_names=None, for_shipping=False):
     errors += check_palette(profile)
     errors += check_characters(profile, known_names)
     if for_shipping:
+        errors += check_placeholders(profile)
         errors += check_shippable(profile)
     return errors
 

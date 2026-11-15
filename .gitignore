@@ -42,3 +42,8 @@ out/
 renders/
 dist/
 *.mp4
+m1/v*/work/pages/
+m1/v*/work/profiles/
+m1/v*/work/cache/
+m1/v*/work/audio/
+m1/v*/out/

@@ -3,6 +3,12 @@
 *.epub
 *.mobi
 
+# M0 experiment: copied manga pages, novel excerpts, model drafts stay local.
+# Only the prompt templates / result table / alignment note are tracked.
+m0/pages/
+m0/novel_excerpt.txt
+m0/drafts/
+
 # Local pipeline artifacts
 .local/
 

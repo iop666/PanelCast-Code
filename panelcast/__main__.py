@@ -234,12 +234,14 @@ def _m1_run(args):
     bg = getattr(args, "bg", "blur")
     burn = getattr(args, "subs", "burn") == "burn"
     info = render(work, out, timeline, ffmpeg=ffmpeg,
-                  width=width, height=height, fit=fit, burn_subs=burn, bg=bg)
+                  width=width, height=height, fit=fit, burn_subs=burn, bg=bg,
+                  chapter=getattr(args, "chapter", None),
+                  name=getattr(args, "name", "sample"))
     print(
         f"render: {info['width']}x{info['height']} {info['fps']}fps "
         f"{info['duration']:.1f}s fit={fit} bg={bg} "
         f"subs={'burn' if burn else 'none'} "
-        f"-> {out / 'sample.mp4'} (+ sample.srt/ass)"
+        f"-> {out / (args.name + '.mp4')} (+ .srt/.ass)"
     )
     return 0
 
@@ -316,6 +318,14 @@ def main(argv=None):
     m1run.add_argument(
         "--subs", default="burn", choices=["burn", "none"],
         help="burn=把字幕烧进画面（白字黑描边）；none=只出 srt/ass 文件",
+    )
+    m1run.add_argument(
+        "--chapter", default=None,
+        help='右上角常驻章节标签，如 "第一章 与自称是女神的家伙一起转生到异世界！"',
+    )
+    m1run.add_argument(
+        "--name", default="sample",
+        help="产物文件名（不含扩展名），如 第一章 -> 第一章.mp4/.srt/.ass",
     )
     args = parser.parse_args(argv)
     if args.command == "ingest":

@@ -19,6 +19,11 @@ m1/test5min/work/pages/
 m1/test5min/work/audio/
 m1/test5min/work/cache/
 m1/test5min/out/
+# 第一章成片（按章节出片）：同上
+m1/ch1/work/pages/
+m1/ch1/work/audio/
+m1/ch1/work/cache/
+m1/ch1/out/
 
 # Local pipeline artifacts
 .local/

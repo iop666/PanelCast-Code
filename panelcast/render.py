@@ -29,7 +29,11 @@ BG_MODES = ("blur", "white")
 SUBTITLE_BAND_RATIO = 0.14
 BLURPAD_MARGIN = 10
 # 顶部留白单独加大：漫画整体略下沉，不贴画面上边缘（纯平移，不缩尺寸）
-BLURPAD_TOP_MARGIN = 50
+# 72 = 给右上角章节标签留出位置，相比原来的 50 只下移 22px
+BLURPAD_TOP_MARGIN = 72
+# 右上角章节标签：字号（占画布高度）与距顶距离
+CHAPTER_FONT_RATIO = 0.021
+CHAPTER_TOP_RATIO = 0.006
 
 
 def fit_filter(width, height, fit="letterbox", band=0, margin=0, bg="blur",
@@ -227,8 +231,11 @@ def probe_video(ffprobe, path):
 
 def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
            width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fit="letterbox",
-           burn_subs=True, bg="blur"):
-    """timeline → sample.mp4 + sample.srt + sample.ass。失败抛 RuntimeError。"""
+           burn_subs=True, bg="blur", chapter=None, name="sample"):
+    """timeline → <name>.mp4 + <name>.srt + <name>.ass。失败抛 RuntimeError。
+
+    chapter 非空时在右上角常驻一行章节标签（章节号 + 章节名）。
+    """
     from .panels import find_ffmpeg, find_ffprobe
     ffmpeg = ffmpeg or find_ffmpeg()
     ffprobe = ffprobe or find_ffprobe()
@@ -257,12 +264,15 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
     audio_concat = work / "cache" / "audio_concat.wav"
     concat_audio(ffmpeg, seg_wavs, audio_concat)
 
-    mp4 = out / "sample.mp4"
+    mp4 = out / f"{name}.mp4"
     ass_name = None
     if burn_subs:
-        ass_path = out / "sample.ass"
-        write_text_atomic(ass_path, build_ass(build_cues(timeline),
-                                              width, height))
+        ass_path = out / f"{name}.ass"
+        write_text_atomic(ass_path, build_ass(
+            build_cues(timeline), width, height,
+            chapter_label=chapter,
+            total_duration=timeline["total_duration"],
+        ))
         # 用 cwd=out + 相对文件名，避免 Windows 盘符在滤镜参数里被当成分隔符
         ass_name = ass_path.name
     vf = ["-vf", video_filters(ass_name)]
@@ -302,6 +312,6 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
             f"(frames truncated)"
         )
 
-    write_text_atomic(out / "sample.srt",
+    write_text_atomic(out / f"{name}.srt",
                       build_srt_from_cues(build_cues(timeline)))
     return info

@@ -198,5 +198,39 @@ class TestSentenceAnchoredCues(unittest.TestCase):
         self.assertAlmostEqual(_char_time(anchors, 99), 8.0)   # 越界取末锚点
 
 
+class TestChapterLabel(unittest.TestCase):
+    """右上角章节标签：浅灰小字、右上对齐、常驻全片。"""
+
+    def _ass(self, **kw):
+        return build_ass([{"start": 0, "end": 1, "text": "测试"}], 1080, 1920, **kw)
+
+    def test_label_style_is_top_right_and_light(self):
+        ass = self._ass(chapter_label="第一章 与自称是女神的家伙一起转生到异世界！",
+                        total_duration=416.6)
+        self.assertIn("Style: Chapter,", ass)
+        line = next(l for l in ass.splitlines() if l.startswith("Style: Chapter,"))
+        fields = line.split(",")
+        self.assertEqual(fields[3], "&H00999999")      # 浅灰填充
+        self.assertEqual(fields[18], "9")              # Alignment=9 右上
+        # 字号明显小于字幕字号
+        self.assertLess(int(fields[2]), 77)
+
+    def test_label_dialogue_covers_whole_video(self):
+        ass = self._ass(chapter_label="第一章 测试", total_duration=100.0)
+        line = next(l for l in ass.splitlines() if l.startswith("Dialogue: 1,"))
+        self.assertIn("0:00:00.00,0:01:40.00", line)
+        self.assertIn("第一章 测试", line)
+
+    def test_no_label_no_chapter_style(self):
+        ass = self._ass()
+        self.assertNotIn("Chapter", ass)
+        self.assertNotIn("Dialogue: 1,", ass)
+
+    def test_label_braces_escaped(self):
+        ass = self._ass(chapter_label="第一章 {测试}", total_duration=1.0)
+        self.assertIn("第一章 (测试)", ass)
+        self.assertNotIn("{测试}", ass)
+
+
 if __name__ == "__main__":
     unittest.main()

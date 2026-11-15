@@ -313,17 +313,38 @@ def format_ass_ts(sec):
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
+def _escape_ass(text):
+    """ASS 文本转义：换行压成空格，大括号会被当成覆盖标签。"""
+    return str(text).replace("\n", " ").replace("{", "(").replace("}", ")")
+
+
 def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
-              margin_v=None, strip=STRIP_CHARS):
-    """生成 ASS 字幕（白字黑描边，底部居中）。
+              margin_v=None, strip=STRIP_CHARS, chapter_label=None,
+              chapter_size=None, chapter_top=None, total_duration=None):
+    """生成 ASS 字幕（白字黑描边，底部居中）+ 右上角章节标签。
 
     字号/边距按画布高度比例给默认值：竖屏 1920 高约 77px 字、MarginV 100；
     横屏 1080 高约 43px 字、MarginV 56。strip 里的标点不进画面。
+    chapter_label 非空时在右上角（Alignment=9）加一行浅灰小字，常驻全片。
     """
     font_size = font_size or max(28, round(height * 0.040))
     margin_v = margin_v if margin_v is not None else round(height * 0.052)
     outline = max(2, round(font_size * 0.075))
     margin_h = round(width * 0.03)
+    chapter_size = chapter_size or max(18, round(height * 0.021))
+    chapter_top = chapter_top if chapter_top is not None else round(height * 0.006)
+    styles = (
+        f"Style: Default,{font},{font_size},&H00FFFFFF,&H00FFFFFF,"
+        f"&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,{outline},0,2,"
+        f"{margin_h},{margin_h},{margin_v},1\n"
+    )
+    if chapter_label:
+        # 浅灰（&H00999999）、不加粗、无描边，压在顶部留白里不抢画面
+        styles += (
+            f"Style: Chapter,{font},{chapter_size},&H00999999,&H00999999,"
+            f"&H00FFFFFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,9,"
+            f"{margin_h},{margin_h},{chapter_top},1\n"
+        )
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -338,21 +359,24 @@ def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{font},{font_size},&H00FFFFFF,&H00FFFFFF,"
-        f"&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,{outline},0,2,"
-        f"{margin_h},{margin_h},{margin_v},1\n"
+        + styles +
         "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
         "Effect, Text\n"
     )
     lines = []
+    if chapter_label:
+        end = total_duration if total_duration else (cues[-1]["end"] if cues else 0)
+        lines.append(
+            f"Dialogue: 1,{format_ass_ts(0)},{format_ass_ts(end)},Chapter,,"
+            f"0,0,0,,{_escape_ass(chapter_label)}"
+        )
     for cue in cues:
         text = clean_display(cue["text"], strip)
-        text = text.replace("\n", " ").replace("{", "(").replace("}", ")")
         lines.append(
             f"Dialogue: 0,{format_ass_ts(cue['start'])},"
-            f"{format_ass_ts(cue['end'])},Default,,0,0,0,,{text}"
+            f"{format_ass_ts(cue['end'])},Default,,0,0,0,,{_escape_ass(text)}"
         )
     return header + "\n".join(lines) + "\n"
 

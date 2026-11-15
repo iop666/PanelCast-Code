@@ -195,12 +195,52 @@ def plan_page_windows(timeline, snap=SNAP_WINDOW, min_dwell=MIN_DWELL,
         if i == n - 1:
             dur = round(total - sum(d for _, d in entries), 3)
         entries.append((page, dur))
+
+    # 末页吸收余量 + 吸附都可能把某一页顶过上限（实测第二章末页 18.4s）。
+    # 上限是 S9 第 12 条的硬指标，所以这里按容量把超出的部分摊回其他页，
+    # 代价是这些页的切点不再贴句子边界——宁可少一次吸附，不留一页死等。
+    if any(d > max_dwell for _, d in entries) and nominal <= max_dwell:
+        fixed = _cap_dwell([d for _, d in entries], total, min_dwell, max_dwell)
+        entries = [(page, dur) for (page, _), dur in zip(entries, fixed)]
+
     drift = abs(round(sum(d for _, d in entries), 3) - total)
     if drift >= 0.05:
         raise RuntimeError(
             f"error: balanced page windows drift {drift:.3f}s from timeline"
         )
     return entries
+
+
+def _cap_dwell(durs, total, min_dwell, max_dwell, rounds=6):
+    """把每页停留压进 [min_dwell, max_dwell]，总长保持不变。
+
+    先把超限的削到上限、不足的抬到下限，再把缺口按"剩余容量"摊回去；
+    容量不够时下一轮继续摊，最多 rounds 轮。摊不平就返回当前结果，
+    由调用方的 drift 检查如实报错，不静默改总长。
+    """
+    n = len(durs)
+    capped = [min(max(d, min_dwell), max_dwell) for d in durs]
+    for _ in range(rounds):
+        deficit = total - sum(capped)
+        if abs(deficit) < 1e-6:
+            break
+        if deficit > 0:
+            room = [max(0.0, max_dwell - d) for d in capped]
+            capacity = sum(room)
+            if capacity <= 1e-9:
+                break
+            for i in range(n):
+                capped[i] += deficit * room[i] / capacity
+        else:
+            slack = [max(0.0, d - min_dwell) for d in capped]
+            capacity = sum(slack)
+            if capacity <= 1e-9:
+                break
+            for i in range(n):
+                capped[i] -= (-deficit) * slack[i] / capacity
+    capped = [round(d, 3) for d in capped]
+    capped[-1] = round(total - sum(capped[:-1]), 3)
+    return capped
 
 
 def format_ts(sec):

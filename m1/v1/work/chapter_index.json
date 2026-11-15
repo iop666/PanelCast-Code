@@ -37,12 +37,22 @@
       "title": "替华美的高阶职业带来愉悦！",
       "label_zh": "第二章 替华美的高阶职业带来愉悦！",
       "start_page": 45,
-      "end_page": 102,
-      "page_count": 58,
+      "end_page": 74,
+      "page_count": 30,
       "confirmed": true
     },
     {
       "id": "ch03",
+      "number": "第三章",
+      "title": "让不死生物获得安息！",
+      "label_zh": "第三章 让不死生物获得安息！",
+      "start_page": 75,
+      "end_page": 102,
+      "page_count": 28,
+      "confirmed": true
+    },
+    {
+      "id": "ch04",
       "number": "第四章",
       "title": "让爆裂之道获得指引！",
       "label_zh": "第四章 让爆裂之道获得指引！",
@@ -52,7 +62,7 @@
       "confirmed": true
     },
     {
-      "id": "ch04",
+      "id": "ch05",
       "number": "第五章",
       "title": "让可怜的女神获得救济！",
       "label_zh": "第五章 让可怜的女神获得救济！",

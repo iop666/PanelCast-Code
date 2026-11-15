@@ -58,7 +58,12 @@ def sheet(pages_dir, first, last, out, cols=2, cell=None):
         cells = "".join(f"[p{r * cols + c}]" for c in range(cols))
         parts.append(f"{cells}hstack=inputs={cols}[r{r}]")
         layout_rows.append(f"[r{r}]")
-    parts.append(f"{''.join(layout_rows)}vstack=inputs={rows}[out]")
+    joined = "".join(layout_rows)
+    if rows == 1:
+        # vstack 至少需要 2 路输入；单行时直接把唯一那行当输出
+        parts.append(f"{joined}null[out]")
+    else:
+        parts.append(f"{joined}vstack=inputs={rows}[out]")
     cmd = [str(ffmpeg), "-v", "error", "-y", *inputs,
            "-filter_complex", ";".join(parts), "-map", "[out]",
            "-frames:v", "1", "-q:v", "3", str(out)]

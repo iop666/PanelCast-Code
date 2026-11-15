@@ -5,6 +5,7 @@ import unittest
 from panelcast.timeline import (
     MAX_DWELL,
     MIN_DWELL,
+    _cap_dwell,
     page_entries,
     plan_page_windows,
 )
@@ -100,6 +101,44 @@ class TestBalancedWindows(unittest.TestCase):
         old = [d for _, d in page_entries(tl)]
         new = [d for _, d in plan_page_windows(tl)]
         self.assertGreater(max(old) - min(old), max(new) - min(new))
+
+
+class TestDwellCeiling(unittest.TestCase):
+    """上限是 S9 第 12 条的硬指标：末页吸收余量也不许顶破。"""
+
+    def test_tail_page_does_not_exceed_ceiling(self):
+        # 3 页 50 秒：均分 16.7，但末页会吸收吸附留下的余量
+        tl = timeline_of([(50.0, ["p1", "p2", "p3"], None)])
+        durs = [d for _, d in plan_page_windows(tl)]
+        self.assertLessEqual(max(durs), MAX_DWELL)
+
+    def test_total_length_is_preserved_after_capping(self):
+        tl = timeline_of([(50.0, ["p1", "p2", "p3"], None)])
+        entries = plan_page_windows(tl)
+        self.assertAlmostEqual(sum(d for _, d in entries), 50.0, places=2)
+
+    def test_every_page_stays_above_floor(self):
+        tl = timeline_of([(9.0, ["p1", "p2"], None)])
+        durs = [d for _, d in plan_page_windows(tl)]
+        self.assertGreaterEqual(min(durs), MIN_DWELL - 1e-9)
+
+    def test_cap_dwell_redistributes_without_changing_total(self):
+        fixed = _cap_dwell([2.0, 30.0, 8.0], total=40.0,
+                           min_dwell=3.5, max_dwell=18.0)
+        self.assertAlmostEqual(sum(fixed), 40.0, places=3)
+        self.assertLessEqual(max(fixed), 18.0 + 1e-6)
+        self.assertGreaterEqual(min(fixed), 3.5 - 1e-6)
+
+    def test_cap_dwell_is_identity_when_already_in_range(self):
+        self.assertEqual(_cap_dwell([10.0, 12.0], 22.0, 3.5, 18.0),
+                         [10.0, 12.0])
+
+    def test_impossible_ceiling_is_left_visible(self):
+        """3 页 90 秒均分 30 > 上限：代码不硬压，交给 S9 报出来。"""
+        tl = timeline_of([(90.0, ["p1", "p2", "p3"], None)])
+        durs = [d for _, d in plan_page_windows(tl)]
+        self.assertGreater(max(durs), MAX_DWELL)
+        self.assertAlmostEqual(sum(durs), 90.0, places=2)
 
 
 if __name__ == "__main__":

@@ -14,17 +14,28 @@
 import subprocess
 from pathlib import Path
 
-from .timeline import build_srt, page_entries, write_text_atomic
+from .timeline import (
+    build_ass,
+    build_cues,
+    build_srt_from_cues,
+    page_entries,
+    write_text_atomic,
+)
 
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 1920, 1080
-FIT_MODES = ("letterbox", "cover")
+FIT_MODES = ("letterbox", "cover", "blurpad")
+# blurpad：底部留给字幕的带状区域（占画布高度比例）与四周边距（像素）
+SUBTITLE_BAND_RATIO = 0.19
+BLURPAD_MARGIN = 18
 
 
-def fit_filter(width, height, fit="letterbox"):
+def fit_filter(width, height, fit="letterbox", band=0, margin=0):
     """构造 ffmpeg 缩放滤镜。
 
     letterbox: 整页可见，四周补白（信息完整，但画面填不满）。
-    cover:     铺满画布，超出部分居中裁掉（填满画面，边缘可能被裁）。
+    cover:     铺满画布，超出部分居中裁掉（填满画面，边缘会被裁）。
+    blurpad:   整页缩小放入画面（不裁切），四周用同页模糊放大版填充；
+               底部预留字幕带，适合竖屏。
     """
     if fit not in FIT_MODES:
         raise RuntimeError(f"error: unknown fit mode {fit!r}, want {FIT_MODES}")
@@ -33,15 +44,26 @@ def fit_filter(width, height, fit="letterbox"):
             f"scale={width}:{height}:force_original_aspect_ratio=increase,"
             f"crop={width}:{height}"
         )
+    if fit == "blurpad":
+        fg_h = height - band - margin * 2
+        if fg_h <= 0:
+            raise RuntimeError(f"error: subtitle band {band} too tall for {height}")
+        return (
+            f"split=2[bg][fg];"
+            f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height},gblur=sigma=36,eq=brightness=-0.10[bgb];"
+            f"[fg]scale={width}:{fg_h}:force_original_aspect_ratio=decrease[fgs];"
+            f"[bgb][fgs]overlay=(W-w)/2:{margin}"
+        )
     return (
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=white"
     )
 
 
-def _run(cmd, what):
+def _run(cmd, what, cwd=None):
     out = subprocess.run([str(c) for c in cmd], capture_output=True, text=True,
-                         timeout=600)
+                         timeout=600, cwd=cwd)
     if out.returncode != 0:
         raise RuntimeError(
             f"error: {what} failed: {(out.stderr or out.stdout).strip()[:400]}"
@@ -50,23 +72,39 @@ def _run(cmd, what):
 
 
 def prepare_frames(ffmpeg, work, pages_seq, width=DEFAULT_WIDTH,
-                   height=DEFAULT_HEIGHT, fit="letterbox"):
+                   height=DEFAULT_HEIGHT, fit="letterbox", ffprobe=None,
+                   trim=True):
     """每个出场页生成目标画布的 PNG（重复页只做一次）。
 
     缓存按 <宽>x<高>-<fit> 分目录，切换画布/填充方式不会误用旧帧。
+    trim=True 时先自动裁掉页面四周的纯色扫描边（黑边/白边），再缩放。
     """
     frames_dir = Path(work) / "cache" / "frames" / f"{width}x{height}-{fit}"
     frames_dir.mkdir(parents=True, exist_ok=True)
-    vf = fit_filter(width, height, fit)
+    band = round(height * SUBTITLE_BAND_RATIO) if fit == "blurpad" else 0
+    margin = BLURPAD_MARGIN if fit == "blurpad" else 0
+    base_vf = fit_filter(width, height, fit, band=band, margin=margin)
     for page in dict.fromkeys(pages_seq):  # 保序去重
         src = Path(work) / "pages" / f"{page}.jpg"
         dst = frames_dir / f"{page}.png"
         if dst.exists() and dst.stat().st_size > 0:
             continue
+        vf = base_vf
+        if trim and ffprobe is not None:
+            from .panels import detect_content_box
+            x, y, cw, ch = detect_content_box(ffmpeg, ffprobe, src)
+            full = probe_size_cached(ffprobe, src)
+            if (cw, ch) != full:
+                vf = f"crop={cw}:{ch}:{x}:{y},{base_vf}"
         _run([ffmpeg, "-v", "error", "-y", "-i", src,
               "-vf", vf, "-frames:v", "1", dst],
              f"{fit} {page}")
     return frames_dir
+
+
+def probe_size_cached(ffprobe, path):
+    from .panels import probe_size
+    return probe_size(ffprobe, path)
 
 
 def build_ffconcat(entries, frames_dir):
@@ -123,8 +161,9 @@ def probe_video(ffprobe, path):
 
 
 def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
-           width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fit="letterbox"):
-    """timeline → sample.mp4 + sample.srt。失败抛 RuntimeError（一行 error:）。"""
+           width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fit="letterbox",
+           burn_subs=True):
+    """timeline → sample.mp4 + sample.srt + sample.ass。失败抛 RuntimeError。"""
     from .panels import find_ffmpeg, find_ffprobe
     ffmpeg = ffmpeg or find_ffmpeg()
     ffprobe = ffprobe or find_ffprobe()
@@ -141,7 +180,8 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
 
     entries = page_entries(timeline)
     frames_dir = prepare_frames(ffmpeg, work, [p for p, _ in entries],
-                                width=width, height=height, fit=fit)
+                                width=width, height=height, fit=fit,
+                                ffprobe=ffprobe)
     ffconcat = build_ffconcat(entries, frames_dir)
     write_text_atomic(frames_dir / "video.ffconcat", ffconcat)
 
@@ -153,16 +193,25 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
     concat_audio(ffmpeg, seg_wavs, audio_concat)
 
     mp4 = out / "sample.mp4"
-    # 时长以音频为准：显式 -t 硬切（任务书 S5 允许 -shortest 或显式 -t）
+    vf = []
+    if burn_subs:
+        ass_path = out / "sample.ass"
+        write_text_atomic(ass_path, build_ass(build_cues(timeline),
+                                              width, height))
+        # 用 cwd=out + 相对文件名，避免 Windows 盘符在滤镜参数里被当成分隔符
+        vf = ["-vf", f"ass={ass_path.name}"]
+    # cwd=out 时所有输入路径必须是绝对路径，否则会被解析到 out 目录下
     _run([ffmpeg, "-v", "error", "-y",
-          "-f", "concat", "-safe", "0", "-i", str(frames_dir / "video.ffconcat"),
-          "-i", str(audio_concat),
+          "-f", "concat", "-safe", "0",
+          "-i", str((frames_dir / "video.ffconcat").resolve()),
+          "-i", str(audio_concat.resolve()),
           "-map", "0:v:0", "-map", "1:a:0",
+          *vf,
           "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-r", "30",
           "-c:a", "aac", "-b:a", "160k",
           "-t", f"{timeline['total_duration']:.3f}",
-          "-movflags", "+faststart", str(mp4)],
-         "video render")
+          "-movflags", "+faststart", str(mp4.resolve())],
+         "video render", cwd=out if burn_subs else None)
 
     info = probe_video(ffprobe, mp4)
     if (info["width"], info["height"]) != (width, height):
@@ -179,5 +228,6 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
             f"timeline {timeline['total_duration']:.3f}s by {drift:.3f}s"
         )
 
-    write_text_atomic(out / "sample.srt", build_srt(timeline))
+    write_text_atomic(out / "sample.srt",
+                      build_srt_from_cues(build_cues(timeline)))
     return info

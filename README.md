@@ -118,20 +118,22 @@ python -m panelcast m1 run    --work m1/work --out m1/out   # S6 闭环：确认
 `m1 run` 的画布与配音可配：
 
 ```bash
-# 竖屏 9:16，整页铺满画面（超出居中裁切），云希音色，1.2 倍速
-python -m panelcast m1 run --size 1080x1920 --fit cover \
-    --voice zh-CN-YunxiNeural --rate "+20%"
+# 竖屏 9:16：整页缩小 + 模糊背景填充 + 底部字幕带，云希音色，1.2 倍速
+python -m panelcast m1 run --size 1080x1920 --fit blurpad \
+    --voice zh-CN-YunxiNeural --rate "+20%" --subs burn
 ```
 
 | 参数 | 取值 | 说明 |
 | --- | --- | --- |
 | `--size` | `WIDTHxHEIGHT` | 默认 `1920x1080`；竖屏用 `1080x1920` |
-| `--fit` | `letterbox` / `cover` | 默认 `letterbox`（整页可见、四周留白）；`cover` 铺满画布并居中裁切 |
+| `--fit` | `letterbox` / `cover` / `blurpad` | `letterbox` 整页可见但四周留白；`cover` 铺满并居中裁切（会切内容）；`blurpad` 整页缩小 + 同页模糊背景填充 + 底部字幕带（竖屏推荐） |
+| `--subs` | `burn` / `none` | 默认 `burn`：白字黑描边烧进画面；`none` 只输出 `srt` / `ass` |
 | `--voice` | edge-tts 音色名 | 默认 `zh-CN-XiaoxiaoNeural`；男声少年音 `zh-CN-YunxiNeural` |
 | `--rate` | 如 `+20%` | edge-tts 语速；SAPI5 回退时忽略 |
 
 > `--rate "+20%"` 是 SSML 语速参数，实测时长变化约 1.24 倍（非严格线性）。
 > 帧缓存按 `<宽>x<高>-<fit>` 分目录，换画布不会误用旧帧。
+> 字幕按标点切成 ≤16 字的单行，段内按字数占比切分该段**真实时长**（总时长不变）。
 
 - 讲稿放在 `m1/work/script.json`（段 → 文本 + 页面 1–3 页）；
 - TTS 优先 edge-tts（已装且联网），否则 Windows SAPI5（Microsoft Huihui Desktop）；

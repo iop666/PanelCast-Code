@@ -5,11 +5,14 @@ import unittest
 from pathlib import Path
 
 from panelcast.timeline import (
+    build_ass,
+    build_cues,
     build_srt,
     build_timeline,
     format_ts,
     load_script,
     page_entries,
+    split_cues,
 )
 
 BACKEND = {
@@ -88,6 +91,42 @@ class TestBuildTimeline(unittest.TestCase):
                 '"pages": ["page_0099"]}]}', encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 load_script(work, {"page_0005"})
+
+
+class TestSubtitleCues(unittest.TestCase):
+    """字幕分句：不出现 2 字闪屏、不切碎词、时长严格覆盖原段。"""
+
+    def test_no_tiny_flash_chunks(self):
+        text = "落地的地方，是一座被城墙环抱的城镇：红瓦屋顶连绵成片，街上走着尖耳朵的精灵、兽耳的亚人。"
+        cues = split_cues(text)
+        self.assertTrue(cues)
+        self.assertGreaterEqual(min(len(c) for c in cues), 6)
+        self.assertLessEqual(max(len(c) for c in cues), 16)
+        self.assertEqual("".join(cues), text)      # 不丢字、不重复
+
+    def test_long_token_split_balanced(self):
+        # 19 字无标点词块 → 均衡切 10+9，而不是 16+3
+        cues = split_cues("把家里蹲少年佐藤和真一起拽进了异世界")
+        self.assertEqual(len(cues), 2)
+        self.assertLessEqual(abs(len(cues[0]) - len(cues[1])), 2)
+
+    def test_cues_cover_segment_duration_exactly(self):
+        timeline = {"segments": [{
+            "id": "seg_0001", "text": "第一句话。第二句话，第三句话。",
+            "start": 1.5, "end": 7.5, "duration": 6.0,
+        }]}
+        cues = build_cues(timeline)
+        self.assertAlmostEqual(cues[0]["start"], 1.5)
+        self.assertAlmostEqual(cues[-1]["end"], 7.5)
+        for a, b in zip(cues, cues[1:]):            # 无缝衔接
+            self.assertAlmostEqual(a["end"], b["start"])
+
+    def test_ass_has_outline_and_bottom_alignment(self):
+        ass = build_ass([{"start": 0, "end": 1, "text": "测试"}], 1080, 1920)
+        self.assertIn("PlayResY: 1920", ass)
+        self.assertIn("&H00000000", ass)            # 黑色描边色
+        self.assertIn(",1,", ass)                   # BorderStyle=1 描边
+        self.assertIn("Dialogue: 0,0:00:00.00,0:00:01.00,Default", ass)
 
 
 if __name__ == "__main__":

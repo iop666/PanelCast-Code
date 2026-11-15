@@ -163,7 +163,10 @@ def cache_key(text, backend, voice, rate):
 
 
 def _load_index(cache_dir):
-    path = cache_dir / "tts_index.json"
+    # v2：音频按内容哈希存到 cache/tts/<key>.wav。v1 把音频直接写成
+    # audio/seg_XXXX.wav，换 voice/rate 后同名文件被覆盖、旧索引仍指向它，
+    # 会命中到**别的语速**的音频，故废弃旧索引。
+    path = cache_dir / "tts_index_v2.json"
     if path.exists():
         try:
             return json.loads(path.read_text(encoding="utf-8")), path
@@ -196,6 +199,8 @@ def synth_segments(work_dir, script, backend_info, ffmpeg=None):
     audio_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
     index, index_path = _load_index(cache_dir)
+    tts_cache_dir = cache_dir / "tts"
+    tts_cache_dir.mkdir(parents=True, exist_ok=True)
     backend, voice, rate = (
         backend_info["backend"], backend_info["voice"], backend_info["rate"]
     )
@@ -209,30 +214,33 @@ def synth_segments(work_dir, script, backend_info, ffmpeg=None):
         key = cache_key(text, backend, voice, rate)
         entry = index.get(key)
         target = audio_dir / f"{seg_id}.wav"
+        # 内容寻址：同一个 key 永远对应同一个文件，不会被别的语速覆盖
+        cached = tts_cache_dir / f"{key}.wav"
         if entry and entry.get("file"):
-            cached = audio_dir / entry["file"]
+            cached = cache_dir / entry["file"]
             if cached.exists() and cached.stat().st_size > 44:
                 duration = wav_duration(cached)
-                if not target.exists() or target.resolve() != cached.resolve():
+                if not target.exists() or target.read_bytes() != cached.read_bytes():
                     _copy_atomic(cached, target)
                 results.append({
                     "id": seg_id, "text": text, "file": target,
                     "duration": duration, "cached": True,
                 })
                 continue
-        # 未命中 → 真实合成
+        # 未命中 → 真实合成到缓存路径，再复制到本次运行的工作文件名
         if backend.startswith("edge-tts:"):
-            _edge_synthesize(text, voice, target, ffmpeg or _lazy_ffmpeg(),
+            _edge_synthesize(text, voice, cached, ffmpeg or _lazy_ffmpeg(),
                              rate=str(rate))
         else:
-            _sapi_synthesize(text, voice, rate, target)
-        if not target.exists() or target.stat().st_size <= 44:
+            _sapi_synthesize(text, voice, rate, cached)
+        if not cached.exists() or cached.stat().st_size <= 44:
             raise RuntimeError(f"error: synthesis produced no audio for {seg_id}")
-        duration = wav_duration(target)
+        duration = wav_duration(cached)
         if duration <= 0:
             raise RuntimeError(f"error: zero-length audio for {seg_id}")
+        _copy_atomic(cached, target)
         index[key] = {
-            "file": target.name,
+            "file": f"tts/{key}.wav",
             "duration": round(duration, 3),
             "backend": backend,
             "voice": voice,

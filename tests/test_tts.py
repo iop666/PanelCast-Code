@@ -1,5 +1,6 @@
 """tts.py 单元测试：WAV 头真实时长、缓存键稳定性、缓存命中与局部重算。"""
 
+import json
 import struct
 import tempfile
 import unittest
@@ -61,8 +62,13 @@ class TestSynthSegments(unittest.TestCase):
 
         def fake_synth(text, voice, rate, out_path):
             self.calls.append(text)
-            # 内容随文本变化，以便断言"改文本 → 音频字节变化"
-            _write_wav(out_path, seconds=0.5, rate=8000, fill=text)
+            # 时长随 rate 变化，以便断言"换语速 → 音频不同"
+            try:
+                pct = int(str(rate).strip("%+"))
+            except ValueError:
+                pct = 0
+            _write_wav(out_path, seconds=round(0.5 * 100 / (100 + pct), 3),
+                       rate=8000, fill=text)
 
         tts._sapi_synthesize = fake_synth
         self.addCleanup(setattr, tts, "_sapi_synthesize", self._orig)
@@ -101,10 +107,28 @@ class TestSynthSegments(unittest.TestCase):
         self.assertNotEqual(
             (self.work / "audio" / "seg_0002.wav").read_bytes(), bytes_1
         )
-        # 索引已落盘
-        index = (self.work / "cache" / "tts_index.json").read_text(encoding="utf-8")
-        self.assertIn("seg_0001.wav", index)
-        self.assertIn("seg_0002.wav", index)
+        # 索引已落盘，且音频按内容哈希存放（换语速不会互相覆盖）
+        index = (self.work / "cache" / "tts_index_v2.json").read_text(
+            encoding="utf-8")
+        self.assertIn("tts/", index)
+        self.assertEqual(len(json.loads(index)), 3)   # 第一段 / 第二段 / 第二段改
+        self.assertEqual(len(list((self.work / "cache" / "tts").glob("*.wav"))), 3)
+
+    def test_switching_rate_does_not_reuse_other_rates_audio(self):
+        """回归：换 rate 再换回来，必须拿到该 rate 自己的音频，不能串味。"""
+        script = self._script(["第一段"])
+        slow = dict(BACKEND, rate="+0%")
+        fast = dict(BACKEND, rate="+30%")
+
+        a = tts.synth_segments(self.work, script, slow)[0]
+        b = tts.synth_segments(self.work, script, fast)[0]
+        self.assertNotEqual(a["duration"], b["duration"])  # 假实现按 rate 区分
+
+        # 再切回 +0%：必须命中 +0% 的内容，而不是刚写的 +30%
+        c = tts.synth_segments(self.work, script, slow)[0]
+        self.assertTrue(c["cached"])
+        self.assertEqual(c["duration"], a["duration"])
+        self.assertNotEqual(c["duration"], b["duration"])
 
     def test_empty_text_rejected(self):
         with self.assertRaises(RuntimeError):

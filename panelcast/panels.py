@@ -108,6 +108,42 @@ def decode_gray(ffmpeg, path, w, h):
     return out.stdout
 
 
+def detect_content_box(ffmpeg, ffprobe, path, threshold=20):
+    """检测页面四周的纯色边（扫描黑边/白边），返回建议裁切框 (x, y, w, h)。
+
+    逐行/逐列看灰度极差：极差 < threshold 视为纯色边。只裁真正贴边的纯色带，
+    且裁完不得小于原尺寸的 60%（否则判定为误检，返回整页）。
+    """
+    w, h = probe_size(ffprobe, path)
+    gray = decode_gray(ffmpeg, path, w, h)
+
+    def row_spread(y):
+        row = gray[y * w:(y + 1) * w]
+        return max(row) - min(row)
+
+    def col_spread(x):
+        col = gray[x::w]
+        return max(col) - min(col)
+
+    top = 0
+    while top < h - 1 and row_spread(top) < threshold:
+        top += 1
+    bottom = h - 1
+    while bottom > top and row_spread(bottom) < threshold:
+        bottom -= 1
+    left = 0
+    while left < w - 1 and col_spread(left) < threshold:
+        left += 1
+    right = w - 1
+    while right > left and col_spread(right) < threshold:
+        right -= 1
+
+    cw, ch = right - left + 1, bottom - top + 1
+    if cw < w * 0.6 or ch < h * 0.6:      # 误检保护：别把整页裁没了
+        return 0, 0, w, h
+    return left, top, cw, ch
+
+
 def _hist256(gray):
     """灰度直方图（256 次 C 级 bytes.count 扫描）。"""
     return [gray.count(v) for v in range(256)]

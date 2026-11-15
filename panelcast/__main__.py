@@ -231,11 +231,13 @@ def _m1_run(args):
     )
     width, height = _parse_size(getattr(args, "size", None))
     fit = getattr(args, "fit", "letterbox")
+    burn = getattr(args, "subs", "burn") == "burn"
     info = render(work, out, timeline, ffmpeg=ffmpeg,
-                  width=width, height=height, fit=fit)
+                  width=width, height=height, fit=fit, burn_subs=burn)
     print(
         f"render: {info['width']}x{info['height']} {info['fps']}fps "
-        f"{info['duration']:.1f}s fit={fit} -> {out / 'sample.mp4'} (+ sample.srt)"
+        f"{info['duration']:.1f}s fit={fit} subs={'burn' if burn else 'none'} "
+        f"-> {out / 'sample.mp4'} (+ sample.srt/ass)"
     )
     return 0
 
@@ -301,8 +303,13 @@ def main(argv=None):
         help="画布尺寸 WIDTHxHEIGHT，如 1080x1920（竖屏）；默认 1920x1080",
     )
     m1run.add_argument(
-        "--fit", default="letterbox", choices=["letterbox", "cover"],
-        help="letterbox=整页可见留白；cover=铺满裁切（竖屏填满用 cover）",
+        "--fit", default="letterbox", choices=["letterbox", "cover", "blurpad"],
+        help="letterbox=整页可见留白；cover=铺满裁切；"
+             "blurpad=缩小整页+模糊背景填充+底部字幕带（竖屏推荐）",
+    )
+    m1run.add_argument(
+        "--subs", default="burn", choices=["burn", "none"],
+        help="burn=把字幕烧进画面（白字黑描边）；none=只出 srt/ass 文件",
     )
     args = parser.parse_args(argv)
     if args.command == "ingest":

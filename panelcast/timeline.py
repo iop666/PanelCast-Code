@@ -125,7 +125,7 @@ def format_ts(sec):
 
 
 def build_srt(timeline):
-    """一段一条字幕。"""
+    """一段一条字幕（供外部播放器用，不烧进画面）。"""
     blocks = []
     for i, seg in enumerate(timeline["segments"], 1):
         blocks.append(
@@ -133,6 +133,144 @@ def build_srt(timeline):
             f"{seg['text']}\n"
         )
     return "\n".join(blocks)
+
+
+_SENT_END = "。！？…；"
+_SOFT_BREAK = "，、：—"
+
+
+def _tokens(text):
+    """按标点切成词块（标点跟随前块）。"""
+    toks, buf = [], ""
+    for ch in text:
+        buf += ch
+        if ch in _SENT_END or ch in _SOFT_BREAK:
+            toks.append(buf)
+            buf = ""
+    if buf:
+        toks.append(buf)
+    return toks
+
+
+def split_cues(text, max_chars=16, min_chars=6):
+    """把一段长文本切成适合单行显示的短句。
+
+    先按标点切词块，再贪心打包到 <= max_chars；过长的词块硬切；过短的尾块
+    并入前一块。目标是让每条字幕长度接近，避免 2 个字闪 0.3 秒那种跳字。
+    仅用于**字幕分行**，不改变任何时长计算。
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+
+    pieces = []
+    for tok in _tokens(text):
+        if len(tok) <= max_chars:
+            pieces.append(tok)
+            continue
+        # 超长词块均衡切分（而非切满 max_chars 留个 3 字尾巴）
+        n = -(-len(tok) // max_chars)
+        size = -(-len(tok) // n)
+        pieces.extend(tok[i:i + size] for i in range(0, len(tok), size))
+
+    chunks, cur = [], ""
+    for p in pieces:
+        if cur and len(cur) + len(p) > max_chars:
+            chunks.append(cur)
+            cur = p
+        else:
+            cur += p
+    if cur:
+        chunks.append(cur)
+
+    merged = []
+    for c in chunks:                          # 短块并入前块，减少闪烁
+        if merged and len(c) < min_chars and len(merged[-1]) + len(c) <= max_chars + 4:
+            merged[-1] += c
+        else:
+            merged.append(c)
+    return merged
+
+
+def build_cues(timeline, max_chars=16):
+    """段 → 字幕条：段内按字符占比切分该段真实时长（不改总时长）。"""
+    cues = []
+    for seg in timeline["segments"]:
+        parts = split_cues(seg["text"], max_chars=max_chars)
+        if not parts:
+            continue
+        total = sum(len(p) for p in parts)
+        start = seg["start"]
+        for i, part in enumerate(parts):
+            if i == len(parts) - 1:
+                end = seg["end"]          # 末条吃余数，保证无缝衔接
+            else:
+                end = start + seg["duration"] * len(part) / total
+            cues.append({"start": start, "end": end, "text": part})
+            start = end
+    return cues
+
+
+def build_srt_from_cues(cues):
+    """字幕条 → SRT（与烧进画面的分行一致，供外部播放器用）。"""
+    blocks = []
+    for i, cue in enumerate(cues, 1):
+        blocks.append(
+            f"{i}\n{format_ts(cue['start'])} --> {format_ts(cue['end'])}\n"
+            f"{cue['text']}\n"
+        )
+    return "\n".join(blocks)
+
+
+def format_ass_ts(sec):
+    """ASS 时间戳 H:MM:SS.cc。"""
+    cs = int(round(sec * 100))
+    h, rem = divmod(cs, 360_000)
+    m, rem = divmod(rem, 6_000)
+    s, cs = divmod(rem, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def build_ass(cues, width, height, font="Microsoft YaHei", font_size=None,
+              margin_v=None):
+    """生成 ASS 字幕（白字黑描边，底部居中）。
+
+    字号/边距按画布高度比例给默认值：竖屏 1920 高约 62px 字、MarginV 150；
+    横屏 1080 高约 44px 字、MarginV 60。
+    """
+    font_size = font_size or max(28, round(height * 0.0325))
+    margin_v = margin_v or round(height * 0.075)
+    outline = max(2, round(font_size * 0.075))
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        f"PlayResX: {width}\n"
+        f"PlayResY: {height}\n"
+        "WrapStyle: 2\n"          # 不自动换行（已按字数切好）
+        "ScaledBorderAndShadow: yes\n"
+        "YCbCr Matrix: TV.709\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,{font},{font_size},&H00FFFFFF,&H00FFFFFF,"
+        f"&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,{outline},0,2,"
+        f"60,60,{margin_v},1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
+        "Effect, Text\n"
+    )
+    lines = []
+    for cue in cues:
+        text = cue["text"].replace("\n", " ").replace("{", "(").replace("}", ")")
+        lines.append(
+            f"Dialogue: 0,{format_ass_ts(cue['start'])},"
+            f"{format_ass_ts(cue['end'])},Default,,0,0,0,,{text}"
+        )
+    return header + "\n".join(lines) + "\n"
 
 
 def write_text_atomic(path, text):

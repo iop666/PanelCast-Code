@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://panelcast.local/schemas/page-profile.v1.json",
+  "title": "PanelCast page profile (v1)",
+  "description": "每页漫画的结构化介绍页。§6.3 的机器可读形式：出片门禁、素材复用检索单都以此为准。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "page", "source", "chapter", "layout",
+    "story", "text", "visual", "reuse", "provenance"
+  ],
+  "properties": {
+    "schema": {"const": "page-profile/v1"},
+    "page": {"type": "string", "pattern": "^page_[0-9]{4}$"},
+
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["series", "volume", "file", "page_index", "printed_page",
+                   "sha256", "width", "height"],
+      "properties": {
+        "series": {"type": "string", "minLength": 1},
+        "volume": {"type": "string", "minLength": 1},
+        "file": {"type": "string", "minLength": 1},
+        "page_index": {"type": "integer", "minimum": 1},
+        "printed_page": {"type": ["integer", "null"], "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      }
+    },
+
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label_zh"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ch[0-9]{2,3}$"},
+        "label_zh": {"type": "string", "minLength": 1}
+      }
+    },
+
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "is_color", "panel_count", "reading_direction",
+                   "text_density", "has_splash", "borderless"],
+      "properties": {
+        "kind": {
+          "enum": ["story", "title_page", "frontispiece", "divider",
+                   "cover", "blank", "colophon", "watermark"]
+        },
+        "is_color": {"type": "boolean"},
+        "panel_count": {"type": "integer", "minimum": 0},
+        "reading_direction": {"enum": ["rtl", "ltr"]},
+        "text_density": {"enum": ["low", "medium", "high"]},
+        "has_splash": {"type": "boolean"},
+        "borderless": {"type": "boolean"}
+      }
+    },
+
+    "story": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["beat", "summary", "characters", "location",
+                   "time_of_day", "weather", "emotion", "continuity"],
+      "properties": {
+        "beat": {
+          "enum": ["establishing", "dialogue", "reaction", "action",
+                   "exposition", "transition", "gag", "cliffhanger"]
+        },
+        "summary": {"type": "string", "minLength": 1, "maxLength": 40},
+        "characters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "role", "region", "expression"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "role": {
+                "enum": ["protagonist", "deuteragonist", "supporting",
+                         "antagonist", "unknown"]
+              },
+              "region": {
+                "enum": ["left", "right", "center", "full",
+                         "top", "bottom", "unknown"]
+              },
+              "expression": {"type": "string"}
+            }
+          }
+        },
+        "location": {"type": "string", "minLength": 1},
+        "time_of_day": {"enum": ["day", "night", "dusk", "dawn", "unknown"]},
+        "weather": {"enum": ["indoor", "clear", "rain", "snow", "unknown"]},
+        "emotion": {
+          "enum": ["comedic", "tense", "sad", "exciting", "warm",
+                   "eerie", "neutral"]
+        },
+        "continuity": {"enum": ["same_scene", "cut", "flashback", "time_skip"]}
+      }
+    },
+
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bubbles", "narration_boxes", "sfx",
+                   "verbatim_complete", "ocr_confidence"],
+      "properties": {
+        "bubbles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["speaker", "text", "region", "is_shout"],
+            "properties": {
+              "speaker": {"type": "string"},
+              "text": {"type": "string", "minLength": 1},
+              "region": {
+                "enum": ["top-left", "top-right", "center", "bottom-left",
+                         "bottom-right", "full", "unknown"]
+              },
+              "is_shout": {"type": "boolean"}
+            }
+          }
+        },
+        "narration_boxes": {"type": "array", "items": {"type": "string"}},
+        "sfx": {"type": "array", "items": {"type": "string"}},
+        "verbatim_complete": {"type": "boolean"},
+        "ocr_confidence": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shot", "composition", "key_props", "palette", "motion_hint"],
+      "properties": {
+        "shot": {
+          "enum": ["wide", "full", "medium", "closeup",
+                   "extreme_closeup", "insert", "over_shoulder"]
+        },
+        "composition": {"type": "string", "minLength": 1},
+        "key_props": {"type": "array", "items": {"type": "string"}},
+        "palette": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}
+        },
+        "motion_hint": {
+          "enum": ["static", "push_in", "pull_out", "pan_left", "pan_right",
+                   "tilt_up", "tilt_down", "shake"]
+        }
+      }
+    },
+
+    "reuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replaceable", "replace_strategy", "scene_tags",
+                   "asset_brief", "blocking_reason"],
+      "properties": {
+        "replaceable": {"type": "boolean"},
+        "replace_strategy": {
+          "enum": ["keep_original", "reuse_other_page", "stock",
+                   "generated", "text_card"]
+        },
+        "scene_tags": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "pattern": "^(indoor|outdoor|fantasy|character|meta)\\.[a-z_]+$"
+          }
+        },
+        "asset_brief": {"type": "string", "minLength": 1},
+        "blocking_reason": {"type": ["string", "null"]}
+      },
+      "if": {
+        "properties": {"replaceable": {"const": false}},
+        "required": ["replaceable"]
+      },
+      "then": {
+        "properties": {
+          "blocking_reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generated_by", "generated_at", "confidence", "reviewed"],
+      "properties": {
+        "generated_by": {"type": "string", "minLength": 1},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "reviewed": {"type": "boolean"},
+        "reviewer_notes": {"type": "string"}
+      }
+    }
+  }
+}

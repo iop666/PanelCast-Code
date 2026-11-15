@@ -62,7 +62,13 @@ def _replace_subtree(stage_path, dst):
 
 
 def cmd_ingest(args):
-    inputs = list(_iter_inputs(args.inputs or [DEFAULT_SCAN_ROOT]))
+    # Input expansion runs before any output dir / staging is created, so it
+    # gets its own guard (exit 4) instead of joining the staging try/finally.
+    try:
+        inputs = list(_iter_inputs(args.inputs or [DEFAULT_SCAN_ROOT]))
+    except OSError as exc:  # 输入路径不存在 / 无法访问 -> 4
+        print(f"error: {exc}", file=sys.stderr)
+        return 4
     epubs = [p for p in inputs if p.suffix.lower() == ".epub"]
     mobis = [p for p in inputs if p.suffix.lower() == ".mobi"]
 

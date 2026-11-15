@@ -359,6 +359,16 @@ class TestIngestCli(unittest.TestCase):
         self.assertIn("error:", err)
         self.assertNotIn("Traceback", err)
 
+    def test_missing_input_path_exits_4(self):
+        missing = self.workspace / "no-such.epub"
+
+        code, err = self.run_cli("ingest", str(missing), "-o", str(self.out))
+        self.assertEqual(code, 4)
+        self.assertIn("error:", err)
+        self.assertNotIn("Traceback", err)
+        self.assertFalse((self.out / "source_manifest.json").exists())
+        self.assertEqual(list(self.out.glob(".panelcast-stage-*")), [])
+
     def test_failure_leaves_no_staging_residue(self):
         bad = self.workspace / "bad.mobi"
         bad.write_bytes(b"\x00" * 8)

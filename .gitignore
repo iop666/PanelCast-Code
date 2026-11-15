@@ -14,6 +14,11 @@ m0/drafts/
 m1/work/pages/
 m1/work/audio/
 m1/work/cache/
+# 5-minute review build: same policy (script.json + panels tracked, media local)
+m1/test5min/work/pages/
+m1/test5min/work/audio/
+m1/test5min/work/cache/
+m1/test5min/out/
 
 # Local pipeline artifacts
 .local/

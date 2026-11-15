@@ -1,0 +1,22 @@
+# Copyright material (source books) and derived local outputs
+この素晴らしい世界に祝福を！/
+*.epub
+*.mobi
+
+# Local pipeline artifacts
+.local/
+
+# Agent workspace (local notes, memory, tool state)
+.workbuddy-ai/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# Build / render outputs
+out/
+renders/
+dist/
+*.mp4

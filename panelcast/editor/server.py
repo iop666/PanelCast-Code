@@ -1,11 +1,18 @@
-"""S2 分格人工修正编辑器：标准库 http.server，只读写 m1/work/ 下文件。
+"""S2/S3 人工修正编辑器：标准库 http.server，只读写 m1/work/ 下文件。
+
+两个标签页：
+
+- 分格（S2）：拖框确认 panels.json
+- 介绍页（S3）：校对 page profile 的语义字段
 
 路由：
 - GET  /                        → 编辑器页面（static/index.html）
-- GET  /api/pages               → 页面列表（候选数/确认状态）
+- GET  /api/pages               → 页面列表（候选数/确认状态/介绍页状态）
 - GET  /api/page/<n>/panels     → panels.json 优先，否则 candidates.json
 - POST /api/page/<n>/panels     → 保存人工确认结果（source=manual，temp+replace 原子写）
 - GET  /api/page/<n>/image      → 页面原图
+- GET  /api/page/<n>/profile    → 介绍页 + 表单枚举 + 已知人物名
+- POST /api/page/<n>/profile    → 校验后保存（reviewed=true）
 
 安全：页名只允许 [A-Za-z0-9_-]+，解析后必须仍落在 work/ 内（路径穿越一律 404）。
 启动：python -m panelcast m1 edit --work m1/work [--port 8642]
@@ -21,6 +28,52 @@ _STATIC = Path(__file__).resolve().parent / "static"
 _NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
+def _collect_enums(node, path="$", out=None):
+    """把 schema 里所有 enum 按 JSON 路径收集起来，供前端生成下拉框。
+
+    不写死枚举值：schema 改了前端自动跟上，不会出现"界面里还留着旧选项"。
+    """
+    if out is None:
+        out = {}
+    if isinstance(node, dict):
+        if isinstance(node.get("enum"), list):
+            out[path] = list(node["enum"])
+        for key, value in node.items():
+            if key == "properties":
+                for name, sub in value.items():
+                    _collect_enums(sub, f"{path}.{name}", out)
+            elif key == "items":
+                _collect_enums(value, f"{path}.items", out)
+            elif key in ("then", "else", "if"):
+                _collect_enums(value, path, out)
+            elif key in ("type", "enum", "const", "required", "pattern",
+                         "minLength", "maxLength", "minimum", "maximum",
+                         "format", "additionalProperties", "$schema", "$id",
+                         "title", "description"):
+                continue
+    return out
+
+
+def _ship_errors(doc, known_names):
+    """出片门禁的差距（占位符/未审阅），只做提示，不阻止保存草稿。"""
+    from ..profile import check_placeholders, check_shippable
+
+    return check_placeholders(doc) + check_shippable(doc)
+
+
+def _profile_state(editor, name):
+    """页面列表里的介绍页标记：none / draft / reviewed。"""
+    f = editor.profile_file(name)
+    if f is None or not f.exists():
+        return "none"
+    try:
+        doc = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "bad"
+    return "reviewed" if (doc.get("provenance") or {}).get("reviewed") else "draft"
+
+
+
 class _Editor:
     """work 目录绑定 + 请求处理（不继承 handler，便于测试）。"""
 
@@ -28,6 +81,7 @@ class _Editor:
         self.work = Path(work_dir).resolve()
         self.pages_dir = self.work / "pages"
         self.panels_dir = self.work / "panels"
+        self.profiles_dir = self.work / "profiles"
 
     # ---- 路径安全 ----
     def safe_page_dir(self, name):
@@ -63,6 +117,100 @@ class _Editor:
             return None
         return f
 
+    def profile_file(self, name):
+        if not _NAME_RE.match(name or ""):
+            return None
+        f = self.profiles_dir / f"{name}.profile.json"
+        try:
+            if f.resolve().parent != self.profiles_dir.resolve():
+                return None
+        except OSError:
+            return None
+        return f
+
+    def _read_profile(self, name):
+        f = self.profile_file(name)
+        if f is None or not f.exists():
+            return None, None
+        try:
+            return f, json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return f, None
+
+    def known_names(self):
+        """全卷出现过的说话人 + 已登记人物名。
+
+        介绍页里写的人物必须在这张表里（§6.6 不编人名）。表是跨页累计的，
+        所以同一页顺序校对时，后面页能引用前面页出现过的角色。
+        """
+        names = set()
+        if not self.profiles_dir.is_dir():
+            return []
+        for f in sorted(self.profiles_dir.glob("*.profile.json")):
+            try:
+                doc = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for b in (doc.get("text") or {}).get("bubbles") or []:
+                if b.get("speaker"):
+                    names.add(b["speaker"])
+            for c in (doc.get("story") or {}).get("characters") or []:
+                if c.get("name"):
+                    names.add(c["name"])
+        return sorted(names)
+
+    def get_profile(self, name):
+        from ..profile import load_schema
+
+        f, doc = self._read_profile(name)
+        if f is None:
+            return {"error": f"no profile dir for {name}"}, 404
+        if doc is None:
+            return {"error": f"no profile for {name}"}, 404
+        return {
+            "data": doc,
+            "enums": _collect_enums(load_schema()),
+            "known_names": self.known_names(),
+            "shippable_errors": _ship_errors(doc, self.known_names()),
+        }, 200
+
+    def save_profile(self, name, body):
+        from ..profile import check_profile, load_schema
+
+        f = self.profile_file(name)
+        if f is None:
+            return {"error": "bad page name"}, 404
+        _, doc = self._read_profile(name)
+        if doc is None:
+            return {"error": f"no profile for {name} (run m1 profile first)"}, 404
+        if not isinstance(body, dict):
+            return {"error": "malformed profile payload"}, 400
+        # 只接受可编辑的语义字段，几何/来源字段（source/layout 尺寸）由测量决定
+        for key in ("story", "text", "visual", "reuse"):
+            if key in body:
+                doc[key] = body[key]
+        if "layout" in body and isinstance(body["layout"], dict):
+            # 只允许改人工判断项，尺寸/颜色统计保持测量值
+            for key in ("kind", "has_splash", "borderless", "panel_count",
+                        "reading_direction", "text_density"):
+                if key in body["layout"]:
+                    doc.setdefault("layout", {})[key] = body["layout"][key]
+        prov = doc.setdefault("provenance", {})
+        prov["reviewed"] = True
+        prov["generated_by"] = "editor"
+        if body.get("reviewer_notes") is not None:
+            prov["reviewer_notes"] = str(body["reviewer_notes"])
+
+        errors = check_profile(doc, load_schema(), self.known_names())
+        if errors:
+            return {"error": "校验未通过", "errors": errors}, 400
+        tmp = f.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=2,
+                                  sort_keys=True), encoding="utf-8")
+        os.replace(tmp, f)
+        return {"ok": True, "reviewed": True,
+                "shippable_errors": _ship_errors(doc, self.known_names())}, 200
+
     # ---- API ----
     def list_pages(self):
         pages = []
@@ -93,6 +241,7 @@ class _Editor:
                 "manual": manual_count,
                 "confirmed": confirmed,
                 "source": source,
+                "profile": _profile_state(self, name),
             })
         return {"pages": pages}
 
@@ -229,18 +378,26 @@ def make_handler(editor):
                 if f is None or not f.exists():
                     return self._json({"error": "not found"}, 404)
                 return self._file(f, "image/jpeg")
+            m = re.match(r"^/api/page/([^/]+)/profile$", path)
+            if m:
+                data, status = editor.get_profile(m.group(1))
+                return self._json(data, status)
             self._json({"error": "not found"}, 404)
 
         def do_POST(self):
             path = self.path.split("?", 1)[0]
-            m = re.match(r"^/api/page/([^/]+)/panels$", path)
-            if not m:
-                return self._json({"error": "not found"}, 404)
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length).decode("utf-8"))
             except (OSError, ValueError):
                 return self._json({"error": "bad request body"}, 400)
+            m = re.match(r"^/api/page/([^/]+)/profile$", path)
+            if m:
+                data, status = editor.save_profile(m.group(1), body)
+                return self._json(data, status)
+            m = re.match(r"^/api/page/([^/]+)/panels$", path)
+            if not m:
+                return self._json({"error": "not found"}, 404)
             data, status = editor.save_panels(m.group(1), body)
             return self._json(data, status)
 

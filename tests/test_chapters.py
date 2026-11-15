@@ -1,15 +1,22 @@
 """S2 章节定界测试。"""
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from panelcast.chapters import (
     DIVIDER_BLANK_INK,
     DIVIDER_DARK_INK,
+    build_chapter_work,
     build_index,
+    chapter_label,
     detect_divider_starts,
+    find_chapter,
     pages_of,
     require_confirmed,
+    slice_pages,
+    write_index,
 )
 
 
@@ -179,6 +186,108 @@ class TestPagesOf(unittest.TestCase):
     def test_unknown_chapter(self):
         with self.assertRaises(RuntimeError):
             pages_of(self.index, "ch99")
+
+
+class TestFindChapter(unittest.TestCase):
+    def setUp(self):
+        self.index = build_index(rows_of([0.2] * 6), labels={
+            "chapters": [{"number": "第一章", "title": "转生", "start_page": 2},
+                         {"number": "第十章", "start_page": 5}]})
+
+    def test_lookup_by_id(self):
+        self.assertEqual(find_chapter(self.index, "ch02")["number"], "第十章")
+
+    def test_lookup_by_number(self):
+        self.assertEqual(find_chapter(self.index, "第一章")["id"], "ch01")
+
+    def test_unknown_lists_known(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            find_chapter(self.index, "第三章")
+        self.assertIn("ch01=第一章", str(ctx.exception))
+
+    def test_label_without_title_is_number_only(self):
+        self.assertEqual(chapter_label(find_chapter(self.index, "ch02")), "第十章")
+
+    def test_label_with_title_joins_both(self):
+        self.assertEqual(chapter_label(find_chapter(self.index, "ch01")),
+                         "第一章 转生")
+
+
+class TestSlicePages(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.src = root / "vol" / "pages"
+        self.dst = root / "ch" / "pages"
+        self.src.mkdir(parents=True)
+        for i in (3, 4, 5):
+            (self.src / f"page_{i:04d}.jpg").write_bytes(b"x" * 10)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_links_every_requested_page(self):
+        stats = slice_pages(self.src, self.dst,
+                            ["page_0003", "page_0004", "page_0005"])
+        self.assertEqual(stats["total"], 3)
+        self.assertEqual(stats["linked"] + stats["copied"], 3)
+        self.assertEqual(sorted(p.name for p in self.dst.glob("*.jpg")),
+                         ["page_0003.jpg", "page_0004.jpg", "page_0005.jpg"])
+
+    def test_only_requested_pages_are_sliced(self):
+        slice_pages(self.src, self.dst, ["page_0004"])
+        self.assertEqual([p.name for p in self.dst.glob("*.jpg")],
+                         ["page_0004.jpg"])
+
+    def test_rerun_reuses_existing_files(self):
+        slice_pages(self.src, self.dst, ["page_0003"])
+        stats = slice_pages(self.src, self.dst, ["page_0003"])
+        self.assertEqual(stats["reused"], 1)
+        self.assertEqual(stats["linked"] + stats["copied"], 0)
+
+    def test_missing_source_page_raises(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            slice_pages(self.src, self.dst, ["page_0009"])
+        self.assertIn("page_0009", str(ctx.exception))
+
+
+class TestBuildChapterWork(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.work = root / "vol"
+        (self.work / "pages").mkdir(parents=True)
+        for i in range(1, 8):
+            (self.work / "pages" / f"page_{i:04d}.jpg").write_bytes(b"x")
+        self.index = build_index(rows_of([0.2] * 7), labels={
+            "series": "为美好的世界献上祝福！",
+            "volume": "漫画 第1卷",
+            "chapters": [{"number": "第二章", "title": "公会", "start_page": 2},
+                         {"number": "第三章", "start_page": 5}]})
+        write_index(self.work, self.index)
+        self.out = root / "ch02"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_writes_pages_and_chapter_json(self):
+        doc, stats, path = build_chapter_work(self.work, self.index, "ch01",
+                                              self.out)
+        self.assertEqual(doc["label"], "第二章 公会")
+        self.assertEqual(stats["total"], 3)
+        self.assertTrue(path.exists())
+        self.assertEqual(len(list((self.out / "pages").glob("*.jpg"))), 3)
+
+    def test_chapter_json_roundtrips(self):
+        build_chapter_work(self.work, self.index, "ch01", self.out)
+        doc = json.loads((self.out / "chapter.json").read_text(encoding="utf-8"))
+        self.assertEqual(doc["pages"],
+                         ["page_0002", "page_0003", "page_0004"])
+        self.assertEqual(doc["start_page"], 2)
+
+    def test_does_not_copy_the_volume_script(self):
+        build_chapter_work(self.work, self.index, "ch01", self.out)
+        self.assertFalse((self.out / "script.json").exists())
 
 
 if __name__ == "__main__":

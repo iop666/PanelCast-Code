@@ -17,6 +17,8 @@
 """
 
 import json
+import os
+import shutil
 from pathlib import Path
 
 from .panels import decode_gray, find_ffmpeg, find_ffprobe, probe_size
@@ -241,3 +243,85 @@ def load_index(work_dir):
 
 def load_labels(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def find_chapter(index, key):
+    """按 id（ch02）或章节号（第二章）找一章，找不到抛错。"""
+    for ch in index["chapters"]:
+        if key in (ch["id"], ch["number"]):
+            return ch
+    known = ", ".join(f"{c['id']}={c['number']}" for c in index["chapters"])
+    raise RuntimeError(f"error: unknown chapter {key!r}; known: {known}")
+
+
+def chapter_label(ch):
+    """右上角标签文案：有标题就「第二章 标题」，没标题就只写「第十章」。"""
+    title = (ch.get("title") or "").strip()
+    return f"{ch['number']} {title}".strip()
+
+
+def slice_pages(src_pages, dst_pages, names):
+    """把一章的页面放进章级 work/pages/。
+
+    优先硬链接（同卷、零拷贝、几百 MB 不重复占盘），跨卷或文件系统不支持时
+    退回复制。已存在的同名文件直接复用——重跑不会重复搬运。
+    """
+    src_pages = Path(src_pages)
+    dst_pages = Path(dst_pages)
+    dst_pages.mkdir(parents=True, exist_ok=True)
+    linked = copied = reused = 0
+    missing = []
+    for name in names:
+        src = src_pages / f"{name}.jpg"
+        dst = dst_pages / f"{name}.jpg"
+        if not src.exists():
+            missing.append(name)
+            continue
+        if dst.exists() and dst.stat().st_size == src.stat().st_size:
+            reused += 1
+            continue
+        if dst.exists():
+            dst.unlink()
+        try:
+            os.link(src, dst)
+            linked += 1
+        except OSError:
+            shutil.copyfile(src, dst)
+            copied += 1
+    if missing:
+        raise RuntimeError(
+            f"error: {len(missing)} page(s) missing in {src_pages}: "
+            + ", ".join(missing[:5]) + ("..." if len(missing) > 5 else "")
+        )
+    return {"linked": linked, "copied": copied, "reused": reused,
+            "total": len(names)}
+
+
+def build_chapter_work(src_work, index, key, out_work):
+    """组装章级 work 目录：pages/ + chapter.json。
+
+    只搬页面，不搬 script.json——旁白要按章重写，不能从整卷脚本里切。
+    """
+    ch = find_chapter(index, key)
+    names = pages_of(index, ch["id"])
+    stats = slice_pages(Path(src_work) / "pages", Path(out_work) / "pages",
+                        names)
+    doc = {
+        "schema": "chapter-work/v1",
+        "series": index.get("series", ""),
+        "volume": index.get("volume", ""),
+        "id": ch["id"],
+        "number": ch["number"],
+        "title": ch.get("title") or "",
+        "label": chapter_label(ch),
+        "start_page": ch["start_page"],
+        "end_page": ch["end_page"],
+        "page_count": ch["page_count"],
+        "pages": names,
+        "source_work": str(src_work),
+    }
+    path = Path(out_work) / "chapter.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+    return doc, stats, path

@@ -158,6 +158,8 @@ def cmd_m1(args):
             return 0
         if args.m1_command == "chapter":
             return _m1_chapter(args)
+        if args.m1_command == "slice":
+            return _m1_slice(args)
         if args.m1_command == "profile":
             return _m1_profile(args)
         if args.m1_command == "verify":
@@ -203,6 +205,22 @@ def _m1_chapter(args):
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
             return 3
+    return 0
+
+
+def _m1_slice(args):
+    """把一章的页面组装成章级 work 目录（pages/ + chapter.json）。"""
+    from .chapters import build_chapter_work, load_index
+
+    src = Path(args.work)
+    out = Path(args.out)
+    index = load_index(src)
+    doc, stats, path = build_chapter_work(src, index, args.chapter, out)
+    print(f"{doc['id']} {doc['label']} "
+          f"p{doc['start_page']}-{doc['end_page']} ({doc['page_count']}p)")
+    print(f"pages: {stats['total']} total, {stats['linked']} linked, "
+          f"{stats['copied']} copied, {stats['reused']} reused -> {out / 'pages'}")
+    print(f"chapter -> {path}")
     return 0
 
 
@@ -265,15 +283,7 @@ def _m1_run(args):
     """S6：确认检查(缺 panels.json → 退出码 3) → TTS → timeline → render。"""
     import json as _json
 
-    from .panels import find_ffmpeg
-    from .render import render
-    from .timeline import (
-        build_srt,
-        build_timeline,
-        load_script,
-        write_text_atomic,
-    )
-    from .tts import probe_backend, synth_segments
+    from .timeline import load_script
 
     work = Path(args.work)
     out = Path(args.out)
@@ -283,6 +293,14 @@ def _m1_run(args):
     if not pages:
         print(f"error: no pages in {pages_dir}", file=sys.stderr)
         return 3
+    if getattr(args, "skip_panel_gate", False):
+        # V1 是整页渲染，分格不参与出片；批量出片时不必逐页确认分格。
+        # 一旦要做分镜级渲染，这个开关必须关掉。
+        print("panels: gate skipped (whole-page render, panels unused)")
+        confirmed = {p: None for p in pages}
+        script = load_script(work, set(confirmed))
+        return _m1_render_pipeline(args, work, out, script)
+
     missing = [p for p in pages
                if not (panels_dir / f"{p}.panels.json").exists()]
     if missing:
@@ -310,6 +328,18 @@ def _m1_run(args):
         return 3
 
     script = load_script(work, set(confirmed))
+    return _m1_render_pipeline(args, work, out, script)
+
+
+def _m1_render_pipeline(args, work, out, script):
+    """S6–S8：TTS → timeline → render。分格门禁已在上游处理。"""
+    import json as _json
+
+    from .panels import find_ffmpeg
+    from .render import render
+    from .timeline import build_timeline, write_text_atomic
+    from .tts import probe_backend, synth_segments
+
     backend = probe_backend(voice=getattr(args, "voice", None),
                             rate=getattr(args, "rate", None))
     print(f"tts: {backend['backend']} (voice={backend['voice']}, "
@@ -418,6 +448,11 @@ def main(argv=None):
         help='右上角常驻章节标签，如 "第一章 与自称是女神的家伙一起转生到异世界！"',
     )
     m1run.add_argument(
+        "--skip-panel-gate", action="store_true",
+        help="整页渲染不需要分格确认时跳过该门禁（批量出片用；"
+             "改成分镜级渲染后必须关掉）",
+    )
+    m1run.add_argument(
         "--name", default="sample",
         help="产物文件名（不含扩展名），如 第一章 -> 第一章.mp4/.srt/.ass",
     )
@@ -431,6 +466,16 @@ def main(argv=None):
     m1chapter.add_argument("--volume", default="", help="卷名，写进 index")
     m1chapter.add_argument("--require-confirmed", action="store_true",
                            help="有未确认章时退出码 3")
+
+    m1slice = m1sub.add_parser(
+        "slice", help="按章组装章级 work 目录（pages/ + chapter.json）",
+    )
+    m1slice.add_argument("--work", default="m1/work",
+                         help="卷级 work（要有 chapter_index.json 和 pages/）")
+    m1slice.add_argument("--chapter", required=True,
+                         help="章 id 或章节号，如 ch02 / 第二章")
+    m1slice.add_argument("--out", required=True,
+                         help="章级 work 目录，如 m1/v1/ch02/work")
 
     m1profile = m1sub.add_parser(
         "profile", help="S3: geometry-only page profiles (semantic fields left blank)",

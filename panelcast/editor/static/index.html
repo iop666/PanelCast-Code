@@ -46,10 +46,45 @@
   #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
            background: #333; color: #fff; padding: 6px 16px; border-radius: 4px;
            opacity: 0; transition: opacity .25s; pointer-events: none; }
+  /* ---- 标签页 ---- */
+  .tabs { display: flex; gap: 4px; }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #page-list li .pm { font-size: 11px; color: #999; margin-left: 4px; }
+  #page-list li .pm.reviewed { color: #1a8f3c; font-weight: 700; }
+  /* ---- 介绍页面板 ---- */
+  #profile-pane { flex: 1; display: flex; overflow: hidden; }
+  #profile-pane[hidden] { display: none; }
+  #pf-img-wrap { flex: 0 0 46%; overflow: auto; background: #525659; padding: 12px; }
+  #pf-img-wrap img { display: block; width: 100%; background: #fff; }
+  #pf-form { flex: 1; overflow-y: auto; padding: 10px 16px 60px; }
+  #pf-form h3 { font-size: 13px; margin: 14px 0 6px; color: #444;
+                border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .field { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .field > label { flex: 0 0 96px; font-size: 12px; color: #555; }
+  .field input[type=text], .field input[type=number], .field select, .field textarea {
+    flex: 1; padding: 3px 6px; border: 1px solid var(--line); border-radius: 3px;
+    font: inherit; font-size: 13px; }
+  .field textarea { min-height: 46px; resize: vertical; }
+  .field input[type=checkbox] { width: 16px; height: 16px; }
+  .rep { border: 1px dashed var(--line); border-radius: 4px; padding: 6px;
+         margin: 6px 0; position: relative; }
+  .rep .del { position: absolute; right: 4px; top: 2px; padding: 0 6px;
+              font-size: 11px; line-height: 16px; }
+  .addbtn { font-size: 12px; padding: 2px 8px; }
+  .pf-actions { position: sticky; bottom: 0; background: #fff; padding: 8px 0;
+                border-top: 1px solid var(--line); display: flex; gap: 10px;
+                align-items: center; }
+  .pf-note { font-size: 12px; color: #b06a00; }
+  .pf-note.ok { color: #1a8f3c; }
+  #pf-errors { color: #c0392b; font-size: 12px; white-space: pre-wrap; }
 </style>
 </head>
 <body>
 <header>
+  <div class="tabs">
+    <button id="tab-panels" class="on">分格</button>
+    <button id="tab-profile">介绍页</button>
+  </div>
   <span class="rtl">RTL ▶ 从右往左读 · 1 号应在右上</span>
   <span class="stats" id="stats">候选 – / 当前框 –</span>
   <button id="save-btn">保存 (S)</button>
@@ -58,13 +93,25 @@
 <div id="layout">
   <ul id="page-list"></ul>
   <div id="viewport"><div id="stage"><img id="page-img" alt=""></div></div>
+  <div id="profile-pane" hidden>
+    <div id="pf-img-wrap"><img id="pf-img" alt=""></div>
+    <div id="pf-form">
+      <div class="pf-actions">
+        <button id="pf-save">保存介绍页 (S)</button>
+        <span id="pf-state" class="pf-note"></span>
+      </div>
+      <div id="pf-errors"></div>
+      <div id="pf-fields"></div>
+    </div>
+  </div>
 </div>
 <div id="toast"></div>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = { pages: [], current: null, meta: null, boxes: [], selected: -1,
-                candidates: 0, isManual: false };
+                candidates: 0, isManual: false, mode: "panels",
+                profile: null, enums: {}, known: [], shipErrors: [] };
 
 function toast(msg) {
   const t = $("toast");
@@ -79,7 +126,9 @@ async function loadPages() {
   const ul = $("page-list"); ul.innerHTML = "";
   for (const p of state.pages) {
     const li = document.createElement("li");
-    li.innerHTML = `<span>${p.name}</span><span class="mark ${p.confirmed ? "ok" : ""}">${p.confirmed ? "✓" : "○"}</span>`;
+    const pm = p.profile === "reviewed" ? "●" : p.profile === "draft" ? "○" : "–";
+    li.innerHTML = `<span>${p.name}</span><span><span class="pm ${p.profile}">${pm}</span>` +
+      `<span class="mark ${p.confirmed ? "ok" : ""}">${p.confirmed ? "✓" : " "}</span></span>`;
     li.dataset.name = p.name;
     if (p.name === state.current) li.classList.add("current");
     li.onclick = () => loadPage(p.name);
@@ -97,11 +146,13 @@ async function loadPage(name) {
   const img = $("page-img");
   img.onload = () => { layoutStage(); renderBoxes(); };
   img.src = `/api/page/${name}/image?ts=${Date.now()}`;
+  $("pf-img").src = `/api/page/${name}/image?ts=${Date.now()}`;
   const info = state.pages.find(p => p.name === name) || {};
   state.candidates = info.candidates ?? 0;
   [...$("page-list").children].forEach(li =>
     li.classList.toggle("current", li.dataset.name === name));
   updateStats();
+  if (state.mode === "profile") await loadProfile(name);
 }
 
 function layoutStage() {
@@ -273,6 +324,252 @@ document.addEventListener("keydown", (ev) => {
 });
 
 window.addEventListener("resize", () => { if (state.meta) { layoutStage(); renderBoxes(); } });
+
+/* ================= 介绍页校对 ================= */
+const PF_SCALARS = [
+  ["layout.kind", "页面类型", "enum"],
+  ["layout.text_density", "文字密度", "enum"],
+  ["layout.panel_count", "分格数", "int"],
+  ["layout.has_splash", "跨页大图", "bool"],
+  ["layout.borderless", "无边框", "bool"],
+  ["story.beat", "叙事节拍", "enum"],
+  ["story.summary", "一句话剧情", "text"],
+  ["story.location", "场景地点", "text"],
+  ["story.time_of_day", "时间", "enum"],
+  ["story.weather", "室内外/天气", "enum"],
+  ["story.emotion", "情绪", "enum"],
+  ["story.continuity", "衔接", "enum"],
+  ["text.verbatim_complete", "台词读全", "bool"],
+  ["text.ocr_confidence", "转录置信度", "num"],
+  ["text.narration_boxes", "旁白框", "list"],
+  ["text.sfx", "拟声词", "list"],
+  ["visual.shot", "景别", "enum"],
+  ["visual.composition", "构图", "text"],
+  ["visual.key_props", "关键道具", "list"],
+  ["visual.palette", "配色", "list"],
+  ["visual.motion_hint", "运镜提示", "enum"],
+  ["reuse.replaceable", "可替换", "bool"],
+  ["reuse.replace_strategy", "替换策略", "enum"],
+  ["reuse.scene_tags", "场景标签", "list"],
+  ["reuse.asset_brief", "素材需求", "area"],
+  ["reuse.blocking_reason", "不可替换原因", "text"],
+  ["provenance.reviewer_notes", "校对备注", "area"],
+];
+const PF_GROUPS = [
+  ["版面", ["layout.kind", "layout.text_density", "layout.panel_count",
+            "layout.has_splash", "layout.borderless"]],
+  ["剧情", ["story.beat", "story.summary", "story.location", "story.time_of_day",
+            "story.weather", "story.emotion", "story.continuity"]],
+  ["台词", ["text.verbatim_complete", "text.ocr_confidence", "text.narration_boxes",
+            "text.sfx"]],
+  ["画面", ["visual.shot", "visual.composition", "visual.key_props",
+            "visual.palette", "visual.motion_hint"]],
+  ["复用", ["reuse.replaceable", "reuse.replace_strategy", "reuse.scene_tags",
+            "reuse.asset_brief", "reuse.blocking_reason"]],
+  ["审阅", ["provenance.reviewer_notes"]],
+];
+
+function getPath(obj, path) {
+  return path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+function setPath(obj, path, val) {
+  const keys = path.split(".");
+  let cur = obj;
+  for (const k of keys.slice(0, -1)) {
+    if (cur[k] == null || typeof cur[k] !== "object") cur[k] = {};
+    cur = cur[k];
+  }
+  cur[keys[keys.length - 1]] = val;
+}
+function el(tag, attrs, kids) {
+  const d = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") d.className = v;
+    else if (k.startsWith("on")) d.addEventListener(k.slice(2), v);
+    else d.setAttribute(k, v);
+  }
+  for (const kid of kids || []) d.append(kid);
+  return d;
+}
+function enumSelect(path, value, onChange) {
+  const list = state.enums["$." + path] || [];
+  const s = el("select");
+  for (const v of list) {
+    const o = el("option", {value: v}, [document.createTextNode(v)]);
+    if (v === value) o.selected = true;
+    s.append(o);
+  }
+  s.onchange = () => onChange(s.value);
+  return s;
+}
+
+async function loadProfile(name) {
+  const {status, body} = await api(`/api/page/${name}/profile`);
+  if (status !== 200) {
+    $("pf-fields").innerHTML = "";
+    $("pf-errors").textContent = body.error || "没有介绍页（先跑 m1 profile）";
+    $("pf-state").textContent = "";
+    state.profile = null;
+    return;
+  }
+  state.profile = body.data;
+  state.enums = body.enums || {};
+  state.known = body.known_names || [];
+  state.shipErrors = body.shippable_errors || [];
+  renderProfile();
+}
+
+function renderProfile() {
+  const p = state.profile, host = $("pf-fields");
+  host.innerHTML = "";
+  if (!p) return;
+  for (const [title, paths] of PF_GROUPS) {
+    host.append(el("h3", {}, [document.createTextNode(title)]));
+    for (const path of paths) {
+      const spec = PF_SCALARS.find(s => s[0] === path);
+      if (!spec) continue;
+      const [, label, kind] = spec;
+      let input;
+      const cur = getPath(p, path);
+      if (kind === "enum") {
+        input = enumSelect(path, cur, v => setPath(p, path, v));
+      } else if (kind === "bool") {
+        input = el("input", {type: "checkbox"});
+        input.checked = !!cur;
+        input.onchange = () => setPath(p, path, input.checked);
+      } else if (kind === "int" || kind === "num") {
+        input = el("input", {type: "number", step: kind === "int" ? "1" : "0.01"});
+        input.value = cur ?? 0;
+        input.oninput = () => setPath(p, path, kind === "int"
+          ? parseInt(input.value || "0", 10) : parseFloat(input.value || "0"));
+      } else if (kind === "list") {
+        input = el("input", {type: "text"});
+        input.value = Array.isArray(cur) ? cur.join(", ") : "";
+        input.oninput = () => setPath(p, path,
+          input.value.split(/[,，]/).map(s => s.trim()).filter(Boolean));
+      } else if (kind === "area") {
+        input = el("textarea");
+        input.value = cur ?? "";
+        input.oninput = () => setPath(p, path, input.value);
+      } else {
+        input = el("input", {type: "text", maxlength: path === "story.summary" ? "40" : "200"});
+        input.value = cur ?? "";
+        input.oninput = () => setPath(p, path, input.value);
+      }
+      host.append(el("div", {class: "field"}, [el("label", {}, [document.createTextNode(label)]), input]));
+    }
+  }
+  host.append(el("h3", {}, [document.createTextNode("人物")]));
+  host.append(repList("story.characters", [
+    ["name", "text"], ["role", "enum:$.story.characters.items.properties.role"],
+    ["region", "enum:$.story.characters.items.region"],
+    ["expression", "text"],
+  ], {name: "主角", role: "protagonist", region: "center", expression: "平静"}));
+  host.append(el("h3", {}, [document.createTextNode("对白气泡")]));
+  host.append(repList("text.bubbles", [
+    ["speaker", "text"], ["text", "text"],
+    ["region", "enum:$.text.bubbles.items.region"],
+    ["is_shout", "bool"],
+  ], {speaker: "", text: "", region: "center", is_shout: false}));
+  updateProfileState();
+}
+
+function repList(path, cols, blank) {
+  const wrap = el("div");
+  const list = getPath(state.profile, path) || [];
+  if (!Array.isArray(list)) setPath(state.profile, path, []);
+  const arr = getPath(state.profile, path);
+  const redraw = () => {
+    [...wrap.querySelectorAll(".rep")].forEach(n => n.remove());
+    arr.forEach((item, idx) => {
+      const box = el("div", {class: "rep"});
+      box.append(el("button", {class: "del", onclick: () => {
+        arr.splice(idx, 1); redraw();
+      }}, [document.createTextNode("删除")]));
+      for (const [key, kind] of cols) {
+        let input;
+        if (kind.startsWith("enum:")) {
+          const realPath = kind.slice(5);
+          input = enumSelect(realPath, item[key], v => item[key] = v);
+        } else if (kind === "bool") {
+          input = el("input", {type: "checkbox"});
+          input.checked = !!item[key];
+          input.onchange = () => item[key] = input.checked;
+        } else {
+          input = el("input", {type: "text"});
+          input.value = item[key] ?? "";
+          input.oninput = () => item[key] = input.value;
+        }
+        box.append(el("div", {class: "field"},
+          [el("label", {}, [document.createTextNode(key)]), input]));
+      }
+      wrap.append(box);
+    });
+    wrap.append(el("button", {class: "addbtn", onclick: () => {
+      arr.push({...blank}); redraw();
+    }}, [document.createTextNode("+ 增加一行")]));
+  };
+  redraw();
+  return wrap;
+}
+
+function updateProfileState() {
+  const p = state.profile;
+  if (!p) return;
+  const rev = (p.provenance || {}).reviewed;
+  const s = $("pf-state");
+  s.textContent = rev ? "已审阅" : "未审阅（草稿）";
+  s.className = "pf-note" + (rev ? " ok" : "");
+}
+
+async function saveProfile() {
+  if (!state.profile || !state.current) { toast("没有介绍页可保存"); return; }
+  const p = state.profile;
+  if (p.reuse && !p.reuse.blocking_reason) p.reuse.blocking_reason = null;
+  const body = {
+    layout: p.layout, story: p.story, text: p.text, visual: p.visual,
+    reuse: p.reuse,
+    reviewer_notes: (p.provenance || {}).reviewer_notes || "",
+  };
+  const {status, resp} = await fetch(`/api/page/${state.current}/profile`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body),
+  }).then(async r => ({status: r.status, resp: await r.json()}));
+  if (status === 200) {
+    $("pf-errors").textContent = "";
+    p.provenance.reviewed = true;
+    state.shipErrors = resp.shippable_errors || [];
+    $("pf-state").textContent = state.shipErrors.length
+      ? "已审阅 · 但还不能出片：" + state.shipErrors.join("；")
+      : "已审阅 · 可出片";
+    $("pf-state").className = "pf-note" + (state.shipErrors.length ? "" : " ok");
+    toast("介绍页已保存");
+    await loadPages();
+  } else {
+    $("pf-errors").textContent = (resp.errors || [resp.error || "保存失败"]).join("\n");
+    toast(resp.error || "保存失败");
+  }
+}
+$("pf-save").onclick = saveProfile;
+
+function setMode(mode) {
+  state.mode = mode;
+  $("tab-panels").classList.toggle("on", mode === "panels");
+  $("tab-profile").classList.toggle("on", mode === "profile");
+  $("viewport").hidden = mode !== "panels";
+  $("profile-pane").hidden = mode !== "profile";
+  $("save-btn").hidden = mode !== "panels";
+  if (mode === "profile" && state.current) loadProfile(state.current);
+}
+$("tab-panels").onclick = () => setMode("panels");
+$("tab-profile").onclick = () => setMode("profile");
+
+document.addEventListener("keydown", (ev) => {
+  if ((ev.key === "s" || ev.key === "S") && state.mode === "profile") {
+    ev.preventDefault(); saveProfile();
+  }
+});
+
 loadPages().then(() => { if (state.pages.length) loadPage(state.pages[0].name); });
 </script>
 </body>

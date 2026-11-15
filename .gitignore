@@ -47,3 +47,9 @@ m1/v*/work/profiles/
 m1/v*/work/cache/
 m1/v*/work/audio/
 m1/v*/out/
+# 章级 work 目录（m1/v1/ch02/work/...）：页面、音频、帧缓存、成片都不入库
+m1/**/work/pages/
+m1/**/work/audio/
+m1/**/work/cache/
+m1/**/work/panels/
+m1/**/out/

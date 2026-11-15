@@ -5,8 +5,11 @@ import os
 import shutil
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
+from .errors import IngestError
 from .epub_ingest import ingest_epub
 from .manifest import build_manifest, write_manifest
 from .mobi_ingest import ingest_mobi
@@ -123,6 +126,13 @@ def cmd_ingest(args):
         manifest_path = write_manifest(source_dir, manifest)
         print(f"manifest -> {manifest_path}")
         return 0
+    except IngestError as exc:        # 能打开但没内容 -> 3
+        print(f"error: {exc}", file=sys.stderr)
+        return 3
+    except (zipfile.BadZipFile, ElementTree.ParseError, ValueError,
+            KeyError, OSError) as exc:  # 根本读不了 -> 4
+        print(f"error: {exc}", file=sys.stderr)
+        return 4
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 

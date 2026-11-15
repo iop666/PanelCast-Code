@@ -5,7 +5,10 @@ import json
 import posixpath
 import zipfile
 from html.parser import HTMLParser
+from pathlib import Path
 from xml.etree import ElementTree
+
+from .errors import IngestError
 
 CHAPTER_IDS = [f"chapter{i:02d}.xhtml" for i in range(6)]  # chapter00..chapter05
 
@@ -105,6 +108,11 @@ def extract_chapters(epub_path):
                 "source_entry": entry,
                 "sha256": hashlib.sha256(raw).hexdigest(),
             })
+        if not chapters:
+            raise IngestError(
+                f"no usable chapters in {Path(epub_path).name}: expected spine "
+                f"chapter ids {CHAPTER_IDS[0]}~{CHAPTER_IDS[-1]}"
+            )
     return chapters, language
 
 

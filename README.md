@@ -35,6 +35,20 @@ python -m panelcast ingest "この素晴らしい世界に祝福を！/1.epub" "
 工具自管的 `epub/`、`mobi/` 子树与 staging 目录，源文件（`*.epub` /
 `*.mobi`）绝不会被修改或删除。
 
+### 退出码
+
+| 码 | 含义 |
+| --- | --- |
+| 0 | 成功 |
+| 1 | 没找到任何 `.epub` / `.mobi` 输入 |
+| 2 | 输入组合被拒（同类型多于一个；argparse 用法错误同样退出 2） |
+| 3 | 空摄取：输入能打开但产出 0 条记录（EPUB 无 chapter00~05、MOBI 无 JPEG） |
+| 4 | 输入无法解析 / IO 失败（损坏 zip、非法 PDB 头等） |
+
+3 与 4 严格区分：3 = 文件能打开但没内容，4 = 文件根本读不了。空摄取守卫在
+写盘之前触发，staging 目录不会留半成品。失败时只打印一行 `error: <原因>`
+（无 traceback），上一次有效输出与 manifest 不受影响。
+
 ## 输出结构
 
 ```
@@ -101,8 +115,9 @@ python -m unittest discover -s tests -v
 重复页标记、manifest 构建（双输入 / 单类型 / created_at 保留）、
 CLI 行为（单类型 ingest、多同类型拒绝）、输出目录一致性回归
 （pair→仅 EPUB 清理旧 MOBI 子树、pair→仅 MOBI 清理旧 EPUB 子树、
-页数减少清除多余 JPEG、失败运行逐字节保留旧输出与 manifest），以及
-真实文件冒烟测试（源文件存在时）。
+页数减少清除多余 JPEG、失败运行逐字节保留旧输出与 manifest）、
+空摄取守卫与干净错误出口（退出码 3 / 4 区分、stderr 无 traceback、
+失败无 staging 残留），以及真实文件冒烟测试（源文件存在时）。
 
 ## 文档
 

@@ -76,6 +76,27 @@ def _build_epub(path):
             )
 
 
+def _build_epub_with_spine(path, chapter_ids):
+    """Valid EPUB with an arbitrary spine (empty-ingest guard fixtures)."""
+    manifest_items = "".join(
+        f'<item id="{c}" href="Text/{c}" media-type="application/xhtml+xml"/>'
+        for c in chapter_ids
+    )
+    spine_items = "".join(f'<itemref idref="{c}"/>' for c in chapter_ids)
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml", CONTAINER_XML)
+        z.writestr(
+            "OEBPS/content.opf",
+            OPF_TEMPLATE.format(manifest=manifest_items, spine=spine_items),
+        )
+        for c in chapter_ids:
+            z.writestr(
+                f"OEBPS/Text/{c}",
+                f"<html><head><title>{c}</title></head><body><p>text {c}</p></body></html>",
+            )
+
+
 class TestIngestCli(unittest.TestCase):
     def setUp(self):
         self._tmp = TemporaryDirectory()
@@ -243,8 +264,8 @@ class TestIngestCli(unittest.TestCase):
 
         bad = self.workspace / "bad.mobi"
         bad.write_bytes(b"\x00" * 8)  # fails the PDB header check
-        with self.assertRaises(ValueError):
-            self.run_cli("ingest", str(self.epub), str(bad), "-o", str(self.out))
+        code, _ = self.run_cli("ingest", str(self.epub), str(bad), "-o", str(self.out))
+        self.assertEqual(code, 4)
 
         self.assertEqual(
             (self.out / "source_manifest.json").read_bytes(), manifest_before
@@ -265,12 +286,91 @@ class TestIngestCli(unittest.TestCase):
         self.run_cli("ingest", str(self.epub), str(self.mobi), "-o", str(self.out))
         bad = self.workspace / "bad.epub"
         bad.write_bytes(b"not a zip")
-        with self.assertRaises(zipfile.BadZipFile):
-            self.run_cli("ingest", str(bad), "-o", str(self.out))
+        code, _ = self.run_cli("ingest", str(bad), "-o", str(self.out))
+        self.assertEqual(code, 4)
 
         self.assertTrue((self.out / "epub" / "chapters.json").exists())
         self.assertTrue((self.out / "mobi" / "pages" / "page_0001.jpg").exists())
         self.assertEqual(self.manifest()["page_count"], 3)
+
+    def test_epub_without_known_chapters_exits_3(self):
+        empty = self.workspace / "empty.epub"
+        _build_epub_with_spine(empty, ("cover.xhtml",))
+
+        code, err = self.run_cli("ingest", str(empty), "-o", str(self.out))
+        self.assertEqual(code, 3)
+        self.assertIn("error:", err)
+        self.assertIn("empty.epub", err)
+        self.assertFalse((self.out / "source_manifest.json").exists())
+
+    def test_mobi_without_jpeg_pages_exits_3(self):
+        empty = self.workspace / "empty.mobi"
+        empty.write_bytes(_build_pdb([b"A" * 10]))  # valid PDB, no JPEG inside
+
+        code, err = self.run_cli("ingest", str(empty), "-o", str(self.out))
+        self.assertEqual(code, 3)
+        self.assertIn("error:", err)
+        self.assertFalse((self.out / "source_manifest.json").exists())
+        # guard fired before any disk write: no mobi/ subtree was staged
+        self.assertFalse((self.out / "mobi").exists())
+
+    def test_empty_ingestion_keeps_previous_output(self):
+        self.run_cli("ingest", str(self.epub), str(self.mobi), "-o", str(self.out))
+        manifest_before = (self.out / "source_manifest.json").read_bytes()
+        chapters_before = (self.out / "epub" / "chapters.json").read_bytes()
+        pages_before = {
+            p.name: p.read_bytes()
+            for p in (self.out / "mobi" / "pages").glob("*.jpg")
+        }
+
+        empty = self.workspace / "empty.epub"
+        _build_epub_with_spine(empty, ("cover.xhtml",))
+        code, err = self.run_cli("ingest", str(empty), "-o", str(self.out))
+        self.assertEqual(code, 3)
+        self.assertIn("error:", err)
+
+        self.assertEqual(
+            (self.out / "source_manifest.json").read_bytes(), manifest_before
+        )
+        self.assertEqual(
+            (self.out / "epub" / "chapters.json").read_bytes(), chapters_before
+        )
+        pages_after = {
+            p.name: p.read_bytes()
+            for p in (self.out / "mobi" / "pages").glob("*.jpg")
+        }
+        self.assertEqual(pages_after, pages_before)
+
+    def test_corrupt_epub_reports_clean_error(self):
+        bad = self.workspace / "bad.epub"
+        bad.write_bytes(b"not a zip")
+
+        code, err = self.run_cli("ingest", str(bad), "-o", str(self.out))
+        self.assertEqual(code, 4)
+        self.assertIn("error:", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_corrupt_mobi_reports_clean_error(self):
+        bad = self.workspace / "bad.mobi"
+        bad.write_bytes(b"\x00" * 8)
+
+        code, err = self.run_cli("ingest", str(bad), "-o", str(self.out))
+        self.assertEqual(code, 4)
+        self.assertIn("error:", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_failure_leaves_no_staging_residue(self):
+        bad = self.workspace / "bad.mobi"
+        bad.write_bytes(b"\x00" * 8)
+        code, _ = self.run_cli("ingest", str(bad), "-o", str(self.out))  # exit 4 path
+        self.assertEqual(code, 4)
+
+        empty = self.workspace / "empty.epub"
+        _build_epub_with_spine(empty, ("cover.xhtml",))
+        code, _ = self.run_cli("ingest", str(empty), "-o", str(self.out))  # exit 3 path
+        self.assertEqual(code, 3)
+
+        self.assertEqual(list(self.out.glob(".panelcast-stage-*")), [])
 
 
 if __name__ == "__main__":

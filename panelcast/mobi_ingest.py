@@ -4,6 +4,7 @@ import json
 import struct
 from pathlib import Path
 
+from .errors import IngestError
 from .jpeg import EOI, SOI, iter_jpegs, jpeg_dimensions, sha256
 
 
@@ -62,6 +63,8 @@ def ingest_mobi(mobi_path, out_dir):
     """
     data = Path(mobi_path).read_bytes()
     entries = scan_jpeg_pages(data)
+    if not entries:
+        raise IngestError(f"no JPEG pages found in {Path(mobi_path).name}")
 
     pages_dir = out_dir / "pages"
     pages_dir.mkdir(parents=True, exist_ok=True)

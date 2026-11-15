@@ -63,11 +63,35 @@
    3 页→1 页只留 1 张 JPEG、失败运行逐字节保留旧输出与 manifest
    （均用小型临时 fixture，不依赖真实素材）。
 
+9. **空摄取守卫 + 干净错误出口（退出码 3 / 4 严格分离）**。守卫一律发生在
+   写盘之前，staging 目录不留半成品：`extract_chapters()` 扫不到
+   `chapter00.xhtml`~`chapter05.xhtml` 时、`scan_jpeg_pages()` 扫不到任何
+   JPEG 时抛 `IngestError`（`panelcast/errors.py` 中唯一异常类型）。CLI 在
+   staging 区块外加两层 `except`（`IngestError` 在前）打印单行
+   `error: <原因>`，不输出 traceback：
+
+   | 码 | 含义 |
+   | --- | --- |
+   | 0 | 成功 |
+   | 1 | 没找到任何 `.epub` / `.mobi` 输入 |
+   | 2 | 输入组合被拒（同类型多于一个；argparse 用法错误同样退出 2） |
+   | 3 | 空摄取：文件能打开但产出 0 条记录 |
+   | 4 | 输入无法解析 / IO 失败：文件根本读不了 |
+
+   3 与 4 不合并：空数据若以退出码 0 写出 manifest，下游会把空清单当成
+   有效输入（严重缺陷），必须与解析失败区分报告。`SystemExit` /
+   `KeyboardInterrupt` 不被捕获。
+
 ## 后果
 
 - 正面：零依赖、可审计、除 `created_at` 外幂等、重复页可追溯；成功运行后
-  输出目录与 manifest 严格一致，失败保留最后一次有效输出。
+  输出目录与 manifest 严格一致，失败保留最后一次有效输出；空摄取与
+  解析失败分别以退出码 3 / 4 干净报告（单行 error，无 traceback）。
 - 限制：不做 OCR / 分割 / AI 处理（明确超出本期范围）；JPEG 扫描以单条
   PDB record 载荷为单位，SOI..EOI 不会跨 record 拼接——跨 record 存储
   的 JPEG 变体无法完整取回。当前素材为整页 JPEG 单 record 存储，不受
   影响；若日后需要支持该变体，须先按偏移表把 record 数据流重组后再扫描。
+  **已知限制——提交阶段非原子**：子树替换为"先 `rmtree` 旧子树、再
+  `os.replace` staging 子树"两步，两步之间进程崩溃会留下半提交状态
+  （数据子树已替换而 manifest 仍为旧值），须由下一次成功运行自愈；
+  经评估暂不做原子化改造。

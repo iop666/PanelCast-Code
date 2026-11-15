@@ -73,7 +73,7 @@ def _sapi_synthesize(text, voice, rate, out_path):
         )
 
 
-def _edge_synthesize(text, voice, out_path, ffmpeg):
+def _edge_synthesize(text, voice, out_path, ffmpeg, rate="+0%"):
     """edge-tts → mp3 → ffmpeg 转 WAV（仅当 edge-tts 已安装且网络通时可达）。"""
     import edge_tts  # noqa: 仅探测成功后才 import
 
@@ -82,7 +82,7 @@ def _edge_synthesize(text, voice, out_path, ffmpeg):
     async def _save():
         # 必须写到 tmp_mp3：edge-tts 产出的是 mp3，直接写 out_path 会让下面的
         # ffmpeg 找不到输入（曾因此静默回退到 SAPI5）。
-        await edge_tts.Communicate(text, voice).save(str(tmp_mp3))
+        await edge_tts.Communicate(text, voice, rate=rate).save(str(tmp_mp3))
 
     try:
         asyncio.run(asyncio.wait_for(_save(), timeout=60))
@@ -111,20 +111,26 @@ def wav_duration(path):
     return frames / rate
 
 
-def probe_backend(ffmpeg=None):
-    """按 2.2 顺序探测：edge-tts → SAPI5。返回 {backend, voice, rate}。"""
+def probe_backend(ffmpeg=None, voice=None, rate=None):
+    """按 2.2 顺序探测：edge-tts → SAPI5。返回 {backend, voice, rate}。
+
+    voice/rate 可显式指定（edge-tts 音色如 zh-CN-YunxiNeural，rate 如 "+20%"）；
+    未指定时用默认晓晓 + 原速。SAPI5 无多音色可选，voice 仅作参考。
+    """
     ffmpeg = ffmpeg or None
     # 1) edge-tts：已装且网络通
     try:
         import importlib.util
         if importlib.util.find_spec("edge_tts") is not None:
-            voice = "zh-CN-XiaoxiaoNeural"
+            voice = voice or "zh-CN-XiaoxiaoNeural"
+            rate = rate or "+0%"
             probe_path = Path(tempfile.gettempdir()) / "panelcast-tts-edge-probe.wav"
-            _edge_synthesize("测试", voice, probe_path, ffmpeg or _lazy_ffmpeg())
+            _edge_synthesize("测试", voice, probe_path,
+                             ffmpeg or _lazy_ffmpeg(), rate=rate)
             if wav_duration(probe_path) > 0:
                 with contextlib.suppress(OSError):
                     probe_path.unlink()
-                return {"backend": f"edge-tts:{voice}", "voice": voice, "rate": "+0%"}
+                return {"backend": f"edge-tts:{voice}", "voice": voice, "rate": rate}
     except Exception:
         pass  # 网络/包不可用 → 回退 SAPI5
     # 2) SAPI5
@@ -216,7 +222,8 @@ def synth_segments(work_dir, script, backend_info, ffmpeg=None):
                 continue
         # 未命中 → 真实合成
         if backend.startswith("edge-tts:"):
-            _edge_synthesize(text, voice, target, ffmpeg or _lazy_ffmpeg())
+            _edge_synthesize(text, voice, target, ffmpeg or _lazy_ffmpeg(),
+                             rate=str(rate))
         else:
             _sapi_synthesize(text, voice, rate, target)
         if not target.exists() or target.stat().st_size <= 44:

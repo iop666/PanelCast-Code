@@ -122,8 +122,9 @@ class TestEdgeSynthesize(unittest.TestCase):
         saved = {}
 
         class FakeCommunicate:
-            def __init__(self, text, voice):
-                self.text, self.voice = text, voice
+            def __init__(self, text, voice, rate="+0%"):
+                self.text, self.voice, self.rate = text, voice, rate
+                saved["rate"] = rate
 
             async def save(self, path):
                 saved["path"] = path

@@ -1,10 +1,14 @@
-"""S5 渲染：ffmpeg 硬切合成 1080p MP4——白底 letterbox、无转场、无运镜。
+"""S5 渲染：ffmpeg 硬切合成 MP4——无转场、无运镜。
 
-- 画布 1920×1080，页面等比缩放居中（不裁切），帧率 30，yuv420p，libx264 crf 20；
+- 画布尺寸与填充方式可配：`letterbox`（等比缩放 + 留边，不裁切）或
+  `cover`（等比放大到铺满 + 居中裁切，竖屏 9:16 用这个）；
+- 帧率 30，yuv420p，libx264 crf 20；
 - 音频：各段 WAV concat 后统一重采样 44100，aac 混流；时长以音频为准；
 - 视频轨来自 concat demuxer（末条文件按 ffmpeg 惯例重复一次）；
 - 产物 m1/out/sample.mp4、m1/out/sample.srt；成片时长与 total_duration
   误差 ≥ 0.2 秒则报错退出，绝不"能播就行"。
+
+帧缓存按 (尺寸, 填充方式) 分目录，换画布不会复用旧帧。
 """
 
 import subprocess
@@ -12,11 +16,27 @@ from pathlib import Path
 
 from .timeline import build_srt, page_entries, write_text_atomic
 
-_WIDTH, _HEIGHT = 1920, 1080
-_VF_LETTERBOX = (
-    f"scale={_WIDTH}:{_HEIGHT}:force_original_aspect_ratio=decrease,"
-    f"pad={_WIDTH}:{_HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=white"
-)
+DEFAULT_WIDTH, DEFAULT_HEIGHT = 1920, 1080
+FIT_MODES = ("letterbox", "cover")
+
+
+def fit_filter(width, height, fit="letterbox"):
+    """构造 ffmpeg 缩放滤镜。
+
+    letterbox: 整页可见，四周补白（信息完整，但画面填不满）。
+    cover:     铺满画布，超出部分居中裁掉（填满画面，边缘可能被裁）。
+    """
+    if fit not in FIT_MODES:
+        raise RuntimeError(f"error: unknown fit mode {fit!r}, want {FIT_MODES}")
+    if fit == "cover":
+        return (
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height}"
+        )
+    return (
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=white"
+    )
 
 
 def _run(cmd, what):
@@ -29,18 +49,23 @@ def _run(cmd, what):
     return out
 
 
-def prepare_frames(ffmpeg, work, pages_seq):
-    """每个出场页生成 1920×1080 白底 letterbox PNG（重复页只做一次）。"""
-    frames_dir = Path(work) / "cache" / "frames"
+def prepare_frames(ffmpeg, work, pages_seq, width=DEFAULT_WIDTH,
+                   height=DEFAULT_HEIGHT, fit="letterbox"):
+    """每个出场页生成目标画布的 PNG（重复页只做一次）。
+
+    缓存按 <宽>x<高>-<fit> 分目录，切换画布/填充方式不会误用旧帧。
+    """
+    frames_dir = Path(work) / "cache" / "frames" / f"{width}x{height}-{fit}"
     frames_dir.mkdir(parents=True, exist_ok=True)
+    vf = fit_filter(width, height, fit)
     for page in dict.fromkeys(pages_seq):  # 保序去重
         src = Path(work) / "pages" / f"{page}.jpg"
         dst = frames_dir / f"{page}.png"
         if dst.exists() and dst.stat().st_size > 0:
             continue
         _run([ffmpeg, "-v", "error", "-y", "-i", src,
-              "-vf", _VF_LETTERBOX, "-frames:v", "1", dst],
-             f"letterbox {page}")
+              "-vf", vf, "-frames:v", "1", dst],
+             f"{fit} {page}")
     return frames_dir
 
 
@@ -97,7 +122,8 @@ def probe_video(ffprobe, path):
     }
 
 
-def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None):
+def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None,
+           width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fit="letterbox"):
     """timeline → sample.mp4 + sample.srt。失败抛 RuntimeError（一行 error:）。"""
     from .panels import find_ffmpeg, find_ffprobe
     ffmpeg = ffmpeg or find_ffmpeg()
@@ -105,6 +131,7 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None):
     work = Path(work_dir)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    fit_filter(width, height, fit)  # 提前校验 fit 取值
 
     if not all((work / "pages" / f"{p}.jpg").exists()
                for p in {e[0] for e in page_entries(timeline)}):
@@ -113,7 +140,8 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None):
         raise RuntimeError(f"error: missing page images: {', '.join(missing)}")
 
     entries = page_entries(timeline)
-    frames_dir = prepare_frames(ffmpeg, work, [p for p, _ in entries])
+    frames_dir = prepare_frames(ffmpeg, work, [p for p, _ in entries],
+                                width=width, height=height, fit=fit)
     ffconcat = build_ffconcat(entries, frames_dir)
     write_text_atomic(frames_dir / "video.ffconcat", ffconcat)
 
@@ -137,10 +165,10 @@ def render(work_dir, out_dir, timeline, ffmpeg=None, ffprobe=None):
          "video render")
 
     info = probe_video(ffprobe, mp4)
-    if (info["width"], info["height"]) != (_WIDTH, _HEIGHT):
+    if (info["width"], info["height"]) != (width, height):
         raise RuntimeError(
             f"error: rendered size {info['width']}x{info['height']}, "
-            f"want {_WIDTH}x{_HEIGHT}"
+            f"want {width}x{height}"
         )
     if not info["has_audio"]:
         raise RuntimeError("error: rendered video has no audio track")

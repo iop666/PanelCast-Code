@@ -216,8 +216,10 @@ def _m1_run(args):
         return 3
 
     script = load_script(work, set(confirmed))
-    backend = probe_backend()
-    print(f"tts: {backend['backend']} (voice={backend['voice']})")
+    backend = probe_backend(voice=getattr(args, "voice", None),
+                            rate=getattr(args, "rate", None))
+    print(f"tts: {backend['backend']} (voice={backend['voice']}, "
+          f"rate={backend['rate']})")
     audios = synth_segments(work, script, backend)
     ffmpeg = find_ffmpeg()
     timeline = build_timeline(script, audios, backend, ffmpeg)
@@ -227,12 +229,30 @@ def _m1_run(args):
         f"timeline: {len(timeline['segments'])} segments, "
         f"total {timeline['total_duration']:.1f}s -> {work / 'timeline.json'}"
     )
-    info = render(work, out, timeline, ffmpeg=ffmpeg)
+    width, height = _parse_size(getattr(args, "size", None))
+    fit = getattr(args, "fit", "letterbox")
+    info = render(work, out, timeline, ffmpeg=ffmpeg,
+                  width=width, height=height, fit=fit)
     print(
         f"render: {info['width']}x{info['height']} {info['fps']}fps "
-        f"{info['duration']:.1f}s -> {out / 'sample.mp4'} (+ sample.srt)"
+        f"{info['duration']:.1f}s fit={fit} -> {out / 'sample.mp4'} (+ sample.srt)"
     )
     return 0
+
+
+def _parse_size(size):
+    """'1080x1920' → (1080, 1920)；None → 默认 1920x1080。"""
+    from .render import DEFAULT_HEIGHT, DEFAULT_WIDTH
+    if not size:
+        return DEFAULT_WIDTH, DEFAULT_HEIGHT
+    try:
+        w, h = size.lower().split("x", 1)
+        w, h = int(w), int(h)
+    except (ValueError, AttributeError):
+        raise SystemExit(f"error: bad --size {size!r}, want WIDTHxHEIGHT")
+    if w <= 0 or h <= 0 or w % 2 or h % 2:
+        raise SystemExit(f"error: bad --size {size!r}, need positive even numbers")
+    return w, h
 
 
 def main(argv=None):
@@ -268,6 +288,22 @@ def main(argv=None):
     )
     m1run.add_argument("--work", default="m1/work")
     m1run.add_argument("--out", default="m1/out")
+    m1run.add_argument(
+        "--voice", default=None,
+        help="edge-tts 音色（如 zh-CN-YunxiNeural）；默认 zh-CN-XiaoxiaoNeural",
+    )
+    m1run.add_argument(
+        "--rate", default=None,
+        help='edge-tts 语速，如 "+20%%"（1.2 倍速）；默认 +0%%',
+    )
+    m1run.add_argument(
+        "--size", default=None,
+        help="画布尺寸 WIDTHxHEIGHT，如 1080x1920（竖屏）；默认 1920x1080",
+    )
+    m1run.add_argument(
+        "--fit", default="letterbox", choices=["letterbox", "cover"],
+        help="letterbox=整页可见留白；cover=铺满裁切（竖屏填满用 cover）",
+    )
     args = parser.parse_args(argv)
     if args.command == "ingest":
         sys.exit(cmd_ingest(args))

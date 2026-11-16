@@ -21,8 +21,9 @@
 | 后续接"无漫画素材复用"的人 | §6 全文，尤其 §6.7 检索单、§6.8 决策矩阵、§14.2 |
 | 后续接横版切格的人 | §1.4 模式边界、§15 横版规划、ROADMAP P1–P2 |
 
-文中标 **【已实现】** 的是当前代码里已经能跑的能力，标 **【待建】** 的是本规范要求、
-但代码还没写的能力。**不要把【待建】当成已完成去汇报。**
+文中标 **【已实现】** 的是当前代码里已经能跑的能力，标 **【部分】** 的是"机器那一半能跑、
+人的那一半还没做"，标 **【待建】** 的是本规范要求、但代码还没写的能力。
+**不要把【待建】当成已完成去汇报，也不要把【部分】当成全自动。**
 
 ### 0.1 交付状态一览
 
@@ -40,8 +41,10 @@
 | 小说正文抽取（epub → `novel.txt` + 索引） | 【已实现】 | `python tools/novel_extract.py` |
 | 章节自动定界 | 【待建】 | §5.3 |
 | 介绍页语义自动生成（读图填字段） | 【待建】 | §5.4 / §6.5 |
-| 底稿对齐 `novel_ref.json` | 【待建】 | §5.6.1 |
-| `m1 novel --align/--check` 门禁 | 【待建】 | §9.1、ROADMAP P0-05 |
+| 底稿对齐 `novel_ref.json` | 【部分】 | `m1 novel align` 产骨架（全部 `unconfirmed`），**逐 beat 判定必须人做** |
+| `m1 novel check` 五步门禁 | 【已实现】 | `m1 novel check`（P0-05） |
+| 审核报告 Schema 校验 | 【已实现】 | `m1 novel lint`（P0-REVIEW-04） |
+| 逐段内容审计 | 【部分】 | 第一章样张 25 段已出结论，**未签核**；其余九章未做 |
 | 真实帧视觉验收 | 【待建】 | §9.5 |
 | 章节全书唯一 ID | 【待建】 | §4.3.1、ROADMAP P0-08 |
 | 无漫画素材复用（V2 page 模式） | 【待建】 | §14.2 |
@@ -305,6 +308,36 @@ panelcast/
 `find_chapter` 按 `id` 或 `number` 匹配才没炸。**人工对数必须看 `label_zh`，不要看 `id`。**
 P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 
+##### P0-08 已登记的明确问题：三套编号在同一个目录里对不上
+
+这不是"命名不统一"，是**三个不同身份维度被混在一起**。实测证据（`m1/v2/ch06`）：
+
+| 维度 | 实际值 | 谁在用 |
+| --- | --- | --- |
+| 目录名 | `ch06` | 文件系统、脚本按路径找章 |
+| `chapter.json` 的 `id` | `ch01` | 程序引用（`find_chapter`） |
+| `chapter.json` 的 `number` | `第六章` | 展示、人工对数 |
+| 实际身份 | 第二卷第一章（全书第六章） | 三者都没有正确表达 |
+
+同一个"第六章"，`id` 说它是 `ch01`，目录说它是 `ch06`，`number` 说它是「第六章」。
+**任一字段单独看都是对的，合起来就是错的。**
+
+**危险在哪**：`P0-01` 的章节对应关系即使人工做对了，只要写进错误的工作区，
+底稿、审计、讲稿会一起挂到另一章上，而且**门禁照样通过**——因为哈希绑的是文件内容，
+不是章节身份。这类错配不会自己暴露，只会让整章内容张冠李戴。
+
+**P0-08 的验收要求（未实现，不许跳过）**：
+
+1. `chapter_uid` 成为机器内部**唯一**身份，跨文件引用只用它；
+2. `id` / `number` 降级为展示或兼容字段，**不得**用于任何跨章定位；
+3. 卷号、全书章节号、卷内章节号三个数字**分开存**，不许互相推导；
+4. 目录名、`id`、`number`、`chapter_uid` 四者不一致时**明确报错**，
+   报错信息要同时列出四个值——**不许程序猜一个"最像的"继续跑**；
+5. 迁移脚本必须能列出全部不一致的章（当前已知至少 `m1/v2/ch06–ch10`）。
+
+第 4 条是重点。当前代码的默认行为是"猜"（`find_chapter` 按 `id` 或 `number` 都能命中），
+猜对是运气，猜错是静默错配。**P0-08 之后，猜必须变成报错。**
+
 `page_kinds` 取值：`cover | colophon | frontispiece | title_page | story | blank | divider | watermark | extra`。
 **非 `story`/`title_page` 的页不进正文出片**，但介绍页照样要写（复用时会用到）。
 
@@ -497,15 +530,20 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 }
 ```
 
-#### 4.3.9 `novel_ref.json`【待建】
+#### 4.3.9 `novel_ref.json`【部分：骨架已实现，逐 beat 判定待人工】
 
 一章一份，记录"这一章的画面，对应小说的哪几段，哪些照写、哪些没画、哪些改了"。
 它是 §5.6.2 写稿的唯一依据，也是事后追责"这句旁白从哪来"的凭据。
+
+`m1 novel align` 能自动产出的只有**骨架**：`para=null`、`fidelity="unconfirmed"`、
+`review_status="needs_review"`、候选区间放 `para_candidates`。
+**骨架不是结论**，`--check` 第 4 步会逐条拒绝未确认的 beat。
 
 ```json
 {
   "schema": "novel-ref/v1",
   "chapter_uid": "konosuba-manga-v01-ch02",
+  "judgement_scope": "manga_vs_novel",
   "chapter_id": "ch02",
   "label": "第二章 替华美的高阶职业带来愉悦！",
   "pages": [45, 74],
@@ -547,6 +585,7 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `chapter_uid` | 是 | **跨卷唯一身份**，`<系列>-v<卷两位>-ch<全书两位>`。跨文件引用一律用它 |
+| `judgement_scope` | 是 | 固定 `"manga_vs_novel"`。**声明本文件里的 `fidelity` 判的是「漫画 vs 小说」**，见 §4.3.10 的两层语义 |
 | `chapter_id` | 是 | 卷内短 id（`ch02`），**仅兼容用**，不得作为跨卷引用的唯一依据 |
 | `source.sha256` | 是 | **原始 EPUB 文件**字节的 sha256。epub 换了 → 全部底稿失效 |
 | `source.text_sha256` | 是 | **`novel.txt` 文件**字节的 sha256，等于 `novel_index.json` 的 `file_sha256` |
@@ -588,7 +627,7 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 **它不是必须 100% 覆盖的文档，而是必须 100% 诚实的文档**：宁可写 8 条 `omitted`，
 也不许把没读过的段落标成 `drawn`。
 
-#### 4.3.10 `script-audit.json`【待建】
+#### 4.3.10 `script-audit.json`【已实现：Schema v2 + `m1 novel lint`】
 
 **为什么需要它**：`novel_ref.json` 只证明"讲稿有来源"，**不证明"当前这份讲稿被审过"**。
 没有它就会出现这个漏洞：
@@ -606,33 +645,123 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 
 ```json
 {
-  "schema": "script-audit/v1",
-  "audit_spec_version": "v1.0",
+  "schema": "script-audit/v2",
+  "audit_spec_version": "v1.1",
+  "judgement_scope": "narration_vs_source",
   "chapter_uid": "konosuba-manga-v01-ch02",
   "script_schema": "script/v2",
   "script_sha256": "当前 script.json 文件字节的 sha256",
   "novel_ref_sha256": "当前 novel_ref.json 文件字节的 sha256",
   "audited_segments": [
-    {"segment_id": "seg_0001", "text_sha256": "该段 text 字段的 sha256", "status": "approved"},
-    {"segment_id": "seg_0002", "text_sha256": "…", "status": "rewritten"},
-    {"segment_id": "seg_0003", "text_sha256": "…", "status": "removed"}
+    {"segment_id": "seg_0001", "text_sha256": "该段 text 字段的 sha256",
+     "status": "approved", "fidelity": "drawn", "alteration_origin": null,
+     "disposition": "keep", "pages_declared": ["page_0045"],
+     "novel_para": [[338, 352]], "evidence": "第一章 338–352；p45 分格 2"},
+    {"segment_id": "seg_0002", "text_sha256": "…",
+     "status": "pending_rewrite", "fidelity": "altered",
+     "alteration_origin": "narration", "disposition": "rewrite",
+     "pages_declared": ["page_0047"], "novel_para": [[353, 371]],
+     "evidence": "小说 353–371 写的是……，旁白改成了……"},
+    {"segment_id": "seg_0003", "text_sha256": "…",
+     "status": "pending_rewrite", "fidelity": "altered",
+     "alteration_origin": "manga", "disposition": "keep",
+     "pages_declared": ["page_0052"], "novel_para": [[372, 400]],
+     "evidence": "漫画把小说的 A 改成 B，旁白忠于 p52 的 B"}
   ],
-  "review_status": "approved",
-  "reviewed_by": "human:…",
-  "reviewed_at": "2026-11-16T00:00:00+08:00",
-  "notes": "第一～五章为第二轮审计，发现 3 处无来源段落已改写"
+  "review_status": "pending_human",
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "notes": "…"
 }
 ```
+
+##### 两层 `fidelity`：同名不同义，必须显式声明
+
+这是本规范最容易混用的地方，也是 `judgement_scope` 存在的理由：
+
+| 数据路径 | 判的是谁和谁 | `judgement_scope` |
+| --- | --- | --- |
+| `novel_ref.json` → `beats[].fidelity` | **漫画** vs **小说**：漫画有没有照画小说 | `manga_vs_novel` |
+| `script-audit.json` → `audited_segments[].fidelity` | **旁白** vs **它的来源**：讲稿有没有讲对 | `narration_vs_source` |
+
+两层都叫 `fidelity`，但判断主体不同。混用会犯两个方向相反的错：
+
+- 把"旁白忠于漫画的改编"当成"漫画不忠于小说"→ 去改本来正确的旁白；
+- 把"旁白自己编的"当成"漫画改的"→ 放过凭空捏造。
+
+所以两个文件都必须写死自己的 `judgement_scope`，`m1 novel check` 第 4 步验前者、
+第 5 步验后者，**值不匹配直接报错，不许猜**。
+
+##### `alteration_origin`：只回答"差异是谁造成的"
+
+| 值 | 含义 | 处理 |
+| --- | --- | --- |
+| `manga` | 漫画改的，旁白只是忠实复述漫画 | **保留旁白**，把差异与页码记进 `evidence` |
+| `narration` | 旁白自己编的或改的 | **必须改写或删除** |
+| `mixed` | 漫画改了一部分、旁白又追加编造了一部分 | 必须拆开说明各是哪一部分 |
+| `unknown` | 查不清是谁改的 | 保留疑问，**不许硬塞进前两个** |
+| `null` | 没有差异（`drawn` / `omitted`） | 留空 |
+
+三条硬规则：
+
+1. **`alteration_origin` 不能代替来源引用。** 标了 `manga` 仍然必须给出
+   `pages_declared`——"这是漫画改的"本身就是一句关于画面的断言，指不出页码就等于没证据。
+   `m1 novel lint` 会直接拒绝 `alteration_origin=manga` 且 `pages_declared` 为空的记录。
+2. **没有差异时留空，不许用 `"none"` 之类的伪值。** 伪值会让"枚举校验"形同虚设：
+   它看起来是个合法成员，实际上没有任何语义。
+3. **`mixed` 与 `unknown` 是留给出题人的，不是给选择题凑数的。** 遇到"漫画改一半、
+   旁白编一半"，正确做法是拆成两条记录或用 `mixed` 并在 `evidence` 里写清各占哪部分，
+   **不是**为了满足枚举硬挑一个。
+
+##### `status` 与 `review_status`：处理状态 ≠ 签核状态
+
+这两个字段必须分开，否则会出现"改完了 = 通过了"的错误理解：
+
+| 字段 | 层级 | 合法值 | 回答什么问题 |
+| --- | --- | --- | --- |
+| `status` | 逐段 | `approved` / `pending_rewrite` / `rewritten` / `removed` | 这一段**处理到哪一步了** |
+| `review_status` | 整份 | `pending_human` / `approved` / `rejected` | **有没有人签核** |
+
+典型组合：
+
+```json
+{"status": "pending_rewrite", "review_status": "pending_human", "reviewed_by": null}
+```
+
+读法是：**已审出问题（并记录了证据）→ 改稿还没做 → 也没人签核**。
+不许读成"机器还没生成任何结论"，也不许读成"已经通过"。
+
+- `pending_rewrite` 是 P0-REVIEW-04 正式并入的枚举成员（原规范缺这一态，样张只好自己
+  发明 `pending` 并在文件里写声明）。**`pending` 已废弃**，`lint` 会报错并提示改用
+  `pending_rewrite`。
+- `status=approved` 与 `disposition` 不许矛盾：通过了就不该还挂着 `rewrite`。
+- 只有整份 `review_status=approved` 且 `reviewed_by=human:<name>` 才允许出片；
+  `pending_human` 时 `reviewed_by` 必须为空——**没签核就不许留签名**。
+
+##### 逐段字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `segment_id` | 是 | 与 `script.json` 的段 id 一致 |
+| `text_sha256` | 是 | 该段文字的哈希，用于定位"到底哪一段被改了" |
+| `status` | 是 | 见上表，**不许用 `pending`** |
+| `fidelity` | 是 | `drawn / omitted / altered / original`（判的是**旁白 vs 来源**） |
+| `alteration_origin` | `altered` 必填，其余留空 | `manga / narration / mixed / unknown` |
+| `disposition` | 是 | `keep` 原样保留 / `fix_pages` 只改页映射 / `rewrite` 改写文字 / `remove` 删除 |
+| `pages_declared` | `drawn`/`altered` 必填 | 讲稿声称覆盖的页，必须在 `chapter.json` 的 `pages` 里 |
+| `novel_para` | 非 `original` 必填 | 小说段区间；空数组等于"没有来源" |
+| `evidence` | 是 | **人读证据**：页码 + 小说段号 + 一句可核对的话。不许只写"已核验" |
+
+##### 整份字段
 
 | 字段 | 说明 |
 | --- | --- |
 | `audit_spec_version` | **审核标准版本**。审核规范升级后，凭它能看出旧报告依据的是哪一版 |
+| `judgement_scope` | 固定 `narration_vs_source`，见上 |
 | `script_schema` | 被审讲稿用的 schema（`script/v1` 或 `script/v2`）。v1 与 v2 的字段不同，不能混判 |
 | `script_sha256` | **整份** `script.json` 的字节哈希。改一个字就失效 |
 | `novel_ref_sha256` | 底稿的字节哈希。底稿一变，之前的审计结论也不再可信 |
-| `audited_segments[].text_sha256` | 逐段哈希。用于定位"到底哪一段被改了"，比整份哈希更好用 |
-| `status` | `approved` 原样通过 / `rewritten` 改写过 / `removed` 已删除 |
-| `review_status` | 只有 `approved` 才允许正式出片；`partial` / `rejected` 都不行 |
+| `review_status` | 只有 `approved` 才允许正式出片；`pending_human` / `rejected` 都不行 |
 | `reviewed_by` | 必须是人（`human:<name>`）。**模型自审不能填这里** |
 
 **审核报告只由审核流程生成**（P0-C 第二条约束）：
@@ -643,14 +772,30 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 - 讲稿被改动后，审核流程**不能"继承"旧结论**——必须重新逐段判。
   否则"改了台词再点一下审核"就等于伪造审计。
 
+##### 校验分两层：`lint` 管格式，`check` 管放行
+
+```
+m1 novel lint --work <work>     只校验 Schema：枚举 / 证据 / 两层语义 / 覆盖
+                                不要求签核 → 未签核的样张也能被机器校验
+m1 novel check --work <work> --novel-dir <dir>
+                                五步门禁：先 lint，再验三层哈希与人签
+                                任一不过 → 退出码 3
+```
+
+分成两层的原因很实际：把"格式合法"和"人已签核"混在一个判定里，
+一份**尚未签核**的报告就根本没法被机器校验——它连"我这份格式对不对"都问不出来。
+而样张恰恰必须保持未签核状态。所以 `lint` 在前、签名在后，报错顺序也是先格式后哈希
+（否则人会以为是讲稿改了）。
+
 **失效规则（P0-06 门禁）**：
 
 ```
+m1 novel lint 全过？（schema / judgement_scope / 枚举 / 证据 / 覆盖）
 当前 script.json 字节哈希  == script_audit.script_sha256 ？
 当前 novel_ref.json 字节哈希 == script_audit.novel_ref_sha256 ？
 script_schema 与当前讲稿实际 schema 一致？
 audited_segments 覆盖全部当前段，且每段 text_sha256 对得上？
-review_status == "approved" ？
+review_status == "approved" 且 reviewed_by 以 human: 开头？
         ↓ 全过才允许正式出片
 ```
 
@@ -699,7 +844,7 @@ epub ─S1─► chapters/*.xhtml ─S1'─► novel.txt + novel_index.json     
 | S2 | 章节定界 | 机器 + 人 | `chapter_index.json` | **半自动**（程序测墨量 + 人读横幅） |
 | S3 | 页面解读 | 视觉模型 + 人 | `page_XXXX.profile.json` | 【待建】（仅 V2 素材检索需要） |
 | S4 | 分格与确认 | 机器 + 人 | `*.panels.json` | 【已实现】（仅 `visual_mode=panel` 需要） |
-| **S5a** | **底稿对齐** | **人 + 模型** | **`novel_ref.json`** | **【待建】**（流程已定，见 §5.6.1） |
+| **S5a** | **底稿对齐** | **人 + 模型** | **`novel_ref.json`** | **半自动**：`m1 novel align` 产骨架，`check` 五步门禁；逐 beat 判定必须人做（§5.6.1） |
 | S5 | 讲稿 | 模型 + 人 | `script.json` | 半自动（当前人工） |
 | S6 | 配音 | 机器 | `audio/*.wav` + 索引 | 【已实现】 |
 | S7 | 时间轴 | 机器 | `timeline.json` | 【已实现】 |
@@ -943,6 +1088,48 @@ python -m panelcast m1 novel check \
 
 **`--check` 对 v1 讲稿会直接失败**，这是正确的：v1 结构里没有 `source_refs` 字段，
 无从判断来源。要过第 3 步必须先迁到 v2（P0-11）。
+
+##### 工具：`m1 novel lint`（P0-REVIEW-04，已实现）
+
+底稿对齐做完、内容审完之后，还有一层**只校验格式**的入口：
+
+```bash
+python -m panelcast m1 novel lint --work m1/v1/ch01/work
+# novel lint: Schema 合法 -> m1/v1/ch01/work/script-audit.json
+#   注意：这只证明格式对，不证明已签核；出片仍需 review_status=approved
+```
+
+它校验的是审核口径本身，而不是哈希：`schema` / `judgement_scope` / `status` 枚举 /
+`alteration_origin` 枚举 / `disposition` / 证据是否可定位 / 段落覆盖。
+**不要求签核**——所以未签核的样张也能被机器校验。字段定义见 §4.3.10。
+
+`lint` 与 `check` 的分工是刻意的：
+
+| 命令 | 管什么 | 未签核的样张 |
+| --- | --- | --- |
+| `lint` | 格式合法吗 | **能过**（这正是它的用途） |
+| `check` | 能不能出片 | **必须不过**（`review_status` 与 `reviewed_by` 两处拦） |
+
+第一章样张就是这个状态的实例：`lint` 全过、`check` 卡在第 5 步，
+同时因为讲稿还是 v1 卡在第 3 步、因为 34 个 beat 未人工确认卡在第 4 步。
+
+##### 第一章样张（`P0-01-SAMPLE-CH01`）
+
+已产出并作为**正式示例**保留，**未签核**：
+
+| 产物 | 位置 | 说明 |
+| --- | --- | --- |
+| 章节对应表 | `m1/audit/chapter-map.md` | 为什么不能靠编号 + 判定四步法 + 30 行页段对照 |
+| 底稿 | `m1/v1/ch01/work/novel_ref.json` | 34 beats，页覆盖 38/38，`order: reordered` |
+| 审核报告 | `m1/v1/ch01/work/script-audit.json` | 25 段全审，`review_status: pending_human` |
+| 审计明细 | `m1/audit/script-audit-ch01.md` | 逐段判据、反例回归、高危案例 |
+
+结论摘要：25 段中 `drawn` 10 / `altered` 15，`disposition` 为
+`keep` 11 / `fix_pages` 1 / `rewrite` 13；高危 7 段，其中三处属**改变了事实**——
+虚构柜台小姐姓名「露娜」（全书 `grep` 命中 0 次）、把「我还是当冒险者好了」
+改成「我要当大贤者」、把被推开的女生说的「好痛」归到和真身上。
+
+**其余九章未核**，不得据第一章的结果推断它们的状态。
 
 #### 5.6.2 S5 讲稿
 
@@ -1500,12 +1687,16 @@ script.json
    │     == novel_index.json 的 file_sha256？   否 → 底稿失效，回 S5a 重对齐
    ├─3. 每段 source_refs 非空且 beat 存在？      否 → 禁止出片
    ├─4. beat 的页映射合法
-   │     （页在本章、original 必带 pages）？     否 → 禁止出片
+   │     （judgement_scope=manga_vs_novel、页在本章、original 必带 pages、
+   │       非 original 必带 para、beat 已人工 confirmed）？
+   │                                            否 → 禁止出片
    └─5. script-audit.json 有效？
-          · 存在，且 status=approved 或 rewritten
+          · 先跑 Schema 校验（= `m1 novel lint`）
+            schema / judgement_scope=narration_vs_source / 枚举 / 证据 / 覆盖
           · script_sha256 == 当前 script.json 的哈希
           · novel_ref_sha256 == 当前 novel_ref.json 的哈希
-          · 每段有 status 与 reviewed_by（人，不是机器）
+          · 每段 text_sha256 对得上
+          · review_status == approved 且 reviewed_by = human:<name>
                                             否 → 禁止正式出片（只允许 --draft 预览）
                                     ↓ 全过
                                  允许 TTS
@@ -1518,6 +1709,12 @@ script.json
 第 5 步是 P0-C 加的。前四步能证明「来源可追」，但**证明不了「有人看过这段文字」**——
 脚本可以完全合规地引用正确的 beat，同时把剧情讲错。`script-audit.json` 就是那把
 「人确实读过」的锁，它的失效规则见 §4.3.10：脚本、底稿、任一段文字任一变化，审计即过期。
+
+第 5 步内部**先格式后哈希**：`lint` 不过就只报格式错，不再往下比哈希。
+顺序反了会误导——人会以为"哈希不符"是讲稿被改了，其实只是枚举写错了。
+
+单独跑格式校验用 `m1 novel lint --work <work>`（不要求签核），
+它和 `check` 的分工见 §5.6.1。
 
 这五步只能证明**结构完整、来源可追、有人审过**，**不能证明剧情理解正确** —— 后者仍然只能靠
 §9.4 的人工抽检。不要因为 `--check` 通过就宣布内容合格。

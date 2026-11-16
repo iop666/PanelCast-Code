@@ -1,6 +1,7 @@
 {
   "schema": "novel-ref/v1",
   "chapter_uid": "konosuba-manga-v01-ch01",
+  "judgement_scope": "manga_vs_novel",
   "chapter_id": "ch01",
   "label": "第一章 与自称是女神的家伙一起转生到异世界！",
   "pages": [

@@ -57,7 +57,7 @@ PanelCast\
 │       ├── server.py              HTTP + 分格/介绍页读写
 │       └── static/index.html      浏览器界面（两个页签）
 │
-├── tests/                          【跑通】15 个文件 / 286 用例 / OK(skipped=2)
+├── tests/                          【跑通】15 个文件 / 306 用例 / OK(skipped=2)
 │
 ├── tools/                          三个不进 CLI 的辅助脚本
 │   ├── novel_extract.py     114   【跑通】epub → novel.txt + novel_index.json
@@ -312,7 +312,7 @@ y=1821  └──────────────────────┘
 | 验收 | 15 条，`run_report.json` 逐条留痕 |
 | 分格编辑器 | 分格页签 + 介绍页页签（schema 驱动表单） |
 | 小说抽取 | 2,627 段 / 83,599 字；`sha256`（内容）与 `file_sha256`（落盘字节）双哈希稳定 |
-| 测试 | 286 用例通过 |
+| 测试 | 306 用例通过 |
 
 ### 5.2 半自动的
 
@@ -364,9 +364,9 @@ P0 十一项，按依赖顺序：
 | --- | --- | --- |
 | P0-01 | 核实十章 ↔ 小说 ↔ 讲稿的真实对应 | `m1/audit/chapter-map.md`（**第一章已核，九章未核**） |
 | P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10（**ch01 已建，34 beats 全 needs_review**） |
-| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**ch01 已审，14 段待改写**） |
+| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**ch01 已审，13 段待改写 / 1 段待修页映射**） |
 | P0-04 | 改稿后重出受影响成片 | 十章 mp4 + 更新的 `delivery.md` |
-| P0-05 | `m1 novel --align/--check`（五步链） | CLI + 测试 |
+| P0-05 | `m1 novel --align/--check`（五步链）+ `lint`（Schema 校验） | CLI + 测试（`test_novel.py` 56 例） |
 | P0-06 | 正式出片门禁（`--draft` 分离 + 审核报告校验） | `m1 run` 改动 + 测试 |
 | P0-07 | 文档与实现统一 | 主规范 / 本文件 / README / CLI 帮助 |
 | P0-08 | 章节身份统一 | `chapter_uid` + 三种编号 |

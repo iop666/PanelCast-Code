@@ -86,6 +86,10 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   - 小说有、漫画没画：ch01 309–387（两周土木工/浴场/马厩）、562–619、620–711
   - 副产物：发现 `m1/v2/ch06–ch10` 目录名与 `chapter.json` 的 `id` 不一致
     （目录 ch06–ch10 / id ch01–ch05 / number 第六–十章），是 P0-08 的直接证据
+  - 审核口径（P0-REVIEW-04 定稿）：25 段 `drawn` 10 / `altered` 15；
+    `disposition` 为 `keep` 11 / `fix_pages` 1 / `rewrite` 13；高危 7 段
+  - **未签核**：`review_status: pending_human`、`reviewed_by: null`。
+    `m1 novel lint` 全过、`m1 novel check` 在第 3/4/5 步拦截（v1 讲稿 + beat 未确认 + 未签核）
 
 - [ ] **P0-02 建立底稿 `novel_ref.json`**
   十章各一份，覆盖本章所有漫画页；每个 Beat 标 `drawn / omitted / altered / original`。
@@ -122,6 +126,14 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   `fidelity` 必须是四值之一（`unconfirmed` 不算判定结果）、非 `original` 必须有 `para`、
   `review_status` 必须为 `confirmed`；新增 4 个用例。全量 286 tests OK。
 
+  **2026-11-16 追加（P0-REVIEW-04）**：第 4 步加 `judgement_scope=manga_vs_novel` 校验，
+  第 5 步改为**先 `lint` 后哈希**。新增 `m1 novel lint` 子命令与 `lint_audit()`：
+  只校验审核报告 Schema（枚举 / 证据 / 两层语义 / 覆盖），**不要求签核**，
+  使未签核的样张也能被机器校验。`tests/test_novel.py` 36 → 56 个用例，
+  全量 306 tests OK。
+  机器可读 Schema：`docs/schemas/script-audit.schema.json`（与代码枚举由测试锁死，
+  不许只改一边）。
+
 - [ ] **P0-06 正式出片门禁**
   `m1 run` 正式路径检查：底稿 hash、beat 引用、**内容审核报告（`script-audit.json`）
   有效性**——报告里的 `script_sha256` / `novel_ref_sha256` / 逐段 `text_sha256`
@@ -157,6 +169,21 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   `script.json` v2 的 `chapter` 指向 `chapter_uid`（规范 §4.3.4）。
   **仍缺：交付清单（`m1/delivery.md`、`m1/labels/*.json`）里还是展示标签，
   没有 `chapter_uid` 列。** 三处不统一，跨卷检索仍要人肉对表。
+
+  **P0-REVIEW-04 登记为明确问题**（规范 §4.3.1「P0-08 已登记的明确问题」）。
+  实测五章全部不一致，不是个别笔误：
+
+  | 目录 | `id` | `number` | 真实身份 |
+  | --- | --- | --- | --- |
+  | `m1/v2/ch06` | `ch01` | 第六章 | 第二卷第一章（全书第六章） |
+  | `m1/v2/ch07` | `ch02` | 第七章 | 第二卷第二章 |
+  | `m1/v2/ch08` | `ch03` | 第八章 | 第二卷第三章 |
+  | `m1/v2/ch09` | `ch04` | 第九章 | 第二卷第四章 |
+  | `m1/v2/ch10` | `ch05` | 第十章 | 第二卷第五章 |
+
+  危险不在命名难看，在于**门禁抓不到**：哈希绑的是文件内容，不是章节身份。
+  底稿/审计/讲稿一旦写进错误工作区，整章内容张冠李戴，五步门禁照样全过。
+  验收要求五条（含"四者不一致必须报错，不许程序猜"）见规范 §4.3.1。
 
 - [~] **P0-09 规则冲突核查（以代码为准）**【部分完成，需补一轮】
   已核实并写进规范的冲突：

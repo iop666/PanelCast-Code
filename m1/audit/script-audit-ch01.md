@@ -25,24 +25,45 @@
 `severity` 说**错得多重**：`high` = 改了事实或角色；`medium` = 改了动作细节；
 `low` = 措辞或程度偏差；`none` = 无问题。
 
-`alteration_origin` 说**错在谁身上**：
+`alteration_origin` 说**错在谁身上**（枚举以规范 §4.3.10 为准）：
 
-- `manga` —— 漫画改写了小说，旁白忠于漫画。**旁白没错，不该改旁白。**
+- `manga` —— 漫画改写了小说，旁白忠于漫画。**旁白没错，不该改旁白**，但必须给出页码。
 - `narration` —— 旁白自己编的。**必须改。**
-- `none` —— 无改动。
+- `mixed` —— 漫画改一半、旁白又编一半，必须拆开说明各占哪部分。
+- `unknown` —— 查不清是谁改的，保留疑问，不许硬塞进前两个。
+- 留空（`null`）—— 没有差异（`drawn` / `omitted`）。
+
+**不许写 `"none"`。** 那是个伪值：看着像枚举成员，实际没有任何语义，
+会让"枚举校验"形同虚设。本文件首版用过 `"none"`，迁移时已全部改为留空。
 
 这个区分很关键。同样是 `altered`，`origin=manga` 的处理是"记下来、不改稿"，
 `origin=narration` 的处理是"必须重写"。不区分就会出现两种误判：
 把漫画的合理改编当成旁白错误去"修"，或者把旁白编的东西当成漫画内容放过。
 
-### 1.3 审计状态枚举的一处扩展（规范缺口）
+**`alteration_origin` 不能代替来源引用。** 标了 `manga` 仍必须给 `pages_declared`——
+"这是漫画改的"本身就是一句关于画面的断言，指不出页码就等于没证据。
+`m1 novel lint` 会直接拒绝缺页码的 `manga`。
 
-规范 §4.3.10 的 `status` 只有 `approved / rewritten / removed`。
-本样张遇到的真实状态是**"已审出结论、但还没改写、也没人签核"**，三值都套不上。
+### 1.3 `status` 与 `review_status` 是两件事
 
-因此 `script-audit.json` 里 `status` 统一为 `pending`，并在文件内用
-`status_enum_extended` 显式声明这是扩展值、不是规范原值。
-**这是本样张暴露的第一个规范缺口**，建议在 §4.3.10 补一态（见 §7）。
+规范 §4.3.10 的 `status` 原本只有 `approved / rewritten / removed`。
+本样张遇到的真实状态是**"已审出结论、但还没改写"**，三值都套不上。
+
+**这个缺口已按 P0-REVIEW-04 补上**：`pending_rewrite` 并入正式枚举
+（`approved / pending_rewrite / rewritten / removed`），`pending` 废弃。
+首版曾自造 `pending` 并用 `status_enum_extended` 在文件内声明，现该声明块已删除——
+**自造枚举没人校验，等于没有枚举**。
+
+两层必须分清，混起来就会把"改完了"读成"通过了"：
+
+| 字段 | 层级 | 本样张的值 | 回答什么 |
+| --- | --- | --- | --- |
+| `status` | 逐段 | `approved` 11 / `pending_rewrite` 14 | 这一段处理到哪一步 |
+| `review_status` | 整份 | `pending_human` | **有没有人签核** |
+
+`status=pending_rewrite` + `review_status=pending_human` 读作：
+**已审出问题（证据已记）→ 改稿还没做 → 也没人签核。**
+不许读成"机器还没生成任何结论"，也不许读成"已经通过"。
 
 ### 1.4 覆盖率（不抽样）
 
@@ -66,20 +87,25 @@
 | 低 | 6 |
 | 无 | 8 |
 
-| 建议动作 | 段数 |
+| `disposition` | 段数 |
 | --- | --- |
-| 保留 | 10 |
-| 改页引用 | 1 |
-| **改写** | **14** |
+| `keep` 保留 | 11 |
+| `fix_pages` 只改页映射 | 1 |
+| **`rewrite` 改写** | **13** |
 
-**一句话结论：25 段里 14 段需要改写，其中 7 段是高危（改了事实或角色）。**
-这不是"个别措辞问题"，是系统性偏差——而这 14 段当初都是**只看画面写出来的**。
+**一句话结论：25 段里 13 段需要改写、1 段只需改页映射，其中 7 段是高危（改了事实或角色）。**
+这不是"个别措辞问题"，是系统性偏差——而这些段当初都是**只看画面写出来的**。
+
+> 计数在 P0-REVIEW-04 迁移时变过一次（`rewrite` 14 → 13）：`seg_0024` 原判 `rewrite`，
+> 但它的 `alteration_origin` 是 `manga`、备注也写着"旁白跟随漫画"。
+> 按"漫画改编、旁白跟随 → 保留"的规则，它应当是 `keep`。**这条自相矛盾是本轮迁移自己查出来的**，
+> 详见 §3.24 与 `script-audit.json` 的 `schema_migration.corrections`。
 
 ---
 
 ## 2. 总表（25 段，逐条）
 
-| # | 段 | 声明页 | 实际页 | fidelity | 严重度 | 建议 | 一句话 |
+| # | 段 | 声明页 | 实际页 | fidelity | 严重度 | disposition | 一句话 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `seg_0001` | 0005、0006 | 0005、0006 | drawn | 低 | 保留 | 框架句，忠于小说+画面 |
 | 2 | `seg_0002` | 0007、0008 | 0007、0008 | drawn | — | 保留 | 忠于原文 |
@@ -104,7 +130,7 @@
 | 21 | `seg_0021` | 0035 | 0035 | altered | 中 | 改写 | 眼罩动作错位 + 面包无来源 |
 | 22 | `seg_0022` | 0036、0037 | 0036、0037 | drawn | — | 保留 | 忠于原文 |
 | 23 | `seg_0023` | 0038、0039 | 0038、0039 | drawn | — | 保留 | 忠于原文 |
-| 24 | `seg_0024` | 0040 | 0040 | altered | 中 | 改写 | 「那几只」复数夸张（漫画） |
+| 24 | `seg_0024` | 0040 | 0040 | altered | 中 | **保留** | 「那几只」复数夸张（漫画改的，旁白跟随） |
 | 25 | `seg_0025` | 0041、0042 | 0041、0042 | altered | 中 | 保留 | 忠于漫画，漫画改写小说 |
 
 ## 3. 逐段明细
@@ -118,11 +144,12 @@
 | 小说来源 | ch00 118–148；ch01 152–160 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0005、0006 / 0005、0006 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 序章 143–148（和真指定阿克娅为「要带去的东西」，光笼罩两人）；第一章 156–160（红砖屋、兽耳、精灵耳、「如果是这个世界，我愿意乖乖出外工作」） |
 | 结论 | 「被城墙环抱」「货摊」「披甲骑士」只见于 p6 全景，小说未写，属画面补充，不冲突。p5 是扉页、无剧情，旁白落在扉页上是版式决定。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.2 `seg_0002` — drawn（—）
 
@@ -133,11 +160,12 @@
 | 小说来源 | ch01 152–165 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0007、0008 / 0007、0008 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 152「马车驶过石板路」、159「是兽耳！…还有精灵耳！」、160「我愿意乖乖出外工作啊」；p8 高举双手 |
 | 结论 | 「趴在地上放声大哭」与 p8 阿克娅蹲地痛哭一致。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.3 `seg_0003` — drawn（低）
 
@@ -148,11 +176,12 @@
 | 小说来源 | ch01 161–170；ch00 2–3 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0009 / 0009、0010 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 168「就是因为回不去我才伤脑筋啊」；序章 2「虽然短暂，您的人生已经结束了」；p10 首格「沒錯！非常遺憾。真是短暫的人生。」 |
 | 结论 | **页映射不完整**：末句「没错，真是短暂的人生」实际在 p10 首格，本段只登记 p9。内容无误，页引用少一页，会让时间轴把旁白压在错误的页上。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `fix_pages` |
+| disposition | `fix_pages` |
 
 ### 3.4 `seg_0004` — altered（低）
 
@@ -166,8 +195,9 @@
 | alteration_origin | `narration` |
 | 依据 | 序章 14–24 回忆事故；25–33「我可以问一件事吗？」「那个女生…她还活着吗？」；p10 末格起回忆、p11 推开动作 |
 | 结论 | 「再睁眼时」把小说的「我回想起不久之前的记忆」（12）改写成「苏醒」，叙事框架变了；事件本身无误。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.5 `seg_0005` — altered（高）
 
@@ -181,8 +211,9 @@
 | alteration_origin | `narration` |
 | 依据 | 序章 33–35「还活着啊！不过伤势颇为严重，脚都骨折了」「所以我并没有白死」；p12 同 |
 | 结论 | **末两句无来源且时序倒错**：此时尚未发生「把女神拽下界」（那是 p17–p19），旁白却写成既成事实；「他的异世界冒险就此开场」是编导式收束语，小说与漫画都没有。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.6 `seg_0006` — altered（高）
 
@@ -196,8 +227,9 @@
 | alteration_origin | `narration` |
 | 依据 | 序章 40–55 牵引机与被吓死；56「我的名字是阿克娅…有两个选择」；p13「好痛」为**被推开的女生**所说，和真是抱头蹲坐 |
 | 结论 | **两处张冠李戴**：①「和真瘫在地上只剩一句好痛」——小说与 p13 里说「好痛」的是被推开的女生，和真是抱头蹲坐（序章 56）；②「还嘴硬说妳多管闲事」——「多管閒事」是阿克娅形容和真的举动（p12、小说 41 同义），旁白把说话人写成了和真。这类错误不是编剧情，而是把角色对调，比完全虚构更难被发现。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.7 `seg_0007` — drawn（—）
 
@@ -208,11 +240,12 @@
 | 小说来源 | ch01 72–80 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0015 / 0015 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 74–80「有个魔王」「把其他世界的死者送到那里去」「找年纪轻轻便丧命、还充满依恋的人」；p15「就像打電玩一樣♡」 |
 | 结论 | 「人类越死越少」是小说 78「再这样下去，那个世界就不会再有小宝宝诞生」的压缩，语义一致。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.8 `seg_0008` — drawn（—）
 
@@ -223,10 +256,11 @@
 | 小说来源 | ch00 81–94 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0016、0017 / 0016、0017 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 序章 81–94 可带一样东西过去；111–113「那，就你吧」；p16「我一點也不想去！」p17「那我就選妳！」 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.9 `seg_0009` — altered（中）
 
@@ -240,8 +274,9 @@
 | alteration_origin | `narration` |
 | 依据 | 序章 114–124 魔法阵浮现、天使现身；129「一路顺风，阿克娅大人」；p18 魔法阵与「遵命！」 |
 | 结论 | 「抓住女神的手就往传送阵里带」是捏造的动作：小说与 p18 都是**魔法阵自行启动**，和真没有碰她。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.10 `seg_0010` — drawn（—）
 
@@ -252,11 +287,12 @@
 | 小说来源 | ch00 126–130 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0019 / 0019 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 序章 126「带女神去是犯规吧！」130「身为女神，我拥有治愈的力量，但是没有战斗的力量啊！」；p19 同 |
 | 结论 | p19 另有神「對勇者說這些帥氣的台詞…是我的工作啊」，旁白未提，属可接受省略。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.11 `seg_0011` — altered（高）
 
@@ -270,8 +306,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 171–180「阿克娅，总之先告诉我冒险者公会的位置」「这种事情你问我，我也不知道啊」「这家伙真是没用」；p20「死廢人」 |
 | 结论 | **「两人摔在草地上」无来源且与画面矛盾**：小说 152 明写落地是「马车驶过石板路」，p20 画面是城镇街道，没有草地。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.12 `seg_0012` — altered（高）
 
@@ -285,8 +322,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 181–202 问路与进公会；229「登录需要支付登录手续费」；234「在那种状况下突然被带到这里来，我怎么可能有带钱啊？」；p22「一人要收一千艾莉絲」 |
 | 结论 | **「柜台小姐露娜」的人名无来源**：全书检索「露娜」0 次，小说只称「柜台小姐」，p21–p23 也没有出现她的名字。凭空命名，且后两段继续沿用（seg_0014/0015），错误会扩散。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.13 `seg_0013` — altered（高）
 
@@ -300,8 +338,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 242「我是阿克娅…阿克西斯教团所祭拜的神体」「能不能请汝帮个忙，借我一点钱」；248 祭司给钱并告诫别冒用名号；253–256「我们拿登录费来了」「阿克娅从祭司那里要来的钱有三千艾莉丝」 |
 | 结论 | **两处事实错误**：①「恭恭敬敬递上教典」——祭司递的是**钱**，「教典」是他用来自证艾莉丝教徒身份的道具（p23「這是我們的教典」），不是礼物；②「和真看不下去，自己把登记费交了」——小说 253–256 与 p23 用的都是**阿克娅讨来的三千艾莉丝**，和真没有自己掏钱。资金因果被改写。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.14 `seg_0014` — altered（低）
 
@@ -315,8 +354,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 259–278 冒险者是万事屋、卡片显示等级与能力值、经验值可升级；p24–p25 同 |
 | 结论 | 内容忠于原文，唯一问题是「露娜」这个无来源人名（承 seg_0012）。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.15 `seg_0015` — altered（高）
 
@@ -330,8 +370,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 278–303「每一项都很普通…幸运非常高」「幸运是不太需要的数值」「那、那个，我还是，当冒险者好了」；292–303 阿克娅数值与大祭司 |
 | 结论 | **「和真不服，转头说那我要当大贤者」是凭空捏造的台词**：小说 282–283 和真说的是「我还是，当冒险者好了」，p26 也没有「大贤者」。同段仍有「露娜」人名问题。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.16 `seg_0016` — altered（低）
 
@@ -345,8 +386,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 392「巨大的蛙型怪物——巨型蟾蜍」、399「它们巨大的身体比牛还大」；p28 巨蛙远大于人 |
 | 结论 | 「比人还高」与小说「比牛还大」不符，属尺寸低估；「草丛里窜出」与小说「城镇外面的宽广平原」略偏。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.17 `seg_0017` — altered（高）
 
@@ -360,8 +402,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 412–421「蟾蜍已经跑向和逃窜的我不同的方向」「一条腿从蟾蜍的嘴角掉了出来」；p30 同 |
 | 结论 | **关键动作被改写**：「被青蛙一口黏液浇透」——小说与 p30 都是**被吞进嘴里**、被拖出来时全身黏液。把「被吃掉」降级成「被喷到」，抹掉了原作的核心笑点，也掩盖了「女神被蟾蜍吞下」这一事实。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.18 `seg_0018` — altered（低）
 
@@ -375,8 +418,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 444–461「还是招募同伴吧！」「有本小姐在，想找同伴只需要招募一下」；p31「這個任務要賭上性命，但是報酬卻很少…」 |
 | 结论 | 「两人对着账本发愁」无来源：小说 446–461 是**吃着酥炸蟾蜍腿**开会，没有账本。「报酬少得可怜」来自 p31 漫画台词，小说 451 只说「和土木工程的打工费差不了多少」，属程度放大。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.19 `seg_0019` — drawn（—）
 
@@ -387,11 +431,12 @@
 | 小说来源 | ch01 463–480 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0032 / 0032 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 463–480「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同 |
 | 结论 | 「坐到天黑」对应小说 466「已经持续等超过半天」，可接受。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.20 `seg_0020` — drawn（—）
 
@@ -402,11 +447,12 @@
 | 小说来源 | ch01 480–497 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0033、0034 / 0033、0034 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 480「我看见在招募上级职业冒险者的告示」、488「吾乃惠惠！职业乃大法师…爆裂魔法」、494「红魔族首屈一指的魔法师」、495「我已经三天没吃任何东西了」；p33–p34 同 |
 | 结论 | 「最高阶职业」与小说「大法师」（上级职业）一致；「红着脸」画面依据不足，但无害。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.21 `seg_0021` — altered（中）
 
@@ -420,8 +466,9 @@
 | alteration_origin | `narration` |
 | 依据 | 第一章 497–501 眼罩由**和真**去拉；502–506 红魔族说明；507–512 父母名字；513 魔力值很高；515–517 递菜单；p35 惠惠在喝饮料 |
 | 结论 | **两处动作错位**：①「惠惠…撩起眼罩」——小说 500 与 p34 都是**和真**去拉扯她的眼罩，不是她自己撩；②「抓起面包就啃」无来源，小说 515–517 是递菜单，p35 她拿的是杯子。 |
+| status | `pending_rewrite` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `rewrite` |
 
 ### 3.22 `seg_0022` — drawn（—）
 
@@ -432,11 +479,12 @@
 | 小说来源 | ch01 519–543 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0036、0037 / 0036、0037 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 519「在我准备好之前，请你们绊住那只蟾蜍」、538「这就是人类所能实行的攻击手段当中威力最强的一种」；p36–p37 同 |
 | 结论 | 「几只青蛙」小说为两只（一远一近），p36 画面多于两只，属画面差异。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.23 `seg_0023` — drawn（—）
 
@@ -447,11 +495,12 @@
 | 小说来源 | ch01 539–547 |
 | source_type | `novel_beat` |
 | 页面（声明 / 实际） | 0038、0039 / 0038、0039 |
-| alteration_origin | `none` |
+| alteration_origin | 留空（无差异） |
 | 依据 | 第一章 539–547 法杖前端聚光、闪光、爆风；p39 球状法器与冲击波 |
 | 结论 | 「草叶全部压平」是画面推断（p39 冲击波），小说只说「就快被那凌厉的爆风给吹走」；「连喊都喊不出来」无直接依据，无害。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ### 3.24 `seg_0024` — altered（中）
 
@@ -464,9 +513,10 @@
 | 页面（声明 / 实际） | 0040 / 0040 |
 | alteration_origin | `manga` |
 | 依据 | 第一章 545「蟾蜍爆裂开来」、547「形成了一个二十公尺以上的陨石坑」、548「太猛了吧——这就是魔法啊」；p40「一瞬間就把那些青蛙…」 |
-| 结论 | 小说只炸掉**一只**蟾蜍，旁白「那几只青蛙连影子都没剩下」沿用了 p40 漫画台词的复数夸张。属漫画改写、旁白跟随，不是旁白原创。 |
+| 结论 | 小说只炸掉**一只**蟾蜍，旁白「那几只青蛙连影子都没剩下」沿用了 p40 漫画台词的复数夸张。属漫画改写、旁白跟随，不是旁白原创。**原判 `rewrite` 与本行自述矛盾**：既然认定"旁白跟随漫画"，按"漫画改编、旁白跟随 → 保留"的规则就应当是 `keep`。P0-REVIEW-04 迁移时改为 `keep`。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `rewrite` |
+| disposition | `keep` |
 
 ### 3.25 `seg_0025` — altered（中）
 
@@ -480,8 +530,9 @@
 | alteration_origin | `manga` |
 | 依据 | 第一章 549–561「惠惠已经倒在地上了」「我收拾掉…两只蟾蜍」；p41「贏定了！只要靠她的力量，就連魔王也可以輕易地…」、p42「乾脆讓這兩個人都被青蛙吃掉」 |
 | 结论 | 漫画把小说的「和真收拾残局」改写成「盘算丢下两人自己回去」的黑色独白；旁白忠于漫画，与小说的差异属漫画改写，不改旁白。 |
+| status | `approved` |
 | 审核 | `pending_human`，reviewer = null（未签核） |
-| 建议 | `keep` |
+| disposition | `keep` |
 
 ## 4. 反例回归：把规则套回第六章那起错误
 
@@ -663,15 +714,28 @@ P0-05 的验收第 5 条写着「`--check` 对未确认的 beat **报错而不�
 新增 4 个用例（含「只把状态改成 confirmed、fidelity 仍为 unconfirmed 也要拦」）。
 全量 **286 tests OK (skipped=2)**。
 
-### 7.4 规范缺口（建议修订，本轮未改）
+> **P0-REVIEW-04 追加**：第 4 步再加 `judgement_scope=manga_vs_novel` 校验，
+> 第 5 步改为**先 `lint` 后哈希**，并新增 `m1 novel lint`（只校验 Schema、不要求签核）。
+> `tests/test_novel.py` 36 → 56 例，全量 **306 tests OK (skipped=2)**。
+
+### 7.4 规范缺口：已解决的与仍待解决的
+
+**已按 P0-REVIEW-04 解决**（本轮已写进规范 §4.3.9 / §4.3.10 并有测试）：
+
+| # | 原缺口 | 处理 |
+| --- | --- | --- |
+| 1 | `status` 三值缺"已审出结论、待改写" | 正式增 `pending_rewrite`，`pending` 废弃；`lint` 拒绝旧值并给出提示 |
+| 2 | 无"逐段 fidelity / severity / 来源类型"字段 | 已正式纳入 §4.3.10 逐段字段表，并加枚举校验 |
+| 3 | 两层 `fidelity` 同名不同义，易混用 | 新增 `judgement_scope`（`manga_vs_novel` / `narration_vs_source`），两边都必须显式声明，`lint` 与 `check` 各验一处 |
+| 4 | `alteration_origin` 可能被当成来源引用 | 加硬规则：`manga` 必须附 `pages_declared`，`lint` 直接拒绝缺页码的记录 |
+
+**仍待解决**：
 
 | # | 缺口 | 建议 |
 | --- | --- | --- |
-| 1 | §4.3.10 的 `status` 三值缺少"已审出结论、待改写"这一态 | 增 `pending`（或 `needs_rewrite`） |
-| 2 | §4.3.10 无"逐段 fidelity / severity / 来源类型"字段 | 本样张用附加字段实现，建议正式纳入 |
-| 3 | §4.3.9 的 `beats[]` 无 `review_status` / `evidence` / `mapping_confidence` | 建议纳入，否则"未确认"只能靠外部约定 |
-| 4 | §4.3.4 的 `source_refs[].type` 四值里没有"无来源" | 无来源旁白只能标 `novel_beat` 或留空，两者都会骗过门禁。建议显式允许 `none` 并让门禁拦截 |
-| 5 | 段级 `pages` 与实际画面不符时无校验 | 建议加 `pages_actual` 或让 `verify` 比对 |
+| 5 | §4.3.9 的 `beats[]` 无 `review_status` / `evidence` / `mapping_confidence` | 建议纳入，否则"未确认"只能靠外部约定 |
+| 6 | §4.3.4 的 `source_refs[].type` 四值里没有"无来源" | 无来源旁白只能标 `novel_beat` 或留空，两者都会骗过门禁。建议显式允许 `none` 并让门禁拦截 |
+| 7 | 段级 `pages` 与实际画面不符时无校验 | 建议加 `pages_actual` 或让 `verify` 比对 |
 
 ### 7.5 已知但本轮无法解决的问题
 
@@ -696,13 +760,18 @@ P0-05 的验收第 5 条写着「`--check` 对未确认的 beat **报错而不�
 2. 强制逐段。25 段全部列出，没有抽样，覆盖率可计算（100%）。
 3. 门禁可执行。`script-audit.json` 的哈希绑定让"改一句台词"立刻使审计失效。
 
-三条修正：
+三条修正（**第 3 条已在 P0-REVIEW-04 落地**）：
 
 1. **`severity` 和 `alteration_origin` 必须保留**。只留 `fidelity` 会退化成
    "altered 一堆"，无法区分"该改旁白"和"该记不改"。
 2. **"无来源细节清单"要单列**（§6）。它嵌在 `drawn` 段里，段级判定会稀释它，
    而它恰恰是"只看画面写稿"最典型的产物。
-3. **`status` 的 `pending` 态要先补进规范**，否则每章都要重复解释一次扩展。
+3. ~~`status` 的 `pending` 态要先补进规范~~ → **已补**：正式枚举为
+   `approved / pending_rewrite / rewritten / removed`，且与 `review_status` 分离。
+
+**P0-REVIEW-04 之后，本文件的格式已升级为正式 Schema（`script-audit/v2`）**，
+不再需要每章重复解释扩展值。九章迁移时直接照 §4.3.10 的字段表填，
+跑 `m1 novel lint` 自检格式，不要各章自己发明字段。
 
 工作量参考：本章 38 页 / 25 段，逐页读图 + 逐段核原文约 **2.5 小时**。
 按十章 249 页 / 168 段线性估算，约 **17 小时**——与 P0 任务书"20 小时人工"的估算吻合，
@@ -714,10 +783,19 @@ P0-05 的验收第 5 条写着「`--check` 对未确认的 beat **报错而不�
 
 按任务书的停止条件，本样张到此为止，**不自动开始第二章**。
 
-等待项目负责人审核后，需要做的三件事（按顺序）：
+**P0-REVIEW-04 已完成的部分**（文档与代码，不含内容改写）：
 
-1. **签核**：把 `script-audit.json` 的 `reviewed_by` 填 `human:<name>`、
-   `review_status` 改 `approved`（或先改 `rejected` 退回重审）。
-2. **定格式**：确认 §1.1–§1.3 的判据与 §7 的三条修正，再复制到其余九章。
-3. **改写**：`seg_0004/0005/0006/0009/0011/0012/0013/0014/0015/0016/0017/0018/0021/0024`
-   共 14 段进 P0-03；`seg_0003` 的页引用单独修。
+1. 判据写进规范 §4.3.10：`alteration_origin` 四值 + 无差异留空、`status` 四值、
+   两层 `fidelity` 的 `judgement_scope`、证据可定位、`disposition`。
+2. Schema 与校验器：`script-audit/v2` + `lint_audit()` + `m1 novel lint`，12 个新用例。
+3. 本样张升级为 `script-audit/v2` 并保持**未签核**（`pending_human` / `reviewed_by=null`）。
+4. P0-08 三套编号冲突登记为明确问题（规范 §4.3.1 + ROADMAP）。
+
+**仍待项目负责人决定 / 执行**：
+
+1. **签核**：把 `reviewed_by` 填 `human:<name>`、`review_status` 改 `approved`
+   （或改 `rejected` 退回重审）。签核会让本文件字节哈希变化，属预期。
+2. **改写**：`seg_0004/0005/0006/0009/0011/0012/0013/0014/0015/0016/0017/0018/0021`
+   共 **13 段**进 P0-03；`seg_0003` 的页引用单独修（`fix_pages`）。
+   `seg_0024` 已改为 `keep`，不在改写清单里。
+3. **九章批量**：等第一章签核后先做第二章单章验证，再谈并行。

@@ -153,6 +153,22 @@
 - `chapter_index.json` 用 `ch01..ch07`（卷内编号）；
 - `find_chapter` 按 `id` 或 `number` 匹配，实际调用都传「第六章」才没炸。
 
+**P0-REVIEW-04 登记为明确问题（不是命名不统一）**
+
+五章实测，三套编号在同一目录里对不上：
+
+| 目录 | `chapter.json.id` | `number` | 真实身份 |
+| --- | --- | --- | --- |
+| `m1/v2/ch06` | `ch01` | 第六章 | 第二卷第一章（全书第六） |
+| `m1/v2/ch07` | `ch02` | 第七章 | 第二卷第二章 |
+| `m1/v2/ch08` | `ch03` | 第八章 | 第二卷第三章 |
+| `m1/v2/ch09` | `ch04` | 第九章 | 第二卷第四章 |
+| `m1/v2/ch10` | `ch05` | 第十章 | 第二卷第五章 |
+
+危险不在难看，在**门禁抓不到**：哈希绑的是文件内容，不是章节身份。
+底稿 / 审计 / 讲稿一旦写进错误工作区，整章内容张冠李戴，五步门禁照样全过。
+**这是 P0-01 的前置风险**：对应关系人工做对了也没用，写错目录就全废。
+
 **目标结构**
 
 ```json
@@ -230,6 +246,45 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 6. 缺 `script-audit.json` → `--check` 报"未审核"（退出码 3），**不得静默通过**；
 7. 改动 `script.json` 任一段文字后，原 `script-audit.json` 判定失效并指出是哪一段的 `text_sha256` 变了；
 8. 新增测试 ≥15 个，全量 250+ 通过。
+
+---
+
+### P0-REVIEW-04 审核口径与 Schema 修订【已完成】
+
+**来源**：项目负责人对第一章样张的审核意见。三项决定 + 一条要求：
+认可 `alteration_origin`；接受"待改写"状态但要用 `pending_rewrite` 并写进正式 Schema；
+同意 `seg_0025` 判 `altered` 不改稿；要求把 P0-08 编号冲突登记为明确问题。
+
+**做完的四件事**
+
+| # | 事项 | 产物 |
+| --- | --- | --- |
+| 1 | 判据写进规范 | §4.3.10 重写：`alteration_origin` 四值 + 无差异留空、`status` 四值、`judgement_scope`、证据可定位、`disposition` |
+| 2 | 机器可读 Schema | `docs/schemas/script-audit.schema.json`（draft-07，含 if/then 条件规则） |
+| 3 | 校验器 + CLI | `lint_audit()` / `m1 novel lint`（只校验格式、不要求签核）；`check` 第 5 步改为先 lint 后哈希 |
+| 4 | 样张升级 | `script-audit.json` → v2，**保持未签核**；`seg_0024` 自相矛盾已改正 |
+
+**关键设计：为什么把 `lint` 单独拆出来**
+
+门禁第 5 步原本把"格式合法"和"人已签核"混在一个判定里，
+结果一份**未签核**的报告根本没法被机器校验——它连"我格式对不对"都问不出来。
+而样张恰恰必须保持未签核。拆开后：
+
+- `m1 novel lint` → 格式合法就过（样张能过）
+- `m1 novel check` → 还要哈希 + 签核（样张必须不过）
+
+**验收（8 条，全部有测试）**
+
+1. `status="pending"` 被拒，报错提示改用 `pending_rewrite`；
+2. `alteration_origin="none"` 被拒（伪值），无差异必须留空；
+3. `fidelity=altered` 但 `alteration_origin` 为空 → 被拒；
+4. `alteration_origin=manga` 但 `pages_declared` 为空 → 被拒；
+5. `mixed` / `unknown` 被接受（不许为了凑枚举硬挑）；
+6. 缺 `judgement_scope` 或写成 `manga_vs_novel` → 被拒；
+7. `novel_ref` 缺 `judgement_scope=manga_vs_novel` → 第 4 步报错；
+8. `docs/schemas/script-audit.schema.json` 的枚举与代码常量一致（防两边分叉）。
+
+**不做**：不改任何一段旁白（改写属 P0-03）；不签核（只能由人做）；不碰 `m1 run`。
 
 ---
 

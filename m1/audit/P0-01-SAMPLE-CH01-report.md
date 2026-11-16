@@ -11,7 +11,8 @@
 
 第一章 38 页 / 25 段讲稿**逐段审完（100%，无抽样）**，
 结果是 **10 段合格、15 段有问题，其中 7 段高危**（改了事实或角色），
-**14 段需要改写**。问题不是"个别措辞"，而是系统性的：这批讲稿是只看画面写的。
+**13 段需要改写 + 1 段只改页映射**（P0-REVIEW-04 回检后由 14 段修正而来）。
+问题不是"个别措辞"，而是系统性的：这批讲稿是只看画面写的。
 
 同时补上了一个实现缺陷：P0-05 的验收第 5 条（`--check` 要对未确认的 beat 报错）
 在 `8161344` 里**没有实现**，骨架能直接过第 4 步。已修并加测试。
@@ -25,9 +26,9 @@
 | 路径 | 大小 | 说明 |
 | --- | --- | --- |
 | `m1/audit/chapter-map.md` | 11,928 B | 章节对应表（第一章详解 + 十章总表） |
-| `m1/v1/ch01/work/novel_ref.json` | 19,255 B | 34 个 beat，全部 `needs_review` |
-| `m1/v1/ch01/work/script-audit.json` | 36,027 B | 25 段逐段审计（机器可读） |
-| `m1/audit/script-audit-ch01.md` | 43,641 B | 同一份审计的人读版（723 行） |
+| `m1/v1/ch01/work/novel_ref.json` | 19,294 B | 34 个 beat，全部 `needs_review`（P0-REVIEW-04 后） |
+| `m1/v1/ch01/work/script-audit.json` | 37,655 B | 25 段逐段审计（`script-audit/v2`） |
+| `m1/audit/script-audit-ch01.md` | 见 §G | 同一份审计的人读版（801 行） |
 | `m1/audit/P0-01-SAMPLE-CH01-report.md` | 本文件 | 执行报告 |
 
 ### A.2 修改（只有一处代码改动）
@@ -143,13 +144,17 @@ p10 首格才出现"没错！真是短暂的人生。"——由此转入天界�
 | --- | --- |
 | `narration`（旁白自己编的，**必须改**） | 13 |
 | `manga`（漫画改的，旁白忠于漫画，**不改**） | 2（seg_0024 / seg_0025） |
-| `none` | 10 |
+| 留空（无差异，`drawn`） | 10 |
 
-| 建议动作 | 段数 |
+| `disposition` | 段数 |
 | --- | --- |
-| 保留 | 10 |
-| 改页引用 | 1（seg_0003） |
-| **改写** | **14** |
+| `keep` 保留 | 11 |
+| `fix_pages` 只改页映射 | 1（seg_0003） |
+| **`rewrite` 改写** | **13** |
+
+> 计数在 P0-REVIEW-04 迁移时由 `keep 10 / rewrite 14` 变为 `keep 11 / rewrite 13`：
+> `seg_0024` 的 `alteration_origin` 是 `manga`、备注也写"旁白跟随漫画"，
+> 原判 `rewrite` 与自己的判据矛盾，已改为 `keep`。见 §L。
 
 另有无来源局部细节 **8 处**（嵌在 `drawn` 段里，见 §F.2）。
 
@@ -229,21 +234,28 @@ p10 首格才出现"没错！真是短暂的人生。"——由此转入天界�
 
 ## G. 审计前后 SHA-256
 
-| 文件 | 审计前 | 审计后 | 结论 |
+下表的"当前"列是 **P0-REVIEW-04 迁移后**的值（迁移内容见 §L）；
+"首次交付"列是 `eff6fad` 时的值，保留它是因为这份报告本身要能当历史记录读。
+
+| 文件 | 首次交付（eff6fad） | 当前（P0-REVIEW-04 后） | 说明 |
 | --- | --- | --- | --- |
 | `script.json` | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | **同左** | **一字未改**，符合"审计不改稿" |
-| `novel_ref.json` | 不存在 | `c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a` | 新建 |
-| `script-audit.json` | 不存在 | `da5118e34320a4fe9f4635725ee87d78b0c7d081aadcdee76a6bb32c9a9f6d71` | 新建 |
-| `m1/audit/chapter-map.md` | 不存在 | `fea1d6a7d161d2adc1e9d486cb3164ca4281e96ad9eaf3a26b4f15898dcb77ce` | 新建 |
-| `m1/audit/script-audit-ch01.md` | 不存在 | `bb8b258995df000403bf17ecbcc61d0b7c1a87a79e77402bc78eecb168974711` | 新建 |
+| `novel_ref.json` | `c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a` | `9cdba901ea8d3c57cb83c89be28b19a76297ad206d06d81af52a4bfddafee0d5` | 加 `judgement_scope` |
+| `script-audit.json` | `da5118e34320a4fe9f4635725ee87d78b0c7d081aadcdee76a6bb32c9a9f6d71` | `1c0da012abb61dbc92c05779fc375356bc23a173a49a23f3c7a279e15fcef0db` | 升 v2 + 改 1 处判定 |
+| `m1/audit/chapter-map.md` | `fea1d6a7d161d2adc1e9d486cb3164ca4281e96ad9eaf3a26b4f15898dcb77ce` | **同左** | 未改 |
+| `m1/audit/script-audit-ch01.md` | `bb8b258995df000403bf17ecbcc61d0b7c1a87a79e77402bc78eecb168974711` | `c940541941225f49bc969c66bec2f84fb59fb39f636e30419db0c5d09f72a483` | 枚举与计数同步 |
 
 **审计报告内部绑定的三个哈希**（`script-audit.json` 里）：
 
 | 字段 | 值 | 校验什么 |
 | --- | --- | --- |
 | `script_sha256` | `1ac90fae…` | 改一句台词 → 审计立即失效 |
-| `novel_ref_sha256` | `c52879d2…` | 底稿一改 → 审计立即失效 |
+| `novel_ref_sha256` | `9cdba901…` | 底稿一改 → 审计立即失效 |
 | `audited_segments[].text_sha256` | 25 条，逐段 | 能定位"到底哪一段被改了" |
+
+> 注意 `novel_ref_sha256` 变过：加 `judgement_scope` 改了底稿字节，
+> 审核报告里的绑定值必须跟着重算，否则第 5 步会误报"底稿改过但审计没重做"。
+> 这正是哈希绑定的正常代价——**改底稿就必须重绑，不许只改一边**。
 
 ### G.1 门禁当前的实际表现
 
@@ -315,7 +327,7 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 
 | # | 问题 | 归属 |
 | --- | --- | --- |
-| 1 | 14 段需要改写 | P0-03 |
+| 1 | 13 段需要改写 + 1 段只改页映射（P0-REVIEW-04 回检后） | P0-03 |
 | 2 | `seg_0003` 页引用少一页（p9 → p9+p10） | P0-03 / 重出片时一并修 |
 | 3 | 讲稿仍是 `script/v1`，没有 `source_refs` | P0-11 |
 | 4 | `novel_index.json` 章界偏移一处（序章 0–148，但 para 148 属序章末句，第一章从 149 才是标题行） | 工具侧，影响"按章取区间" |
@@ -323,15 +335,16 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 | 6 | `v2/ch07` 是否漫画原创 | 第二章 / 第七章样张 |
 | 7 | 十章中另外九章完全未核（211 页 / 143 段） | P0-02/03 |
 
-### I.3 本轮发现的规范缺口（只提建议，未改文档）
+### I.3 本轮发现的规范缺口（P0-REVIEW-04 后状态）
 
-| # | 缺口 | 建议 |
+| # | 缺口 | 状态 |
 | --- | --- | --- |
-| 1 | §4.3.10 的 `status` 三值缺"已审出结论、待改写" | 增 `pending` |
-| 2 | §4.3.10 无逐段 `fidelity` / `severity` / 来源类型字段 | 本样张用附加字段实现，建议正式纳入 |
-| 3 | §4.3.9 的 `beats[]` 无 `review_status` / `evidence` / `mapping_confidence` | 建议纳入，否则"未确认"只能靠外部约定 |
-| 4 | §4.3.4 的 `source_refs[].type` 四值无"无来源" | 无来源旁白只能标 `novel_beat` 或留空，**两者都会骗过门禁**。建议允许 `none` 并让门禁拦 |
-| 5 | 段级 `pages` 与实际画面不符时无校验 | 建议加 `pages_actual`，或让 `m1 verify` 比对 |
+| 1 | §4.3.10 的 `status` 三值缺"已审出结论、待改写" | **已解决**：正式增 `pending_rewrite`（不是 `pending`），见 §L |
+| 2 | §4.3.10 无逐段 `fidelity` / `severity` / 来源类型字段 | **已解决**：正式纳入 §4.3.10 字段表并加枚举校验 |
+| 3 | 两层 `fidelity` 同名不同义 | **已解决**：新增 `judgement_scope`，两边必须显式声明 |
+| 4 | §4.3.9 的 `beats[]` 无 `review_status` / `evidence` / `mapping_confidence` | 仍待（不影响第一章结论，影响"未确认"的可校验性） |
+| 5 | §4.3.4 的 `source_refs[].type` 四值无"无来源" | 仍待。无来源旁白只能标 `novel_beat` 或留空，**两者都会骗过门禁** |
+| 6 | 段级 `pages` 与实际画面不符时无校验 | 仍待。建议加 `pages_actual`，或让 `m1 verify` 比对 |
 
 ---
 
@@ -352,7 +365,8 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
    "altered 一堆"，无法区分"该改旁白"和"该记不改"（`seg_0025` 就是后者）。
 2. **"无来源细节清单"要单列**。它嵌在 `drawn` 段里，段级判定会稀释它，
    而它恰恰是"只看画面写稿"最典型的产物（本章 8 处）。
-3. **`status` 的 `pending` 态要先补进规范**，否则每章都要重复解释一次扩展。
+3. ~~`status` 的 `pending` 态要先补进规范~~ → **已补**（`pending_rewrite`），
+   且与 `review_status` 分离。九章迁移时直接照 §4.3.10 填、跑 `m1 novel lint` 自检。
 
 ### J.1 工作量校准
 
@@ -360,7 +374,7 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 | --- | --- |
 | 逐页读图 + 逐段核原文 | **约 2.5 小时** |
 | 按十章 249 页 / 168 段线性估算 | **约 17 小时** |
-| 改写 14 段（不含在内） | 约 +1 小时 |
+| 改写 13 段 + 1 段改页映射（不含在内） | 约 +1 小时 |
 
 与 P0 任务书"20 小时人工"的估算吻合，但那 20 小时**不含改写**。
 
@@ -377,8 +391,74 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 - ✅ 没有开始 P0-06 / P0-10 / 横版
 
 等待项目负责人审核本样张后，再决定是否批量执行。
-审核时最需要确认的是三件事：
 
-1. **判据口径**（§D 与 `script-audit-ch01.md` §1）——尤其 `alteration_origin` 的用法；
-2. **`pending` 这个状态扩展**是否接受；
-3. **`seg_0025` 这类"漫画改了、旁白忠于漫画"的段，是否同意判 `altered` 但不改稿**。
+**三件事已在 P0-REVIEW-04 定案**（见 §L）：
+
+1. 判据口径 —— 认可；`alteration_origin` 扩为 `manga/narration/mixed/unknown`，无差异留空；
+2. 状态扩展 —— 接受，但用 `pending_rewrite` 而非 `pending`，并写进正式 Schema 与校验器；
+3. `seg_0025` 这类"漫画改了、旁白忠于漫画" —— 同意判 `altered` 但不改稿；
+   按同一规则回检，`seg_0024` 也一并改为 `keep`。
+
+**现在只剩一件事需要你亲手做**：签核。
+把 `script-audit.json` 的 `reviewed_by` 填 `human:<name>`、`review_status` 改 `approved`
+（或改 `rejected` 退回重审）。在你签核之前，`m1 novel check` 会一直卡在第 5 步——这是设计如此。
+
+---
+
+## L. 附：P0-REVIEW-04 的 Schema 修订（2026-11-16）
+
+本节记录的是**在拿到审核意见之后**对样张做的修订。它不改任何一段旁白，
+改的是"怎么描述判定结果"。
+
+### L.1 改了什么
+
+| # | 项 | 改前 | 改后 | 为什么 |
+| --- | --- | --- | --- | --- |
+| 1 | `schema` | `script-audit/v1` | `script-audit/v2` | 枚举变了，版本必须跟着变，否则旧读者会按旧规则读 |
+| 2 | `audit_spec_version` | `v1.0` | `v1.1` | 审核标准本身升级了 |
+| 3 | `judgement_scope` | 无 | `narration_vs_source` | 与 `novel_ref` 的 `manga_vs_novel` 区分两层语义 |
+| 4 | `status` | 统一 `pending`（自造值） | `approved` 11 / `pending_rewrite` 14 | 自造枚举没人校验，等于没有枚举 |
+| 5 | `alteration_origin` | `none` / `manga` / `narration` | `null` / `manga` / `narration` / `mixed` / `unknown` | `"none"` 是伪值，看着合法、实际无语义 |
+| 6 | `recommended_action` | `keep/fix_pages/rewrite` | 改名 `disposition` | 与审核口径术语对齐 |
+| 7 | `status_enum_extended` | 有（自行声明扩展） | **删除** | 枚举已进正式 Schema，不需要再声明 |
+| 8 | `coverage.by_recommended_action` | 有 | 改为 `by_disposition` + 新增 `by_status` | 与字段改名同步 |
+
+### L.2 顺带查出的一处自相矛盾（`seg_0024`）
+
+改枚举时必须逐段回填，回填时发现：
+
+```
+seg_0024: fidelity=altered, alteration_origin=manga
+review_note: "属漫画改写、旁白跟随，不是旁白原创"
+disposition: rewrite          ← 与上面两句矛盾
+```
+
+既然认定"旁白跟随漫画"，按已认可的规则（漫画改编、旁白跟随 → 保留）就应当 `keep`。
+已改为 `keep`，并写进 `script-audit.json` 的 `schema_migration.corrections` 留痕。
+**这是本轮唯一一处判定变更**，其余 24 段的判定原样保留。
+
+### L.3 校验器
+
+新增 `lint_audit()` 与 `m1 novel lint`，只校验 Schema、不要求签核：
+
+```
+$ python -m panelcast m1 novel lint --work m1/v1/ch01/work
+novel lint: Schema 合法 -> m1/v1/ch01/work/script-audit.json
+  注意：这只证明格式对，不证明已签核；出片仍需 review_status=approved
+```
+
+`m1 novel check` 的第 5 步改为**先 lint 后哈希**，并在第 4 步加
+`novel_ref.judgement_scope == "manga_vs_novel"` 校验。
+`tests/test_novel.py` 36 → 56 例，全量 306 tests OK。
+
+### L.4 门禁现在怎么卡这份样张
+
+```
+[step 3] 讲稿是 script/v1，没有 source_refs 字段 → 需先迁 P0-11
+[step 4] 34 个 beat 仍是 needs_review → 需人工确认
+[step 5] reviewed_by 必须是 human:<name>
+[step 5] review_status='pending_human'，只有 approved 允许出片
+```
+
+四条**都该失败**。`lint` 全过、`check` 全拦，正是"格式合法但未签核"应有的样子。
+

@@ -262,14 +262,42 @@ def _m1_novel(args):
 
     from .novel import (
         GateError,
+        _read_json,
         build_novel_ref,
+        chapter_pages,
         check,
         format_problems,
+        lint_audit,
+        script_segments,
         write_novel_ref,
     )
 
     work = Path(args.work)
-    novel_dir = Path(args.novel_dir)
+    novel_dir = Path(args.novel_dir) if getattr(args, "novel_dir", None) else None
+
+    if args.novel_command == "lint":
+        audit_path = work / "script-audit.json"
+        if not audit_path.exists():
+            print(f"error: {audit_path} not found", file=sys.stderr)
+            return 3
+        try:
+            page_set = set(chapter_pages(work)[1])
+        except GateError:
+            page_set = None
+        try:
+            _d, segs, _s = script_segments(work)
+        except GateError:
+            segs = None
+        problems = lint_audit(_read_json(audit_path), segs=segs, page_set=page_set)
+        if not problems:
+            print(f"novel lint: Schema 合法 -> {audit_path}")
+            print("  注意：这只证明格式对，不证明已签核；出片仍需 review_status=approved")
+            return 0
+        print(f"error: script-audit.json Schema 不合法（{len(problems)} 项）：",
+              file=sys.stderr)
+        for sid, msg in problems:
+            print(f"  [{sid or '文件'}] {msg}", file=sys.stderr)
+        return 3
 
     if args.novel_command == "align":
         try:
@@ -551,12 +579,14 @@ def main(argv=None):
     )
     novel_sub = m1novel.add_subparsers(dest="novel_command", required=True)
     for name, hlp in (("align", "生成 novel_ref.json 骨架（全部未确认）"),
-                      ("check", "五步门禁链：底稿 / 来源 / 页映射 / 审核报告")):
+                      ("check", "五步门禁链：底稿 / 来源 / 页映射 / 审核报告"),
+                      ("lint", "只校验 script-audit.json 的 Schema（不要求签核）")):
         p = novel_sub.add_parser(name, help=hlp)
         p.add_argument("--work", default="m1/work",
                        help="章级 work 目录（要有 chapter.json / script.json）")
-        p.add_argument("--novel-dir", required=True,
-                       help="novel.txt + novel_index.json 所在目录")
+        if name != "lint":
+            p.add_argument("--novel-dir", required=True,
+                           help="novel.txt + novel_index.json 所在目录")
         if name == "align":
             p.add_argument("--chapter-uid", required=True,
                            help="全书唯一身份，如 konosuba-manga-v01-ch02")

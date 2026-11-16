@@ -33,7 +33,7 @@ import json
 import pathlib
 
 NOVEL_REF_SCHEMA = "novel-ref/v1"
-AUDIT_SCHEMA = "script-audit/v1"
+AUDIT_SCHEMA = "script-audit/v2"
 
 #: 一个 beat 最多映射几页。超过这个数说明这一段覆盖太宽，该拆。
 MAX_PAGES_PER_BEAT = 3
@@ -41,6 +41,40 @@ MAX_PAGES_PER_BEAT = 3
 #: `fidelity` 的合法取值（规范 §3.4）。骨架用的 `unconfirmed` **不在其中**——
 #: 它是"还没判"的占位，不是一种判定结果，门禁必须拒绝它。
 FIDELITIES = {"drawn", "omitted", "altered", "original"}
+
+#: `judgement_scope`：声明这份文件里的 `fidelity` 判的是**谁和谁**的关系。
+#:
+#: `novel_ref.beats[].fidelity` 判「**漫画** vs 小说」——漫画有没有照画小说。
+#: `script-audit.audited_segments[].fidelity` 判「**旁白** vs 它的来源」——讲稿有没有讲对。
+#:
+#: 两层同名不同义。混用的后果是双向的：把"旁白忠于漫画的改编"当成"漫画不忠于小说"
+#: 去纠错，或者把"旁白自己编的"当成"漫画改的"放过。所以两边都必须显式声明 scope，
+#: 校验器只认与本文件类型匹配的那个值。
+SCOPES = {
+    "novel_ref": "manga_vs_novel",
+    "script_audit": "narration_vs_source",
+}
+
+#: 差异的**责任来源**（规范 §4.3.10）。只回答"这个差异是谁造成的"，
+#: **不代替来源引用**——标了 manga 仍然必须给出具体页码。
+#:
+#: - `manga`     漫画改的，旁白只是忠实复述漫画 → 保留旁白，记录差异
+#: - `narration` 旁白自己编的或改的 → 必须改写或删除
+#: - `mixed`     漫画改了一部分、旁白又追加编造了一部分 → 要拆开说明
+#: - `unknown`   查不清是谁改的 → 保留疑问，不许硬塞进前两个
+#:
+#: 没有差异时**留空**（`null`），不许用 `"none"` 之类的伪值冒充一个枚举成员。
+ALTERATION_ORIGINS = {"manga", "narration", "mixed", "unknown"}
+
+#: 逐段的**处理状态**。与人工签核（`review_status`）是两件事：
+#: `pending_rewrite` 表示"审出问题了、还没改"，**不代表已经通过**。
+AUDIT_STATUSES = {"approved", "pending_rewrite", "rewritten", "removed"}
+
+#: 逐段的**处理决定**。`fix_pages` 是只改页映射不改文字。
+DISPOSITIONS = {"keep", "fix_pages", "rewrite", "remove"}
+
+#: 人工签核状态。`approved` 才允许出片；`pending_human` 表示机器出了结论但没人签。
+REVIEW_STATUSES = {"pending_human", "approved", "rejected"}
 
 #: 全书中出现次数不超过这个值的二元组才算"稀有锚点"。
 #: 调高会放进"的一""了。"这类到处都有的组合，候选立刻变成随机数。
@@ -274,6 +308,7 @@ def build_novel_ref(work, novel_dir, chapter_uid, epub=None, novel_chapter=None,
     doc = {
         "schema": NOVEL_REF_SCHEMA,
         "chapter_uid": chapter_uid,
+        "judgement_scope": SCOPES["novel_ref"],
         "chapter_id": chapter_doc.get("id"),
         "label": chapter_doc.get("label"),
         "pages": [int(p.rsplit("_", 1)[-1]) for p in pages],
@@ -317,6 +352,106 @@ def _preview(items, n=5):
     items = list(items)
     head = "、".join(str(x) for x in items[:n])
     return head + (f" … 共 {len(items)} 个" if len(items) > n else "")
+
+
+def lint_audit(audit, segs=None, page_set=None):
+    """只校验 `script-audit.json` 的 **Schema**，不要求签核。
+
+    存在的理由：门禁第 5 步把"结构合法"和"人已签核"混在一起判，导致一份
+    **尚未签核**的报告根本没法被机器校验——它连"我这份格式对不对"都问不出来。
+    而样张恰恰必须保持未签核状态。所以把 Schema 校验单独抽出来，
+    签核是另一层（`_check_audit` 在 lint 之上再加哈希与签名）。
+
+    返回 `[(segment_id 或 None, msg)]`，空列表表示格式合法。
+    """
+    out = []
+    if audit.get("schema") != AUDIT_SCHEMA:
+        out.append((None, f"schema 应为 {AUDIT_SCHEMA!r}，实为 {audit.get('schema')!r}"))
+    scope = audit.get("judgement_scope")
+    if scope != SCOPES["script_audit"]:
+        out.append((None, f"judgement_scope 必须显式声明为 "
+                          f"{SCOPES['script_audit']!r}（旁白 vs 来源），实为 {scope!r}；"
+                          f"不声明就无法与 novel_ref 的 {SCOPES['novel_ref']!r} 区分"))
+    if not audit.get("audit_spec_version"):
+        out.append((None, "缺 audit_spec_version（审核标准版本）"))
+    rs = audit.get("review_status")
+    if rs not in REVIEW_STATUSES:
+        out.append((None, f"review_status 非法：{rs!r}；只能是 "
+                          f"{'/'.join(sorted(REVIEW_STATUSES))}"))
+    reviewer = audit.get("reviewed_by")
+    if rs == "approved":
+        if not str(reviewer or "").startswith("human:"):
+            out.append((None, f"review_status=approved 时 reviewed_by 必须是 "
+                              f"human:<name>，实为 {reviewer!r}"))
+    elif reviewer:
+        out.append((None, f"review_status={rs!r} 却已填 reviewed_by={reviewer!r}；"
+                          f"没签核就不许留签名"))
+
+    audited = {a.get("segment_id"): a for a in audit.get("audited_segments") or []}
+    for sid, rec in audited.items():
+        out.extend((sid, m) for m in _lint_segment(sid, rec, page_set))
+    if segs is not None:
+        for sid, _text in segs:
+            if sid not in audited:
+                out.append((sid, "审核报告未覆盖该段"))
+    return out
+
+
+def _lint_segment(sid, rec, page_set):
+    """单段判定的合法性。枚举、证据、两层语义的一致性都在这里锁。"""
+    out = []
+    fid = rec.get("fidelity")
+    origin = rec.get("alteration_origin")
+    disp = rec.get("disposition")
+    status = rec.get("status")
+    pages = rec.get("pages_declared") or []
+
+    if fid not in FIDELITIES:
+        out.append(f"fidelity 非法：{fid!r}；只能是 {'/'.join(sorted(FIDELITIES))}")
+    if status not in AUDIT_STATUSES:
+        hint = "（`pending` 已废弃，语义是「已审出问题、尚未改写」的请用 `pending_rewrite`）" \
+            if status == "pending" else ""
+        out.append(f"status 非法：{status!r}；只能是 "
+                   f"{'/'.join(sorted(AUDIT_STATUSES))}{hint}")
+    if disp not in DISPOSITIONS:
+        out.append(f"disposition 非法：{disp!r}；只能是 {'/'.join(sorted(DISPOSITIONS))}")
+
+    # ---- alteration_origin：只在"有差异"时才有值 ----
+    if fid == "altered":
+        if origin not in ALTERATION_ORIGINS:
+            out.append(f"fidelity=altered 但 alteration_origin={origin!r}；"
+                       f"必须说明差异责任方（{'/'.join(sorted(ALTERATION_ORIGINS))}），"
+                       f"否则无法判断该不该改稿")
+    elif fid == "original":
+        if origin not in (None, "narration"):
+            out.append(f"fidelity=original 的差异只能是旁白造成的，"
+                       f"alteration_origin={origin!r} 不成立")
+    elif origin is not None:
+        out.append(f"fidelity={fid!r} 表示没有差异，alteration_origin 必须留空，"
+                   f"实为 {origin!r}")
+
+    # ---- 证据：alteration_origin 不能代替来源引用 ----
+    if not str(rec.get("evidence") or "").strip():
+        out.append("evidence 为空：判定必须给出可核对的人读证据")
+    if fid in ("drawn", "altered") and not pages:
+        out.append(f"fidelity={fid!r} 必须给出 pages_declared（旁白描述了画面，"
+                   f"就得指得出是哪几页）")
+    if origin == "manga" and not pages:
+        out.append("alteration_origin=manga 但 pages_declared 为空："
+                   "「漫画改的」本身就是一条关于画面的断言，必须附页码")
+    if fid != "original" and not rec.get("novel_para"):
+        out.append(f"fidelity={fid!r} 必须给出 novel_para（没有段落区间就是没有来源）")
+    if page_set is not None:
+        bad = [p for p in pages if p not in page_set]
+        if bad:
+            out.append(f"pages_declared 里有本章不存在的页：{_preview(bad)}")
+
+    # ---- 状态与决定不许互相矛盾 ----
+    if status == "approved" and disp not in (None, "keep"):
+        out.append(f"status=approved 却 disposition={disp!r}：通过了就不该还挂着要改")
+    if status == "removed" and disp not in (None, "remove"):
+        out.append(f"status=removed 却 disposition={disp!r}")
+    return out
 
 
 def check(work, novel_dir):
@@ -388,6 +523,13 @@ def check(work, novel_dir):
         problems.append((4, str(exc)))
         pages = []
     page_set = set(pages)
+    # beat 的 fidelity 判的是「漫画 vs 小说」，必须在文件里写死，
+    # 否则同一份报告被当成「旁白 vs 来源」去读也不会报错。
+    ref_scope = ref.get("judgement_scope")
+    if ref_scope != SCOPES["novel_ref"]:
+        problems.append(
+            (4, f"novel_ref.judgement_scope 必须显式声明为 {SCOPES['novel_ref']!r}"
+                f"（漫画 vs 小说），实为 {ref_scope!r}"))
     unconfirmed, bad_fidelity, missing_para = [], [], []
     for b in ref.get("beats") or []:
         bid = b.get("id")
@@ -427,18 +569,23 @@ def check(work, novel_dir):
 
 
 def _check_audit(work, ref_path, ref, segs, schema):
-    """第 5 步：`script-audit.json` 三层哈希 + 逐段 + 人签。"""
+    """第 5 步：`script-audit.json` Schema + 三层哈希 + 逐段 + 人签。
+
+    顺序是刻意的：**先 lint 再验哈希**。一份格式就错的报告，先告诉人"字段写错了"
+    比先报"哈希不符"有用——后者会让人以为是讲稿改了。
+    """
     out = []
     audit_path = pathlib.Path(work) / "script-audit.json"
     if not audit_path.exists():
         return [(5, "script-audit.json 不存在：内容未经审核，禁止正式出片")]
     audit = _read_json(audit_path)
 
-    if audit.get("schema") != AUDIT_SCHEMA:
-        out.append((5, f"审核报告 schema 应为 {AUDIT_SCHEMA}，"
-                       f"实为 {audit.get('schema')!r}"))
-    if not audit.get("audit_spec_version"):
-        out.append((5, "审核报告缺 audit_spec_version（审核标准版本）"))
+    try:
+        _cdoc, pages = chapter_pages(work)
+    except GateError:
+        pages = []
+    for sid, msg in lint_audit(audit, segs=segs, page_set=set(pages)):
+        out.append((5, f"{sid}: {msg}" if sid else msg))
 
     script_path = pathlib.Path(work) / "script.json"
     if script_path.exists():
@@ -465,8 +612,7 @@ def _check_audit(work, ref_path, ref, segs, schema):
     for sid, text in segs:
         rec = audited.get(sid)
         if not rec:
-            out.append((5, f"{sid}: 审核报告未覆盖该段"))
-            continue
+            continue  # 缺段已由 lint_audit 报过，不重复刷屏
         want = rec.get("text_sha256")
         have = hashlib.sha256(text.encode("utf-8")).hexdigest()
         if want != have:

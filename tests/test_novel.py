@@ -21,11 +21,18 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from panelcast.novel import (  # noqa: E402
+    ALTERATION_ORIGINS,
+    AUDIT_STATUSES,
+    DISPOSITIONS,
+    FIDELITIES,
+    REVIEW_STATUSES,
+    SCOPES,
     GateError,
     build_novel_ref,
     check,
     candidate_ranges,
     format_problems,
+    lint_audit,
     load_novel,
     novel_chapter_range,
     render,
@@ -107,8 +114,13 @@ def write_chapter_work(dirpath, pages=("page_0045", "page_0046", "page_0047"),
 
 
 def write_audit(work, ref_path, schema="script/v1", review_status="approved",
-                reviewed_by="human:reviewer", script_schema=None, seg_texts=None):
-    """落一份审核报告。默认是"全部通过"的基准，测试里再逐项破坏。"""
+                reviewed_by="human:reviewer", script_schema=None, seg_texts=None,
+                seg_extra=None, drop=()):
+    """落一份审核报告。默认是"全部通过"的基准，测试里再逐项破坏。
+
+    `seg_extra` 按 `segment_id` 覆盖单段字段；`drop` 是要从报告里整体删掉的键。
+    这两个参数让"只坏一处"的负例能写得很短。
+    """
     work = Path(work)
     script_bytes = (work / "script.json").read_bytes()
     script = json.loads(script_bytes.decode("utf-8"))
@@ -118,14 +130,23 @@ def write_audit(work, ref_path, schema="script/v1", review_status="approved",
         text = s.get("text") or (s.get("narration") or {}).get("text") or ""
         if seg_texts and s["id"] in seg_texts:
             text = seg_texts[s["id"]]
-        audited.append({
+        rec = {
             "segment_id": s["id"],
             "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             "status": "approved",
-        })
+            "fidelity": "drawn",
+            "alteration_origin": None,
+            "disposition": "keep",
+            "pages_declared": list(s.get("pages") or []),
+            "novel_para": [[0, 0]],
+            "evidence": "夹具：基准证据",
+        }
+        rec.update((seg_extra or {}).get(s["id"], {}))
+        audited.append(rec)
     audit = {
-        "schema": "script-audit/v1",
-        "audit_spec_version": "v1.0",
+        "schema": "script-audit/v2",
+        "audit_spec_version": "v1.1",
+        "judgement_scope": "narration_vs_source",
         "chapter_uid": "konosuba-manga-v01-ch02",
         "script_schema": script_schema or schema,
         "script_sha256": hashlib.sha256(script_bytes).hexdigest(),
@@ -135,6 +156,8 @@ def write_audit(work, ref_path, schema="script/v1", review_status="approved",
         "reviewed_by": reviewed_by,
         "reviewed_at": "2026-11-16T00:00:00+08:00",
     }
+    for k in drop:
+        audit.pop(k, None)
     (work / "script-audit.json").write_text(
         json.dumps(audit, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8", newline="\n")
@@ -168,10 +191,12 @@ def make_v2_script(work, beats_per_seg=1):
     for i, seg in enumerate(doc["segments"], 1):
         seg["visual_refs"] = [{"type": "page", "id": p, "role": "depicts"}
                               for p in seg.get("pages") or []]
-        seg["narration"] = {
-            "text": seg.pop("text"),
-            "source_refs": [{"type": "novel_beat", "beat": f"b{i:02d}"}],
-        }
+        # 幂等：已经迁过的段不再 pop，否则重复调用会 KeyError
+        if "text" in seg:
+            seg["narration"] = {
+                "text": seg.pop("text"),
+                "source_refs": [{"type": "novel_beat", "beat": f"b{i:02d}"}],
+            }
     (work / "script.json").write_text(json.dumps(doc, ensure_ascii=False,
                                                  indent=2) + "\n", encoding="utf-8")
     return doc
@@ -199,6 +224,13 @@ class Base(unittest.TestCase):
 
     def _steps(self, problems):
         return sorted({s for s, _ in problems})
+
+    def _v2_ready(self):
+        """造一份"结构上完全合法"的 v2 章：骨架 → 人工确认 → 讲稿迁移。"""
+        self._align()
+        confirm_beats(self.work)
+        make_v2_script(self.work)
+        return self.work / "novel_ref.json"
 
 
 class TestHashing(Base):
@@ -408,12 +440,6 @@ class TestCheckStep4(Base):
 
 
 class TestCheckStep5(Base):
-    def _v2_ready(self):
-        self._align()
-        confirm_beats(self.work)
-        make_v2_script(self.work)
-        return self.work / "novel_ref.json"
-
     def test_missing_audit_is_step_5(self):
         self._v2_ready()
         ok, problems = check(self.work, self.novel_dir)
@@ -490,6 +516,154 @@ class TestCheckStep5(Base):
         ok, problems = check(self.work, self.novel_dir)
         self.assertFalse(ok)
         self.assertIn("seg_0002", " ".join(m for s, m in problems if s == 5))
+
+
+class TestAuditSchema(Base):
+    """`script-audit.json` 的 Schema 校验（P0-REVIEW-04）。
+
+    这一组用例针对的是"审核口径"本身，不是门禁哈希。它们存在的理由：
+    上一版规范里 `status` 只有 approved/rewritten/removed，样张只好自己发明一个
+    `pending` 并在文件里写声明；`alteration_origin` 又用 `"none"` 冒充枚举成员。
+    自造的枚举没人校验，就等于没有枚举——所以这里逐条锁住。
+    """
+
+    PAGES = {"page_0045", "page_0046", "page_0047"}
+
+    def _lint(self, **kw):
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2", **kw)
+        audit = json.loads((self.work / "script-audit.json").read_text(encoding="utf-8"))
+        return lint_audit(audit, page_set=self.PAGES)
+
+    def _text(self, problems):
+        return " ".join(m for _sid, m in problems)
+
+    def test_baseline_is_clean(self):
+        self.assertEqual(self._lint(), [])
+
+    def test_unsigned_report_passes_lint_but_not_the_gate(self):
+        """样张必须能校验格式，同时必须过不了出片门禁——两件事不能混。"""
+        problems = self._lint(review_status="pending_human", reviewed_by=None)
+        self.assertEqual(problems, [])
+        ok, gate = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        self.assertIn("只有 approved 允许出片", " ".join(m for s, m in gate if s == 5))
+
+    def test_pending_is_not_a_status(self):
+        problems = self._lint(seg_extra={"seg_0001": {"status": "pending"}})
+        self.assertIn("pending_rewrite", self._text(problems))
+
+    def test_none_is_not_an_origin(self):
+        """`"none"` 是伪值：没有差异就该留空，不许造一个枚举成员冒充。"""
+        problems = self._lint(seg_extra={"seg_0001": {"alteration_origin": "none"}})
+        self.assertIn("alteration_origin", self._text(problems))
+
+    def test_altered_without_origin_is_rejected(self):
+        problems = self._lint(seg_extra={"seg_0001": {"fidelity": "altered"}})
+        self.assertIn("必须说明差异责任方", self._text(problems))
+
+    def test_manga_origin_without_pages_is_rejected(self):
+        """`alteration_origin=manga` 本身是关于画面的断言，必须附页码。"""
+        problems = self._lint(seg_extra={"seg_0001": {
+            "fidelity": "altered", "alteration_origin": "manga",
+            "pages_declared": []}})
+        self.assertIn("pages_declared 为空", self._text(problems))
+
+    def test_mixed_and_unknown_are_accepted(self):
+        for origin in ("mixed", "unknown"):
+            with self.subTest(origin=origin):
+                problems = self._lint(seg_extra={"seg_0001": {
+                    "fidelity": "altered", "alteration_origin": origin}})
+                self.assertEqual(problems, [], self._text(problems))
+
+    def test_missing_judgement_scope_is_rejected(self):
+        problems = self._lint(drop=("judgement_scope",))
+        self.assertIn("judgement_scope", self._text(problems))
+
+    def test_wrong_judgement_scope_is_rejected(self):
+        """把审核报告标成 manga_vs_novel，就是把两层语义混用了。"""
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        path = self.work / "script-audit.json"
+        audit = json.loads(path.read_text(encoding="utf-8"))
+        audit["judgement_scope"] = "manga_vs_novel"
+        path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
+        problems = lint_audit(audit, page_set=self.PAGES)
+        self.assertIn("narration_vs_source", self._text(problems))
+
+    def test_novel_ref_requires_its_own_scope(self):
+        doc = self._align()
+        doc.pop("judgement_scope")
+        write_novel_ref(self.work, doc)
+        _ok, problems = check(self.work, self.novel_dir)
+        self.assertIn("manga_vs_novel", " ".join(m for s, m in problems if s == 4))
+
+    def test_page_outside_chapter_is_rejected(self):
+        problems = self._lint(seg_extra={"seg_0001": {
+            "pages_declared": ["page_0099"]}})
+        self.assertIn("page_0099", self._text(problems))
+
+    def test_approved_with_rewrite_disposition_is_contradictory(self):
+        problems = self._lint(seg_extra={"seg_0001": {"disposition": "rewrite"}})
+        self.assertIn("通过了就不该还挂着要改", self._text(problems))
+
+
+class TestSchemaFile(unittest.TestCase):
+    """`docs/schemas/script-audit.schema.json` 与代码常量必须一致。
+
+    两份枚举各写一遍是必要的（一份给人读、一份给机器跑），但**必须锁死不许分叉**：
+    只改一边的后果是"文档说合法、校验器说非法"，比没有 Schema 更糟。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        path = ROOT / "docs" / "schemas" / "script-audit.schema.json"
+        cls.schema = json.loads(path.read_text(encoding="utf-8"))
+        cls.seg = cls.schema["properties"]["audited_segments"]["items"]
+
+    def test_status_enum_matches(self):
+        self.assertEqual(set(self.seg["properties"]["status"]["enum"]),
+                         AUDIT_STATUSES)
+
+    def test_fidelity_enum_matches(self):
+        self.assertEqual(set(self.seg["properties"]["fidelity"]["enum"]),
+                         FIDELITIES)
+
+    def test_disposition_enum_matches(self):
+        self.assertEqual(set(self.seg["properties"]["disposition"]["enum"]),
+                         DISPOSITIONS)
+
+    def test_alteration_origin_enum_matches(self):
+        enum = set(self.seg["properties"]["alteration_origin"]["enum"])
+        self.assertEqual(enum - {None}, ALTERATION_ORIGINS)
+        self.assertIn(None, enum, "无差异必须允许留空")
+
+    def test_review_status_enum_matches(self):
+        self.assertEqual(set(self.schema["properties"]["review_status"]["enum"]),
+                         REVIEW_STATUSES)
+
+    def test_judgement_scope_matches(self):
+        self.assertEqual(self.schema["properties"]["judgement_scope"]["const"],
+                         SCOPES["script_audit"])
+
+    def test_shipped_sample_passes_lint(self):
+        """第一章样张是正式示例，格式不许退化。"""
+        work = ROOT / "m1" / "v1" / "ch01" / "work"
+        if not (work / "script-audit.json").exists():
+            self.skipTest("样张不在当前工作区")
+        audit = json.loads((work / "script-audit.json").read_text(encoding="utf-8"))
+        chapter = json.loads((work / "chapter.json").read_text(encoding="utf-8"))
+        problems = lint_audit(audit, page_set=set(chapter["pages"]))
+        self.assertEqual(problems, [], " ".join(m for _s, m in problems))
+
+    def test_shipped_sample_is_still_unsigned(self):
+        """样张必须保持未签核——签核是项目负责人的动作，不是 Agent 的。"""
+        work = ROOT / "m1" / "v1" / "ch01" / "work"
+        if not (work / "script-audit.json").exists():
+            self.skipTest("样张不在当前工作区")
+        audit = json.loads((work / "script-audit.json").read_text(encoding="utf-8"))
+        self.assertEqual(audit["review_status"], "pending_human")
+        self.assertIsNone(audit["reviewed_by"])
 
 
 class TestFormatting(Base):

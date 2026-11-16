@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://panelcast.local/schemas/script-audit.v2.json",
+  "title": "PanelCast script audit (v2)",
+  "description": "逐段内容审计报告。规范 §4.3.10 的机器可读形式。注意 judgement_scope 区分两层语义：本文件判「旁白 vs 来源」，novel_ref 判「漫画 vs 小说」。可执行校验器是 panelcast.novel.lint_audit()，两者枚举必须一致（有测试锁住）。",
+  "type": "object",
+  "required": [
+    "schema", "audit_spec_version", "judgement_scope", "chapter_uid",
+    "script_schema", "script_sha256", "novel_ref_sha256",
+    "audited_segments", "review_status", "reviewed_by"
+  ],
+  "properties": {
+    "schema": {"const": "script-audit/v2"},
+    "audit_spec_version": {"type": "string", "minLength": 1},
+    "judgement_scope": {
+      "const": "narration_vs_source",
+      "description": "判的是「旁白 vs 它的来源」。写成 manga_vs_novel 就是把两层混用了。"
+    },
+    "chapter_uid": {"type": "string", "minLength": 1},
+    "script_schema": {"enum": ["script/v1", "script/v2"]},
+    "script_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "novel_ref_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+
+    "audited_segments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "segment_id", "text_sha256", "status", "fidelity",
+          "disposition", "evidence"
+        ],
+        "properties": {
+          "segment_id": {"type": "string", "pattern": "^seg_[0-9]{4}$"},
+          "text_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "status": {
+            "enum": ["approved", "pending_rewrite", "rewritten", "removed"],
+            "description": "逐段处理状态。与整份 review_status（人工签核）是两件事。pending 已废弃。"
+          },
+          "fidelity": {
+            "enum": ["drawn", "omitted", "altered", "original"],
+            "description": "旁白相对其来源的关系。不是「漫画 vs 小说」。"
+          },
+          "alteration_origin": {
+            "type": ["string", "null"],
+            "enum": ["manga", "narration", "mixed", "unknown", null],
+            "description": "差异的责任来源。没有差异时必须是 null，不许写 \"none\"。"
+          },
+          "disposition": {
+            "enum": ["keep", "fix_pages", "rewrite", "remove"],
+            "description": "处理决定。fix_pages = 只改页映射不改文字。"
+          },
+          "pages_declared": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^page_[0-9]{4}$"}
+          },
+          "pages_actual": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^page_[0-9]{4}$"}
+          },
+          "novel_para": {
+            "type": "array",
+            "description": "小说段区间数组，如 [[322, 327]]。非 original 必须非空。"
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "人读证据：页码 + 小说段号 + 一句可核对的话。不许只写「已核验」。"
+          },
+          "severity": {"enum": ["high", "medium", "low", "none"]},
+          "source_type": {"type": "string"},
+          "review_note": {"type": "string"}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"fidelity": {"const": "altered"}}},
+            "then": {
+              "required": ["alteration_origin"],
+              "properties": {
+                "alteration_origin": {"enum": ["manga", "narration", "mixed", "unknown"]}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"fidelity": {"enum": ["drawn", "omitted"]}}},
+            "then": {"properties": {"alteration_origin": {"type": "null"}}}
+          },
+          {
+            "if": {"properties": {"fidelity": {"const": "original"}}},
+            "then": {"properties": {"alteration_origin": {"enum": ["narration", null]}}}
+          },
+          {
+            "if": {"properties": {"alteration_origin": {"const": "manga"}}},
+            "then": {
+              "description": "「漫画改的」是关于画面的断言，必须指得出页码。",
+              "properties": {"pages_declared": {"minItems": 1}}
+            }
+          },
+          {
+            "if": {"properties": {"fidelity": {"enum": ["drawn", "altered"]}}},
+            "then": {"properties": {"pages_declared": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"fidelity": {"not": {"const": "original"}}}},
+            "then": {"properties": {"novel_para": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"status": {"const": "approved"}}},
+            "then": {
+              "description": "通过了就不该还挂着要改。",
+              "properties": {"disposition": {"enum": ["keep"]}}
+            }
+          },
+          {
+            "if": {"properties": {"status": {"const": "removed"}}},
+            "then": {"properties": {"disposition": {"enum": ["remove"]}}}
+          }
+        ]
+      }
+    },
+
+    "review_status": {
+      "enum": ["pending_human", "approved", "rejected"],
+      "description": "人工签核状态。只有 approved 允许正式出片。"
+    },
+    "reviewed_by": {
+      "type": ["string", "null"],
+      "description": "必须是人（human:<name>）。模型自审不能填这里；未签核时必须为 null。"
+    },
+    "reviewed_at": {"type": ["string", "null"]},
+    "prepared_by": {"type": "string"},
+    "prepared_at": {"type": "string"},
+    "coverage": {"type": "object"},
+    "schema_migration": {"type": "object"},
+    "notes": {"type": "string"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"review_status": {"const": "approved"}}},
+      "then": {
+        "properties": {"reviewed_by": {"type": "string", "pattern": "^human:"}},
+        "required": ["reviewed_by"]
+      }
+    },
+    {
+      "if": {"properties": {"review_status": {"enum": ["pending_human", "rejected"]}}},
+      "then": {
+        "description": "没签核就不许留签名。",
+        "properties": {"reviewed_by": {"type": "null"}}
+      }
+    }
+  ]
+}

@@ -492,7 +492,7 @@ def main(argv=None):
                            help="章节未确认也继续（仅调试）")
 
     m1verify = m1sub.add_parser(
-        "verify", help="S9: run the 13 acceptance checks -> run_report.json",
+        "verify", help="S9: run the 15 acceptance checks -> run_report.json",
     )
     m1verify.add_argument("--work", default="m1/work")
     m1verify.add_argument("--out", default="m1/out")

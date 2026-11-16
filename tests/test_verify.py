@@ -197,10 +197,10 @@ class TestVerifyRun(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def test_all_thirteen_checks_run(self):
+    def test_all_fifteen_checks_run(self):
         report = verify_run(self.work, self.out, "t", 4.0, ["page_0001"],
                             ffmpeg=self.ffmpeg, ffprobe=self.ffprobe)
-        self.assertEqual([c["id"] for c in report["checks"]], list(range(1, 14)))
+        self.assertEqual([c["id"] for c in report["checks"]], list(range(1, 16)))
         self.assertEqual(report["schema"], "run-report/v1")
 
     def test_structural_checks_pass_on_a_clean_render(self):

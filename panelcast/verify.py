@@ -1,4 +1,4 @@
-"""S9 质检：把规范 §9.2 的 13 条做成一条命令，产出 run_report.json。
+"""S9 质检：把规范 §9.2 的 15 条做成一条命令，产出 run_report.json。
 
 设计原则：**每条都独立复验，不许互相引用**。比如"视频轨时长"必须走
 `stream=duration`，不能拿容器时长代替——容器时长够而视频轨短，正是第一章
@@ -12,7 +12,13 @@ import json
 import subprocess
 from pathlib import Path
 
-from .timeline import plan_page_windows
+from .timeline import (
+    MAX_CHARS_PER_PAGE,
+    MAX_DWELL,
+    MIN_CHARS_PER_PAGE,
+    MIN_DWELL,
+    plan_page_windows,
+)
 
 SCHEMA = "run-report/v1"
 
@@ -32,6 +38,10 @@ MIN_OUTLINE_PIXELS = 5000
 LABEL_GREY = (140, 175)
 
 DEFAULT_SAMPLE_RATIO = 0.3
+
+#: 页窗口越出"讲这一页的段"的容忍量（秒）。0.5 秒是观感上的临界值：
+#: 超过半秒，观众就能察觉画面在等文本，或者文本已经走远了画面还没翻。
+PAGE_SYNC_TOL = 0.5
 
 
 def _run(cmd, what, timeout=120):
@@ -205,7 +215,7 @@ def _ass_ts(raw):
 def verify_run(work_dir, out_dir, name, total_duration, script_pages,
                ffmpeg=None, ffprobe=None, width=1080, height=1920,
                sample_ratio=DEFAULT_SAMPLE_RATIO):
-    """跑 13 条，返回 run_report 字典。"""
+    """跑 15 条，返回 run_report 字典。"""
     from .panels import find_ffmpeg, find_ffprobe
     ffmpeg = ffmpeg or find_ffmpeg()
     ffprobe = ffprobe or find_ffprobe()
@@ -279,12 +289,13 @@ def verify_run(work_dir, out_dir, name, total_duration, script_pages,
         f"end={ass['end']}", ass_ok)
 
     # ---- 时长与页序 ----
+    segments = _segments_for(work_dir)
     entries = plan_page_windows({"total_duration": total_duration,
-                                 "segments": _segments_for(work_dir)})
+                                 "segments": segments})
     dwells = [d for _, d in entries]
-    over = [round(d, 1) for d in dwells if d > 18.0]
-    under = [round(d, 1) for d in dwells if d < 3.5]
-    add(12, "单页停留", "3.5–18s",
+    over = [round(d, 1) for d in dwells if d > MAX_DWELL]
+    under = [round(d, 1) for d in dwells if d < MIN_DWELL]
+    add(12, "单页停留", f"{MIN_DWELL}–{MAX_DWELL:.0f}s",
         f"min={min(dwells):.1f} max={max(dwells):.1f}",
         not over and not under,
         f"超上限 {len(over)} 页，低于下限 {len(under)} 页")
@@ -295,6 +306,21 @@ def verify_run(work_dir, out_dir, name, total_duration, script_pages,
         f"{len(got_pages)} 页" + ("（一致）" if seq_ok else "（不一致）"),
         seq_ok,
         "" if seq_ok else _first_mismatch(script_pages, got_pages))
+
+    sync_ok, worst_page, worst_out, total_out = page_sync(
+        entries, _segments_for(work_dir))
+    add(14, "切页同步", f"越界 ≤{PAGE_SYNC_TOL}s",
+        f"最大越界 {worst_out:.2f}s" + (f"（{worst_page}）" if worst_page else "")
+        + f"，累计 {total_out:.1f}s",
+        sync_ok,
+        "页窗口必须落在讲这一页的段区间内，否则画面与配音脱钩")
+
+    chars = sum(len(s.get("text") or "") for s in segments)
+    per_page = chars / len(got_pages) if got_pages else 0.0
+    add(15, "内容密度", f"{MIN_CHARS_PER_PAGE}–{MAX_CHARS_PER_PAGE} 字/页",
+        f"{per_page:.1f} 字/页（{chars} 字 / {len(got_pages)} 页）",
+        MIN_CHARS_PER_PAGE <= per_page <= MAX_CHARS_PER_PAGE,
+        "按 5.7 字/秒折算约 8–16 秒/页；偏低就是内容不充实")
 
     failed = [c for c in checks if not c["pass"]]
     return {
@@ -316,6 +342,32 @@ def _segments_for(work_dir):
     if not path.exists():
         raise RuntimeError(f"error: timeline not found: {path}")
     return json.loads(path.read_text(encoding="utf-8"))["segments"]
+
+
+def page_sync(entries, segments):
+    """每个页窗口必须落在"讲这一页"的段区间内。
+
+    返回 (ok, worst_page, worst_outside, total_outside)。越界时长 = 页窗口
+    落在该页所有所属段之外的部分；一页被多段提及时按并集算，不误判。
+    """
+    spans = {}
+    for seg in segments:
+        for page in seg["pages"]:
+            spans.setdefault(page, []).append((float(seg["start"]),
+                                               float(seg["end"])))
+    clock = 0.0
+    worst_page, worst_outside, total_outside = None, 0.0, 0.0
+    for page, dur in entries:
+        t0, t1 = clock, clock + dur
+        clock = t1
+        inside = sum(max(0.0, min(t1, e) - max(t0, s))
+                     for s, e in spans.get(page, []))
+        outside = max(0.0, dur - inside)
+        total_outside += outside
+        if outside > worst_outside:
+            worst_page, worst_outside = page, outside
+    return (worst_outside <= PAGE_SYNC_TOL, worst_page,
+            worst_outside, total_outside)
 
 
 def _first_mismatch(want, got):

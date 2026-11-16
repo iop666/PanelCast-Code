@@ -251,7 +251,7 @@ def _m1_profile(args):
 
 
 def _m1_verify(args):
-    """S9：13 条验收 → run_report.json；任一不过退出码 4。"""
+    """S9：15 条验收 → run_report.json；任一不过退出码 4。"""
     import json as _json
 
     from .verify import verify_run, write_report

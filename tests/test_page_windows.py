@@ -1,11 +1,10 @@
-"""页面停留均衡（长段拆页）测试。"""
+"""页面窗口：切页点必须落在"正在讲这一页的那一段"内部。"""
 
 import unittest
 
 from panelcast.timeline import (
     MAX_DWELL,
     MIN_DWELL,
-    _cap_dwell,
     page_entries,
     plan_page_windows,
 )
@@ -25,7 +24,18 @@ def timeline_of(segments):
     return {"total_duration": round(clock, 3), "segments": out}
 
 
-class TestBalancedWindows(unittest.TestCase):
+def windows_with_times(entries):
+    """[(page, start, end)]，便于断言切页时刻。"""
+    out, clock = [], 0.0
+    for page, dur in entries:
+        out.append((page, round(clock, 3), round(clock + dur, 3)))
+        clock += dur
+    return out
+
+
+class TestPageSync(unittest.TestCase):
+    """同步是硬约束：切页时刻不得跑出本段的 [start, end]。"""
+
     def test_every_page_gets_a_window(self):
         tl = timeline_of([(20.0, ["p1", "p2"], None), (20.0, ["p3", "p4"], None)])
         entries = plan_page_windows(tl)
@@ -35,31 +45,41 @@ class TestBalancedWindows(unittest.TestCase):
         tl = timeline_of([(12.0, ["p1", "p2"], None), (9.0, ["p3"], None)])
         self.assertAlmostEqual(sum(d for _, d in plan_page_windows(tl)), 21.0, 3)
 
-    def test_single_page_gets_whole_duration(self):
+    def test_single_page_gets_whole_segment(self):
         tl = timeline_of([(7.5, ["p1"], None)])
         self.assertEqual(plan_page_windows(tl), [("p1", 7.5)])
 
-    def test_long_single_page_segment_is_shortened(self):
-        """一段 1 页 30s 的老毛病：均衡后每页 10s，不再卡 30s。"""
+    def test_page_order_preserved(self):
+        pages = [f"p{i}" for i in range(1, 9)]
+        tl = timeline_of([(12.0, pages[:4], None), (12.0, pages[4:], None)])
+        self.assertEqual([p for p, _ in plan_page_windows(tl)], pages)
+
+    def test_window_never_leaves_its_segment(self):
+        """核心回归：旧实现全局均分，p1 的窗口能跑到第 3 段里去。"""
         tl = timeline_of([(30.0, ["p1"], None), (10.0, ["p2"], None),
                           (10.0, ["p3"], None), (10.0, ["p4"], None)])
-        old = page_entries(tl)
-        new = plan_page_windows(tl)
-        self.assertEqual(old[0], ("p1", 30.0))     # 旧行为：一页 30 秒
-        self.assertLessEqual(max(d for _, d in new), MAX_DWELL)
-        self.assertAlmostEqual(new[0][1], 15.0, 1)
+        got = windows_with_times(plan_page_windows(tl))
+        self.assertEqual(got[0], ("p1", 0.0, 30.0))   # 一页独占自己那段
+        self.assertEqual(got[1], ("p2", 30.0, 40.0))  # 不会被拉到 15s 处
 
-    def test_uniform_when_no_snap_points(self):
-        tl = timeline_of([(40.0, ["p1", "p2", "p3", "p4"], None)])
-        dwells = [d for _, d in plan_page_windows(tl)]
-        self.assertEqual(dwells, [10.0, 10.0, 10.0, 10.0])
+    def test_uneven_segments_do_not_drift(self):
+        """段字数不均时，末页也不能提前/推后到别的段区间。"""
+        tl = timeline_of([(4.0, ["p1"], None), (40.0, ["p2", "p3"], None),
+                          (4.0, ["p4"], None)])
+        got = windows_with_times(plan_page_windows(tl))
+        self.assertEqual(got[0][1:], (0.0, 4.0))
+        self.assertEqual(got[1][1:], (4.0, 24.0))
+        self.assertEqual(got[2][1:], (24.0, 44.0))
+        self.assertEqual(got[3][1:], (44.0, 48.0))
 
-    def test_snaps_to_sentence_boundary(self):
-        # 4 页 / 40s → 理想切点 10s；句尾在 9.2s，应吸过去
-        sents = [{"offset": 0.0, "duration": 9.2, "text": "一二三"}]
-        tl = timeline_of([(40.0, ["p1", "p2", "p3", "p4"], sents)])
-        dwells = [d for _, d in plan_page_windows(tl)]
-        self.assertAlmostEqual(dwells[0], 9.2, 2)
+    def test_cuts_stay_inside_segment_with_snap(self):
+        # 段 10–50s、2 页：理想切点 30s；句尾 10+19.2=29.2s，吸过去
+        sents = [{"offset": 0.0, "duration": 19.2, "text": "一二三"}]
+        tl = timeline_of([(10.0, ["p0"], None),
+                          (40.0, ["p1", "p2"], sents)])
+        got = windows_with_times(plan_page_windows(tl))
+        self.assertAlmostEqual(got[1][2], 29.2, 2)   # 切点 = 10 + 19.2
+        self.assertAlmostEqual(got[2][2], 50.0, 2)
 
     def test_snap_ignored_when_too_far(self):
         sents = [{"offset": 0.0, "duration": 4.0, "text": "一二三"}]
@@ -67,78 +87,81 @@ class TestBalancedWindows(unittest.TestCase):
         dwells = [d for _, d in plan_page_windows(tl, snap=2.0)]
         self.assertAlmostEqual(dwells[0], 10.0, 2)
 
-    def test_min_dwell_enforced(self):
-        # 句尾紧贴理想切点但会挤压下一页 → 不能低于 MIN_DWELL
+    def test_sentence_offsets_outside_segment_are_ignored(self):
+        """句子锚点来自别的段时不能被采用（越段就是不同步）。"""
+        sents = [{"offset": -20.0, "duration": 1.0, "text": "外"}]
+        tl = timeline_of([(10.0, ["p0"], None),
+                          (20.0, ["p1", "p2"], sents)])
+        got = windows_with_times(plan_page_windows(tl))
+        self.assertEqual(got[1][1:], (10.0, 20.0))
+
+    def test_min_dwell_enforced_inside_segment(self):
         sents = [{"offset": 0.0, "duration": 9.9, "text": "一二三"}]
         tl = timeline_of([(40.0, ["p1", "p2", "p3", "p4"], sents)])
         dwells = [d for _, d in plan_page_windows(tl)]
         self.assertGreaterEqual(min(dwells), MIN_DWELL - 1e-6)
 
-    def test_too_few_pages_is_reported_not_fatal(self):
-        """页数不够是内容问题：默认不抛错，交给 S9 第 12 条报出来。"""
-        tl = timeline_of([(60.0, ["p1"], None)])
-        self.assertEqual(plan_page_windows(tl), [("p1", 60.0)])
+    def test_short_segment_with_three_pages_degrades_gracefully(self):
+        """段太短塞不下 3 页：放宽最小停留，但切点仍留在段内。"""
+        tl = timeline_of([(6.0, ["p1", "p2", "p3"], None)])
+        got = windows_with_times(plan_page_windows(tl))
+        self.assertEqual(got[0][1], 0.0)
+        self.assertEqual(got[-1][2], 6.0)
+        for page, start, end in got:
+            self.assertGreaterEqual(start, -1e-9)
+            self.assertLessEqual(end, 6.0 + 1e-9)
 
-    def test_strict_mode_raises_on_too_few_pages(self):
-        tl = timeline_of([(60.0, ["p1"], None)])
+    def test_long_single_page_is_left_visible(self):
+        """一页 30 秒是内容问题：不靠挪切页点掩盖，交给 S9 第 12 条。"""
+        tl = timeline_of([(30.0, ["p1"], None), (10.0, ["p2"], None)])
+        old = page_entries(tl)
+        new = plan_page_windows(tl)
+        self.assertEqual(old, new)          # 两者都必须老实承认 30 秒
+        self.assertGreater(max(d for _, d in new), MAX_DWELL)
+
+    def test_strict_mode_raises_on_too_long_page(self):
+        tl = timeline_of([(30.0, ["p1"], None)])
         with self.assertRaises(RuntimeError) as ctx:
             plan_page_windows(tl, strict=True)
         self.assertIn("ceiling", str(ctx.exception))
+
+    def test_strict_mode_raises_on_too_short_page(self):
+        tl = timeline_of([(5.0, ["p1", "p2", "p3"], None)])
+        with self.assertRaises(RuntimeError) as ctx:
+            plan_page_windows(tl, strict=True)
+        self.assertIn("floor", str(ctx.exception))
 
     def test_empty_timeline_raises(self):
         with self.assertRaises(RuntimeError):
             plan_page_windows({"total_duration": 0.0, "segments": []})
 
-    def test_page_order_preserved(self):
-        pages = [f"p{i}" for i in range(1, 9)]
-        tl = timeline_of([(12.0, pages[:4], None), (12.0, pages[4:], None)])
-        self.assertEqual([p for p, _ in plan_page_windows(tl)], pages)
 
-    def test_balanced_beats_segment_split_on_dwell_spread(self):
-        """均衡后的停留极差必须小于段内均分。"""
-        tl = timeline_of([(18.0, ["p1"], None), (4.0, ["p2"], None),
-                          (4.0, ["p3"], None), (18.0, ["p4"], None)])
-        old = [d for _, d in page_entries(tl)]
-        new = [d for _, d in plan_page_windows(tl)]
-        self.assertGreater(max(old) - min(old), max(new) - min(new))
+class TestPageSyncCheck(unittest.TestCase):
+    """S9 第 14 条：页窗口越出所属段就是不同步。"""
 
+    def test_contained_windows_pass(self):
+        from panelcast.verify import page_sync
+        segs = [{"start": 0.0, "end": 10.0, "pages": ["p1"]},
+                {"start": 10.0, "end": 20.0, "pages": ["p2"]}]
+        ok, page, worst, total = page_sync([("p1", 10.0), ("p2", 10.0)], segs)
+        self.assertTrue(ok)
+        self.assertEqual((page, worst, total), (None, 0.0, 0.0))
 
-class TestDwellCeiling(unittest.TestCase):
-    """上限是 S9 第 12 条的硬指标：末页吸收余量也不许顶破。"""
+    def test_crossing_window_is_caught(self):
+        from panelcast.verify import page_sync
+        segs = [{"start": 0.0, "end": 10.0, "pages": ["p1"]},
+                {"start": 10.0, "end": 20.0, "pages": ["p2"]}]
+        ok, page, worst, total = page_sync([("p1", 15.0), ("p2", 5.0)], segs)
+        self.assertFalse(ok)
+        self.assertEqual(page, "p1")
+        self.assertAlmostEqual(worst, 5.0, 3)
 
-    def test_tail_page_does_not_exceed_ceiling(self):
-        # 3 页 50 秒：均分 16.7，但末页会吸收吸附留下的余量
-        tl = timeline_of([(50.0, ["p1", "p2", "p3"], None)])
-        durs = [d for _, d in plan_page_windows(tl)]
-        self.assertLessEqual(max(durs), MAX_DWELL)
-
-    def test_total_length_is_preserved_after_capping(self):
-        tl = timeline_of([(50.0, ["p1", "p2", "p3"], None)])
-        entries = plan_page_windows(tl)
-        self.assertAlmostEqual(sum(d for _, d in entries), 50.0, places=2)
-
-    def test_every_page_stays_above_floor(self):
-        tl = timeline_of([(9.0, ["p1", "p2"], None)])
-        durs = [d for _, d in plan_page_windows(tl)]
-        self.assertGreaterEqual(min(durs), MIN_DWELL - 1e-9)
-
-    def test_cap_dwell_redistributes_without_changing_total(self):
-        fixed = _cap_dwell([2.0, 30.0, 8.0], total=40.0,
-                           min_dwell=3.5, max_dwell=18.0)
-        self.assertAlmostEqual(sum(fixed), 40.0, places=3)
-        self.assertLessEqual(max(fixed), 18.0 + 1e-6)
-        self.assertGreaterEqual(min(fixed), 3.5 - 1e-6)
-
-    def test_cap_dwell_is_identity_when_already_in_range(self):
-        self.assertEqual(_cap_dwell([10.0, 12.0], 22.0, 3.5, 18.0),
-                         [10.0, 12.0])
-
-    def test_impossible_ceiling_is_left_visible(self):
-        """3 页 90 秒均分 30 > 上限：代码不硬压，交给 S9 报出来。"""
-        tl = timeline_of([(90.0, ["p1", "p2", "p3"], None)])
-        durs = [d for _, d in plan_page_windows(tl)]
-        self.assertGreater(max(durs), MAX_DWELL)
-        self.assertAlmostEqual(sum(durs), 90.0, places=2)
+    def test_page_shared_by_two_segments_uses_union(self):
+        from panelcast.verify import page_sync
+        segs = [{"start": 0.0, "end": 10.0, "pages": ["p1", "p2"]},
+                {"start": 10.0, "end": 20.0, "pages": ["p2"]}]
+        ok, _, _, _ = page_sync([("p1", 10.0), ("p2", 10.0)], segs)
+        self.assertTrue(ok)
 
 
 if __name__ == "__main__":

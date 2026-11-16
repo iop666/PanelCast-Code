@@ -22,9 +22,12 @@
 1. 十章都有 `novel_ref.json`，`m1 novel --check` 全过；
 2. 十章讲稿 **100%** 段落有来源结论（不是抽查），无来源段落已改写；
 3. 重出的十章成片，`delivery.md` 明确区分"技术合格"与"内容合格"；
-4. 正式出片路径无法绕过来源门禁，**有测试证明**；
+4. 正式出片路径无法绕过来源门禁，**且无法绕过 `script-audit.json` 审核门禁**，**有测试证明**；
 5. 主规范 / PROJECT-MAP / README / CLI 帮助文本四者一致；
-6. 章节身份有全书唯一 ID，人工不再依赖模糊的 `id/number`。
+6. 章节身份有全书唯一 ID，人工不再依赖模糊的 `id/number`，
+   **且 `novel_ref` / `script` / 交付清单三处用同一个 `chapter_uid`**；
+7. 十章脚本迁到 v2 schema，`source_refs` 无一条是自动推断出来的；
+8. `m1 verify --visual` 能对十章真实帧给出通过/不通过结论（不再只靠人工 6 帧）。
 
 ---
 
@@ -38,11 +41,15 @@
             │
 批次 2      ▼
   P0-05 m1 novel --align/--check   ← 没有它，P0-02 只能手写 10 份 JSON
+  P0-10 verify --visual            ← 独立，可同时开工
             │
 批次 3      ▼  按章循环 ×10（每章一次走完 01→02→03→04）
   P0-01 对应表 → P0-02 novel_ref → P0-03 讲稿审计 → P0-04 重出片
             │
 批次 4      ▼
+  P0-11 script.json v1→v2 迁移   ← 前置 P0-02（要有 beat 才能填 source_refs）
+            │
+批次 5      ▼
   P0-06 正式出片门禁 + 全量回归
 ```
 
@@ -51,6 +58,10 @@
 
 **为什么 P0-05 要排在 P0-02 前面**：`--align` 能给候选段区间和骨架，
 手写十份 `novel_ref.json` 是纯体力活且容易漏页。
+
+**为什么 P0-11 要排在 P0-02 后面**：v2 schema 的核心是逐段 `source_refs`，
+而 `source_refs` 只能来自 `novel_ref.json` 的 beat。没有 beat 就迁移，
+只能靠"看画面猜来源"，这正是规范明令禁止的（§4.3.4 迁移第 5 步）。
 
 ### 工作量预估（诚实版）
 
@@ -62,8 +73,10 @@
 | P0-04 重出片 | 十章 × 约 5 分钟机时 | 只重算改动段 |
 | P0-05/06 代码 | 约 1.5 天 | 含测试 |
 | P0-07/08/09 文档 | 约 0.5 天 | 最便宜，先做 |
+| P0-10 视觉验收 | 约 0.5 天 | 抽帧 + 判据，比 P0-05 简单 |
+| P0-11 Schema 迁移 | 约 0.5 天代码 + 十章 × 10 分钟 | 迁移脚本 + 逐章核对不推断 |
 
-合计约 **20 小时人工 + 2 天编码**。这不是"跑个脚本"的活。
+合计约 **22 小时人工 + 3 天编码**。这不是"跑个脚本"的活。
 
 ---
 
@@ -170,7 +183,7 @@
 # 只生成候选与骨架，绝不自动标成人工确认
 python -m panelcast m1 novel --align --work m1/v1/ch02/work
 
-# 四步门禁链，任一不过退出码 3
+# 五步门禁链，任一不过退出码 3
 python -m panelcast m1 novel --check --work m1/v1/ch02/work
 ```
 
@@ -178,14 +191,22 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 所有 beat 标 `fidelity: "unconfirmed"`、`review_status: "needs_review"`。
 **候选不得伪装成已确认**。
 
-`--check` 四步（对应主规范 §9.1）：
+`--check` 五步（对应主规范 §9.1）：
 
 ```
 1. novel_ref.json 存在？
-2. source.hash == 当前 novel.txt 的 sha256？
+2. novel_ref.source.text_sha256 == novel_index.json 的 file_sha256？
 3. 每段 source_refs 非空且 beat 存在？
 4. beat 页映射合法（页在本章、original 必带 pages）？
+5. script-audit.json 有效？（script_sha256 / novel_ref_sha256 / 逐段 text_sha256
+   与当前文件一致，且每段 reviewed_by 是人）
 ```
+
+> 第 2 步比的是 `text_sha256`（`novel.txt` 落盘字节，含尾换行，= `novel_index.json`
+> 的 `file_sha256`），**不是** `source.sha256`（EPUB 原文件）。两者永远不相等，
+> 写错会让底稿永远判定为失效。见主规范 §4.3.9 的双哈希对照表。
+> 第 5 步对应 P0-C（审核报告门禁），`--check` 实现时若 `script-audit.json`
+> 尚不存在，应报"未审核"而不是静默跳过。
 
 **范围**：新增 `panelcast/novel.py` + `__main__.py` 子命令 + `tests/test_novel.py`。
 **不做**：`--align` 不调用视觉模型（那是 S3 的事），只做文本锚点匹配。
@@ -196,7 +217,9 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 3. 某段 `source_refs` 为空 → `--check` 报出**具体段 id**；
 4. `original` 的 beat 缺 `pages` → 报错；
 5. `--align` 生成的 beat 全部 `needs_review`，`--check` 对未确认的 beat **报错而不是放过**；
-6. 新增测试 ≥15 个，全量 247+ 通过。
+6. 缺 `script-audit.json` → `--check` 报"未审核"（退出码 3），**不得静默通过**；
+7. 改动 `script.json` 任一段文字后，原 `script-audit.json` 判定失效并指出是哪一段的 `text_sha256` 变了；
+8. 新增测试 ≥15 个，全量 250+ 通过。
 
 ---
 
@@ -247,7 +270,8 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 - `beats` 覆盖本章**全部**漫画页（每页至少出现在一个 beat 的 `pages` 里）；
 - 四类 `fidelity` 计数之和 = `beats_total`；
 - `original` 必带 `pages`（否则就是凭空写的）；
-- `source.hash` 与 `novel.txt` 一致。
+- `source.text_sha256` == `novel_index.json` 的 `file_sha256`
+  （**不是** `source.sha256`，那是 EPUB 原文件哈希，永远对不上）。
 
 **不做**：不为了"覆盖全"把没读过的段标成 `drawn`。宁可 8 条 `omitted`。
 
@@ -317,7 +341,7 @@ TTS 是内容寻址缓存，未改的段会自动命中，只重算改动段。
 **设计**
 
 ```bash
-# 正式：走 S5a 四步链，不过就退出码 3
+# 正式：走 S5a 五步链，不过就退出码 3
 python -m panelcast m1 run --work ... --out ...
 
 # 预览：显式声明草稿，产物文件名带 .draft
@@ -328,6 +352,12 @@ python -m panelcast m1 run --work ... --out ... --draft
 且 `run_report.json` 里 `"draft": true`、`"content_audited": false`。
 **draft 不得改名冒充正式交付。**
 
+**五步链里的第 5 步（审核报告）单独说清楚**：`m1 run` 正式路径必须读
+`script-audit.json`，并校验三样东西对得上当前文件：
+`script_sha256`、`novel_ref_sha256`、逐段 `text_sha256`。
+只要有一段文字改过而审计没重做，就判定失效 → 拒绝出片。
+这一条比前四步更硬：前四步错了是"引错来源"，这一步漏了是"没人读过就发片"。
+
 **范围**：`panelcast/__main__.py`、`panelcast/verify.py`（报告字段）、测试。
 **不做**：不移除 `--skip-panel-gate`（那是竖版合法路径，与内容门禁是两件事）。
 
@@ -335,7 +365,75 @@ python -m panelcast m1 run --work ... --out ... --draft
 1. 缺 `novel_ref.json` 时正式 `run` 退出码 3，且**不产生 mp4**；
 2. `--draft` 能出片，文件名含 `.draft`，报告里 `draft: true`；
 3. 把 draft 产物手工改名为正式名后，`m1 verify` 能识别并报错（靠报告字段，不靠文件名）；
-4. 新增测试 ≥8 个。
+4. 缺 `script-audit.json` 时正式 `run` 退出码 3；
+5. 改一句台词后不重做审计，正式 `run` 退出码 3 并指出失效段 id；
+6. 新增测试 ≥8 个（含第 4、5 条两个用例）。
+
+---
+
+### P0-10 `m1 verify --visual` 视觉验收
+
+**目标**：把"画面合格"从纯人工抽检变成可复现的自动检查。
+
+**为什么它是 P0**：现有 15 条验收全是**技术指标**（分辨率、帧率、时长、音轨、字幕时序），
+没有一条看画面本身。结果就是：字幕带遮住了漫画关键格、某页渲染成空白、
+章节横幅被裁掉一半——**15/15 照样全绿**。这是当前最大的验收盲区。
+
+**设计**
+
+```bash
+python -m panelcast m1 verify --work ... --visual --frames 6
+```
+
+每章抽 6 帧（均分时间轴，避开片头 0.5s 和片尾 0.5s），逐帧判：
+
+| 判据 | 方法 | 不过的表现 |
+| --- | --- | --- |
+| 非全白 | 灰度均值 < 250 | 整页空白、素材没加载 |
+| 非全黑 | 灰度均值 > 5 | 解码失败 |
+| 漫画区非空 | 漫画区内边缘密度 > 阈值 | 图片缩放成一条线 |
+| 字幕带不压画面 | 字幕带以上区域非纯白 | 版式算错，图片顶到字幕里 |
+| 横幅完整 | 右上角区域有文字像素 | 横幅被裁 |
+
+**明确不做**：不判断"画面内容是否对得上旁白"——那需要视觉模型，属 S3/V2。
+P0-10 只回答"这帧是不是一张正常渲染出来的漫画帧"。
+
+**范围**：`panelcast/verify.py` + 新增 `tests/test_verify_visual.py`。
+**验收**
+1. 十章各跑一遍，输出逐帧结论表；
+2. 人为把某章中间一页替换成纯白图，重跑能定位到**具体哪一帧/哪一页**；
+3. 新增测试 ≥6 个（五种判据各一个 + 正常帧不误报）；
+4. 全量 250+ 通过。
+
+---
+
+### P0-11 `script.json` v1 → v2 Schema 迁移
+
+**目标**：十章脚本迁到 v2，让"每句话从哪来"成为结构化字段而不是注释。
+
+**前置**：P0-02（十章 `novel_ref.json` 齐备）。没有 beat 就没有合法的 `source_refs` 来源。
+
+**做法**（严格按主规范 §4.3.4 五步，不得跳步）
+1. 读 v1，按 `chapter_uid` 补章身份（依赖 P0-08）；
+2. 逐段补 `source_refs`，**只允许两种来源**：`novel_ref.json` 里的 beat id，或人工新标的
+   `page_visual` / `setting`；
+3. 计算每段 `text_sha256`（与 `script-audit.json` 同口径）；
+4. 写 v2，保留 v1 为 `script.v1.json.bak`；
+5. **核对：任何一段的 `source_refs` 都不得由脚本自动推断**。
+
+**第 5 步是硬约束**：迁移脚本可以把 beat 列出来给人挑，但**不能**用"这段文字和这个 beat
+关键词重合度最高"之类的规则自动填。一旦自动填，`source_refs` 就变成了伪证——
+它看起来有来源，实际是机器猜的。这正是第六章"哥布林绑票"那类错误的温床。
+
+**范围**：新增 `tools/migrate_script_v2.py`、十章 `script.json`、`tests/test_migrate_script.py`。
+**不做**：不在迁移中改台词内容。改台词是 P0-03 的事，两件事分开做才不会互相污染。
+
+**验收**
+1. 十章全部通过 v2 schema 校验；
+2. `script.v1.json.bak` 与原文件逐字节一致（可回滚）；
+3. 抽查任意 10 段，`source_refs` 指向的 beat 确实在 `novel_ref.json` 里存在且页对得上；
+4. 迁移脚本的 `--auto` 模式**不存在**（或存在但会直接报错退出）；
+5. 新增测试 ≥8 个。
 
 ---
 

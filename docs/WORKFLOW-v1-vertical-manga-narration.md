@@ -322,12 +322,19 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 ```
 
 - `candidates` 只写一次，永不覆盖；`panels` 可反复编辑
-- `source` 必须是 `manual` 才允许出片（退出码 3 卡住）
+- **门禁按 `visual_mode` 区分**（全文统一口径，别处不再重复）：
+  - `visual_mode=page`（竖版）：**不要求分格**。`--skip-panel-gate` 是合法默认路径；
+    页图存在、页序正确即可出片。`panels.json` 只是可选辅助。
+  - `visual_mode=panel`（横版）：每页必须有**人工确认**的切图，且阅读顺序已确认
+    （`confirmed_order` + `order_status=human_confirmed`，见 §15.3）。
+    不满足 → 退出码 3。
 - 整页不分格时，就写一个满页框——**这不是偷懒，是明确的编辑决定**
 
-#### 4.3.4 `script.json`【已实现 / 扩展字段待建】
+#### 4.3.4 `script.json`【v1 已实现 / v2 待建】
 
-现状（十章成片用的就是这一版）：
+**两个版本并存，必须显式声明版本。**
+
+##### v1（现状，十章成片用的就是这一版）
 
 ```json
 {
@@ -338,20 +345,22 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 ```
 
 约束：`pages` 1–3 页；`text` 非空；`id` 唯一；引用页必须已确认。
+**没有版本号字段时一律按 v1 处理。**
 
-**目标结构（P0-05 / P2-02）**：把"旁白从哪来"和"画面放什么"**分成两个字段**。
-现在只有一个 `pages`，会把"小说里有、漫画没画"的情节伪装成"这页画了它"。
+##### v2（目标结构，P0-05 迁移产出）
 
 ```json
 {
+  "schema": "script/v2",
+  "chapter_uid": "konosuba-manga-v01-ch02",
   "segments": [
     {
       "id": "seg_0001",
       "narration": {
         "text": "讲解文字……",
         "source_refs": [
-          {"type": "novel_beat", "id": "b03", "fidelity": "omitted"},
-          {"type": "page_ocr",  "id": "page_0045", "fidelity": "drawn"}
+          {"type": "novel_beat", "id": "b03", "fidelity": "omitted", "note": ""},
+          {"type": "page_visual", "id": "page_0045", "fidelity": "drawn", "note": "惠惠举杖的动作"}
         ]
       },
       "visual_refs": [
@@ -362,18 +371,54 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 }
 ```
 
-| 字段 | 回答什么问题 | 约束 |
+##### 完整字段路径（跨文件引用一律按这张表，不要写简写）
+
+| 路径 | 类型 | 必填 | 取值 |
+| --- | --- | --- | --- |
+| `schema` | string | v2 必填 | `"script/v2"`；v1 无此字段 |
+| `chapter_uid` | string | v2 必填 | 与 `chapter_index.json`、`novel_ref.json` 一致 |
+| `segments[].id` | string | 是 | `seg_%04d`，全章唯一 |
+| `segments[].narration.text` | string | 是 | 旁白原文 |
+| `segments[].narration.source_refs[]` | array | 是 | **至少一条**，否则无法追溯 |
+| `segments[].narration.source_refs[].type` | enum | 是 | `novel_beat` / `page_ocr` / `page_visual` / `setting` |
+| `segments[].narration.source_refs[].id` | string | 是 | beat id / `page_XXXX` / 设定条目 id |
+| `segments[].narration.source_refs[].fidelity` | enum | 是 | `drawn` / `omitted` / `altered` / `original`（§3.4） |
+| `segments[].narration.source_refs[].note` | string | 否 | 为什么引用它 |
+| `segments[].visual_refs[]` | array | 是 | 1–3 条；竖版 `type=page`，横版 `type=panel`（§15） |
+| `segments[].visual_refs[].role` | enum | 是 | `depicts` / `context` / `aftermath` |
+
+**四种来源类型的区别**（这是本轮补充的，之前只有前两种）：
+
+| `type` | 证明什么 | 例 |
 | --- | --- | --- |
-| `narration.source_refs` | **这句话是从哪知道的** | 至少一条；`type` 为 `novel_beat` / `page_ocr` / `setting`（经审核的设定） |
-| `visual_refs` | **这秒画面放什么** | 竖版是 `type: "page"`；横版是 `type: "panel"`（§15） |
-| `role` | 画面和旁白什么关系 | `depicts` 直接描绘 / `context` 相关上下文 / `aftermath` 事后 |
+| `novel_beat` | 小说原文里有这件事 | 达克妮丝在公会上提出入队 |
+| `page_ocr` | 漫画**气泡文字**里写了 | 阿克娅喊「不要，太麻烦了」 |
+| `page_visual` | 漫画**画面**里画了（动作/姿态/场景关系） | 惠惠举杖、笼子泡在水里、鳄鱼咬铁栏 |
+| `setting` | 经审核的设定资料（P4 才有，V1 不用） | 角色年龄、地名 |
 
-`role` 的意义就是解决审核意见里的那个矛盾：一段旁白讲的是小说里被漫画删掉的背景，
-画面用一张相关页做衔接 —— 这时 `source_refs.fidelity = omitted`、`visual_refs.role = context`，
-**结构上就承认"画面不是这句话的来源"**，而不是硬编一个不存在的对应关系。
+> **`page_ocr` 只覆盖文字，覆盖不了画面事实。** 漫画里大量信息是"画出来的"而不是"写出来的"，
+> 如果只有 `page_ocr`，那"鳄鱼在啃笼子"这种没有台词的事实就无法标来源，
+> 执行者只能含糊地标成 `novel_beat` 或干脆不标。所以必须有 `page_visual`。
 
-兼容：`pages` 保留为 `visual_refs` 中 `type=page` 的简写，`m1 run` 继续读它。
-`beats` 是旧草案字段，被 `source_refs` 取代，不再单独使用。
+##### 迁移规则（v1 → v2，任务号 P0-11）
+
+> 本节规则是 P0-11 的施工依据。P0-11 依赖 P0-02（十章 `novel_ref.json` 齐备）——
+> 没有 beat 就没有合法的 `source_refs` 来源，此时迁移只能靠猜，正是第 5 条禁止的。
+
+| 步骤 | 规则 |
+| --- | --- |
+| 1 | `pages` → `visual_refs[{type:"page", id:<页>, role:"depicts"}]`，**机械转换，不推断语义** |
+| 2 | `text` → `narration.text`，**一字不改** |
+| 3 | `source_refs` **留空**，标 `[]`，由人/审计流程填 |
+| 4 | 加 `schema: "script/v2"` 与 `chapter_uid` |
+| 5 | **迁移不得自动推断剧情来源**。空 `source_refs` 就是空，不许猜一个 beat 填上 |
+
+第 5 条是硬规则：自动填一个"看起来像"的 beat，比留空危害大得多——
+它会让 `--check` 通过，而实际上没有人核过。
+
+**兼容读取**：`m1 run` 必须同时读 v1 与 v2；`pages` 作为
+`visual_refs[type=page]` 的简写继续支持。遇到 v1 文件按 v1 语义处理，
+**不许把 v1 的 `pages` 当成"来源已确认"**。
 
 #### 4.3.5 `tts_index_v3.json`【已实现】
 
@@ -442,14 +487,15 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 ```json
 {
   "schema": "novel-ref/v1",
-  "chapter": "ch02",
+  "chapter_uid": "konosuba-manga-v01-ch02",
+  "chapter_id": "ch02",
   "label": "第二章 替华美的高阶职业带来愉悦！",
   "pages": [45, 74],
   "source": {
     "file": "この素晴らしい世界に祝福を！/正文/1.epub",
-    "sha256": "…",
     "volume": 1,
-    "text_sha256": "…"
+    "sha256": "原始 EPUB 文件字节的 sha256",
+    "text_sha256": "novel.txt 文件字节的 sha256（= novel_index.json 的 file_sha256）"
   },
   "novel_chapters": [
     {"index": "ch01", "title": "第一章 和这个自称女神转生到异世界！",
@@ -482,7 +528,10 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `source.sha256` / `text_sha256` | 是 | epub 与抽取文本的哈希。文本一变，本章所有讲稿作废（§11.2） |
+| `chapter_uid` | 是 | **跨卷唯一身份**，`<系列>-v<卷两位>-ch<全书两位>`。跨文件引用一律用它 |
+| `chapter_id` | 是 | 卷内短 id（`ch02`），**仅兼容用**，不得作为跨卷引用的唯一依据 |
+| `source.sha256` | 是 | **原始 EPUB 文件**字节的 sha256。epub 换了 → 全部底稿失效 |
+| `source.text_sha256` | 是 | **`novel.txt` 文件**字节的 sha256，等于 `novel_index.json` 的 `file_sha256` |
 | `novel_chapters[].para_from/to` | 是 | **段号是 `novel.txt` 的全局段号**，不是章内序号，否则跨章区间没法表达 |
 | `order` | 是 | `in_order` / `reordered` / `partial`。`reordered` 必须在 `note` 写明哪几段被挪动 |
 | `beats[].para` | 是（`original` 可为 `null`） | 小说段区间；`null` 就是"小说里没有" |
@@ -490,8 +539,74 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 | `beats[].fidelity` | 是 | `drawn / omitted / altered / original`（§3.4） |
 | `beats[].gist` | 是 | ≤ 40 字，一句话说清这一段发生了什么 |
 
+**两个哈希不要混用**（这是容易实现错的地方）：
+
+| 校验什么 | 用什么 | 对谁比 |
+| --- | --- | --- |
+| epub 有没有被换 | `source.sha256` | 当前 epub 文件字节 |
+| 小说文本有没有被改 | `source.text_sha256` | `novel_index.json` 的 `file_sha256` |
+
+> 注意 `novel_index.json` 里还有一个 `sha256`，那是**纯文本内容**哈希（段之间用 `\n` 连接），
+> 不含文件尾部换行，所以它和 `file_sha256` **不相等**。`novel_ref` 用的是 `file_sha256`。
+> `tools/novel_extract.py` 强制 LF 写盘，保证跨平台字节一致。
+
 **它不是必须 100% 覆盖的文档，而是必须 100% 诚实的文档**：宁可写 8 条 `omitted`，
 也不许把没读过的段落标成 `drawn`。
+
+#### 4.3.10 `script-audit.json`【待建】
+
+**为什么需要它**：`novel_ref.json` 只证明"讲稿有来源"，**不证明"当前这份讲稿被审过"**。
+没有它就会出现这个漏洞：
+
+```
+1. 某章完成 100% 人工审计
+2. 之后有人改了一段旁白
+3. 旧审计报告还在
+4. 新讲稿照样通过结构检查 → 以"已审计"的名义出片
+```
+
+所以审核结果必须**绑定版本哈希**。讲稿或底稿一变，审计即失效。
+
+一章一份，放 `work/script-audit.json`：
+
+```json
+{
+  "schema": "script-audit/v1",
+  "chapter_uid": "konosuba-manga-v01-ch02",
+  "script_sha256": "当前 script.json 文件字节的 sha256",
+  "novel_ref_sha256": "当前 novel_ref.json 文件字节的 sha256",
+  "audited_segments": [
+    {"segment_id": "seg_0001", "text_sha256": "该段 text 字段的 sha256", "status": "approved"},
+    {"segment_id": "seg_0002", "text_sha256": "…", "status": "rewritten"},
+    {"segment_id": "seg_0003", "text_sha256": "…", "status": "removed"}
+  ],
+  "review_status": "approved",
+  "reviewed_by": "human:…",
+  "reviewed_at": "2026-11-16T00:00:00+08:00",
+  "notes": "第一～五章为第二轮审计，发现 3 处无来源段落已改写"
+}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `script_sha256` | **整份** `script.json` 的字节哈希。改一个字就失效 |
+| `novel_ref_sha256` | 底稿的字节哈希。底稿一变，之前的审计结论也不再可信 |
+| `audited_segments[].text_sha256` | 逐段哈希。用于定位"到底哪一段被改了"，比整份哈希更好用 |
+| `status` | `approved` 原样通过 / `rewritten` 改写过 / `removed` 已删除 |
+| `review_status` | 只有 `approved` 才允许正式出片；`partial` / `rejected` 都不行 |
+| `reviewed_by` | 必须是人（`human:<name>`）。**模型自审不能填这里** |
+
+**失效规则（P0-06 门禁）**：
+
+```
+当前 script.json 字节哈希  == script_audit.script_sha256 ？
+当前 novel_ref.json 字节哈希 == script_audit.novel_ref_sha256 ？
+audited_segments 覆盖全部当前段，且每段 text_sha256 对得上？
+review_status == "approved" ？
+        ↓ 全过才允许正式出片
+```
+
+任一不等 → 审计过期，必须重新审。**不许"只补一条审计记录"绕过。**
 
 ---
 
@@ -502,15 +617,17 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 ```
 mobi ─S1─► pages/*.jpg ─S2─► chapter_index.json
                             │
-                            ├─S3─► page_XXXX.profile.json ──► 素材检索单（V2）
+                            ├─S3─► page_XXXX.profile.json（按需，不阻塞竖版）
                             │
-                            └─S4─► *.candidates.json ──人工──► *.panels.json
-                                                                    │
-epub ─S1─► chapters/*.xhtml ─S1'─► novel.txt + novel_index.json     │
-                                       │                            │
-                            S5a 底稿对齐 ──► novel_ref.json         │
-                                       │                            │
-                                       └──► S5 讲稿 ──► script.json ◄┘
+                            └─S4─► 分格：按 visual_mode 分岔
+                                     ├─ page  模式 ──► 整页引用，跳过分格，无 *.panels.json
+                                     └─ panel 模式 ──► *.candidates.json ─人工─► *.panels.json
+                                                                                     │
+epub ─S1─► chapters/*.xhtml ─S1'─► novel.txt + novel_index.json                       │
+                                       │                                             │
+                            S5a 底稿对齐 ──► novel_ref.json                          │
+                                       │                                             │
+                                       └──► S5 讲稿 ──► script.json ◄────────────────┘
                                                           │
                                                           ├─S6─► audio/*.wav + tts_index_v3.json
                                                           ├─S7─► timeline.json
@@ -519,20 +636,33 @@ epub ─S1─► chapters/*.xhtml ─S1'─► novel.txt + novel_index.json     
                                                                     └─S9─► run_report.json
 ```
 
+**读图要点**：S3 和 S4 都不是竖版主链路上的必经环节。
+
+- S3（页面解读）产出的是素材检索单，服务 V2 的配图检索，竖版 `visual_mode=page` 用不到。
+- S4（分格）只有 `visual_mode=panel`（横版）才需要。竖版走 `page` 模式，**整页引用、跳过分格**，
+  `--skip-panel-gate` 在 `visual_mode=page` 下是合法调用（见 §4.3.3）。
+  换句话说：竖版今天能出片，不依赖 S3/S4 任何产物。
+
 | 阶段 | 名称 | 执行者 | 产物 | 现状 |
 | --- | --- | --- | --- | --- |
 | S0 | 能力探测 | 机器 | `capability_report.md` | 【已实现】 |
 | S1 | 素材摄取 | 机器 | `pages/*.jpg` + `pages.json` | 【已实现】 |
 | S1' | 小说纯文本化 | 机器 | `text/novel.txt` + `novel_index.json` | 【已实现】`tools/novel_extract.py` |
-| S2 | 章节定界 | 机器 + 人 | `chapter_index.json` | 【待建】（方法已定，见下） |
-| S3 | 页面解读 | 视觉模型 + 人 | `page_XXXX.profile.json` | 【待建】 |
-| S4 | 分格与确认 | 机器 + 人 | `*.panels.json` | 【已实现】 |
+| S2 | 章节定界 | 机器 + 人 | `chapter_index.json` | **半自动**（程序测墨量 + 人读横幅） |
+| S3 | 页面解读 | 视觉模型 + 人 | `page_XXXX.profile.json` | 【待建】（仅 V2 素材检索需要） |
+| S4 | 分格与确认 | 机器 + 人 | `*.panels.json` | 【已实现】（仅 `visual_mode=panel` 需要） |
 | **S5a** | **底稿对齐** | **人 + 模型** | **`novel_ref.json`** | **【待建】**（流程已定，见 §5.6.1） |
 | S5 | 讲稿 | 模型 + 人 | `script.json` | 半自动（当前人工） |
 | S6 | 配音 | 机器 | `audio/*.wav` + 索引 | 【已实现】 |
 | S7 | 时间轴 | 机器 | `timeline.json` | 【已实现】 |
 | S8 | 渲染 | 机器 | `<章节名>.mp4` | 【已实现】 |
 | S9 | 质检交付 | 机器 + 人 | `run_report.json` | 【已实现】 |
+
+**S2 为什么是半自动而不是【待建】**：程序侧已经跑通——全页灰度导出、墨量计算、
+「黑页 + 波点页」配对反推标题页，都在 `m1 chapter` 里实现并有测试覆盖；
+缺的是「横幅文字要人读一眼」这一步，而这一步本质上无法自动化（横幅位置跨卷不固定，
+见 §5.3）。能力有一半、且缺口是人工环节而非代码，状态就写半自动，
+不写【待建】——否则会让人误以为整段没动手。
 
 ### 5.1 S0 能力探测
 
@@ -1246,29 +1376,50 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 | 阶段 | 门禁 | 不过的退出码 |
 | --- | --- | --- |
 | S1 | 页数/章数 > 0 | 3 |
-| S1' | `novel.txt` 非空、`novel_index.json` 段号连续、`sha256` 与文本一致 | 3 |
-| S2 | 章节标题页人工确认 | 3 |
-| S3 | 介绍页 §6.6 全过 + `reviewed=true` | 3 |
+| S1' | `novel.txt` 非空、`novel_index.json` 段号连续、`file_sha256` 与**磁盘字节**一致 | 3 |
+| S2 | 章节标题页人工确认（`verified_by` 非空） | 3 |
+| S3 | **仅当本章需要素材检索单时校验**：`§6.6` 全过 + `reviewed=true`。竖版 `visual_mode=page` 不读 profile，**S3 缺失不阻塞竖版出片** | 3 |
 | S4 | **按模式区分**：竖版 `page` 可跳过（`--skip-panel-gate` 合法）；横版 `panel` 每页必须有 `panels.json` 且 `source=manual` | 3 |
-| **S5a** | 四步链全过（见下） | 3 |
+| **S5a** | 五步链全过（见下） | 3 |
 | S6 | 音频存在且 > 44 字节、时长 > 0 | 4 |
 | S7 | 总时长与音频累加差 < 0.05s | 4 |
 | S8 | §9.2 全部硬指标 | 4 |
 
-**S5a 的四步门禁链**（P0-05/P0-06，任一不过就 `BLOCKED`，禁止进入 S6）：
+**S3 的适用范围（重要）**：S3 产出 `page_XXXX.profile.json`，是给 V2「按文字找画面」的素材检索单用的。
+竖版 `visual_mode=page` 整页引用、不做画面检索，因此 **S3 与竖版出片无依赖关系**。
+现存 291 个 profile 占位文件**不构成竖版的阻塞项**——不要因为「S3 还没审完」就停掉竖版交付。
+只有当某章确实要用 profile 做检索时，才对该章启用 S3 门禁。
+
+**S5a 的五步门禁链**（P0-05/P0-06，任一不过就 `BLOCKED`，禁止进入 S6）：
 
 ```
 script.json
    │
-   ├─1. novel_ref.json 存在？          否 → 禁止正式出片（只允许 --draft 预览）
-   ├─2. source.hash == 当前 novel.txt？ 否 → 底稿失效，回 S5a 重对齐
-   ├─3. 每段 source_refs 非空且 beat 存在？ 否 → 禁止出片
-   └─4. beat 的页映射合法（页在本章、original 必带 pages）？ 否 → 禁止出片
+   ├─1. novel_ref.json 存在？                  否 → 禁止正式出片（只允许 --draft 预览）
+   ├─2. novel_ref.source.text_sha256
+   │     == novel_index.json 的 file_sha256？   否 → 底稿失效，回 S5a 重对齐
+   ├─3. 每段 source_refs 非空且 beat 存在？      否 → 禁止出片
+   ├─4. beat 的页映射合法
+   │     （页在本章、original 必带 pages）？     否 → 禁止出片
+   └─5. script-audit.json 有效？
+          · 存在，且 status=approved 或 rewritten
+          · script_sha256 == 当前 script.json 的哈希
+          · novel_ref_sha256 == 当前 novel_ref.json 的哈希
+          · 每段有 status 与 reviewed_by（人，不是机器）
+                                            否 → 禁止正式出片（只允许 --draft 预览）
                                     ↓ 全过
                                  允许 TTS
 ```
 
-这四步只能证明**结构完整、来源可追**，**不能证明剧情理解正确** —— 后者仍然只能靠
+第 2 步用的哈希是 `text_sha256`，**不是** `novel_ref.source.sha256`。
+前者是 `novel.txt` 落盘字节的哈希（= `novel_index.json` 的 `file_sha256`，含尾部换行）；
+后者是 EPUB 原文件哈希，两者永远不相等。混用会导致「底稿永远判定为失效」。详见 §4.3.9。
+
+第 5 步是 P0-C 加的。前四步能证明「来源可追」，但**证明不了「有人看过这段文字」**——
+脚本可以完全合规地引用正确的 beat，同时把剧情讲错。`script-audit.json` 就是那把
+「人确实读过」的锁，它的失效规则见 §4.3.10：脚本、底稿、任一段文字任一变化，审计即过期。
+
+这五步只能证明**结构完整、来源可追、有人审过**，**不能证明剧情理解正确** —— 后者仍然只能靠
 §9.4 的人工抽检。不要因为 `--check` 通过就宣布内容合格。
 
 ### 9.2 成片验收（15 条，逐条独立复验）
@@ -1488,13 +1639,18 @@ script.json
 
 1. **`m1 novel`：S5a 一条命令**。抽取半边已经有了（`tools/novel_extract.py`）；
    缺的是 `novel --align --work …`（按锚点给候选段区间、生成 `novel_ref.json` 骨架）
-   与 `novel --check`（跑 §9.1 的四步门禁链）。**这是"内容不充实/编错"的根因，优先级最高**
+   与 `novel --check`（跑 §9.1 的**五步**门禁链，含 `script-audit.json` 审核报告校验）。
+   **这是"内容不充实/编错"的根因，优先级最高**
 2. **十章底稿回填 + 100% 内容审计**（ROADMAP P0-01…P0-04）：
    现有十章全部产出于 S5a 之前，技术上合格但**底稿不可追溯**。
    这不是"补十份 JSON"，要逐段核来源、改错稿、重出片。**抽查不够，必须全量。**
-3. `m1 chapter`：S2 章节定界自动化 + 人工确认（现在靠人肉看横幅，`tools/strip_sheet.py` 是经济解法）
-4. **章节身份统一**（P0-08）：`chapter_uid` + 三种编号分开，见 §4.3.1
+3. `m1 chapter`：S2 章节定界**收敛人工工作量**（程序侧墨量测量 + 黑页/波点页配对已实现，
+   缺的是把"人读横幅"这一步做得更省力，`tools/strip_sheet.py` 是经济解法）。
+   状态是**半自动**，不要写成【待建】。
+4. **章节身份统一**（P0-08）：`chapter_uid` + 三种编号分开，见 §4.3.1。
+   已落地 `novel_ref` / `script`，**还缺交付清单**。
 5. `m1 profile`：S3 页面解读**自动生成**（字段规范与自检已就绪；缺的是"读图填字段"这一步）。
+   **注意 S3 不阻塞竖版**：竖版整页引用不读 profile，见 §9.1。
    **按需生成**，不批量填满 291 份（§6.5.1）
 6. **`m1 verify --visual`**：真实帧视觉验收（§9.5）
 7. **缓存键补源图 hash 与工具链版本**（§11.1）
@@ -1503,6 +1659,20 @@ script.json
 其中第 5 条的**校验半边已经落地**：`panelcast/profile.py` + `docs/schemas/page-profile.schema.json`
 能对一份介绍页跑完 §6.6 八条门禁（`python -m panelcast.profile … --ship`，37 个测试覆盖）。
 剩下的是生成半边——按 §6.5 的规则逐页读图填字段，这一步要接视觉模型。
+
+**本节条目与 ROADMAP 任务号的对应**（两边是同一件事的两种视图）：
+
+| 本文条目 | ROADMAP | 状态 |
+| --- | --- | --- |
+| 1 `m1 novel --align/--check` | P0-05 | 未开工 |
+| 2 十章底稿回填 + 内容审计 | P0-01…P0-04 | 未开工 |
+| 3 S2 收敛人工工作量 | P0-07 | 半自动，文档已统一 |
+| 4 章节身份统一 | P0-08 | `novel_ref`/`script` 已落地，交付清单待补 |
+| 5 S3 生成半边 | 未排期（不阻塞竖版） | 校验已落地，生成待接视觉模型 |
+| 6 `m1 verify --visual` | **P0-10** | CLI 有开关，判据未实现 |
+| 7 缓存键补 hash | P2 之后 | 未开工 |
+| 8 长段拆页 | 未排期 | 未开工 |
+| — | **P0-11** script v1→v2 迁移 | 规范已定，代码未写 |
 
 已完成、不必再列：`m1 verify`（15 条）、编辑器"介绍页校对"面板、切页同步（§9.2 第 14 条）、
 `tools/contact_sheet.py` / `tools/strip_sheet.py` / `tools/novel_extract.py`。
@@ -1813,4 +1983,4 @@ ffprobe -v error -show_entries stream=codec_type,duration,nb_frames \
 | 序章 149 段 / 一章 563 / 二章 569 / 三章 733 / 四章 537 / 终章 76 | 同上，段号 0–2626 全局连续 |
 | 人物锚点首次出现段号（惠惠 1-338、达克妮丝 2-40、维兹 2-511…） | 同上，逐段 `in` 判断 |
 | 「竹笋」在 18 卷正文仅 vol.13 命中 1 次 | 全部 epub 去标签后 `count()` |
-| 测试 247 个 | `python -m unittest discover -s tests` |
+| 测试 250 个 | `python -m unittest discover -s tests` |

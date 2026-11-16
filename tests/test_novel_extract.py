@@ -111,6 +111,34 @@ class TestExtract(unittest.TestCase):
         _, i3 = extract(b)
         self.assertNotEqual(i1["sha256"], i3["sha256"])
 
+    def test_file_sha256_matches_written_bytes(self):
+        """file_sha256 必须等于落盘文件的字节哈希 —— 这是 novel_ref 校验的依据。"""
+        import hashlib
+        epub = self.dir / "1.epub"
+        make_epub(epub, {"OEBPS/Text/chapter01.xhtml": xhtml("第一章", "正文")})
+        out = self.dir / "text"
+        self.assertEqual(main(["--epub", str(epub), "--out", str(out)]), 0)
+        idx = json.loads((out / "novel_index.json").read_text(encoding="utf-8"))
+        actual = hashlib.sha256((out / "novel.txt").read_bytes()).hexdigest()
+        self.assertEqual(idx["file_sha256"], actual)
+
+    def test_file_sha256_differs_from_content_sha256(self):
+        """两个哈希含义不同：内容哈希不含尾部换行，文件哈希含。不能混用。"""
+        epub = self.dir / "1.epub"
+        make_epub(epub, {"OEBPS/Text/chapter01.xhtml": xhtml("甲")})
+        _, idx = extract(epub)
+        self.assertNotEqual(idx["sha256"], idx["file_sha256"])
+
+    def test_novel_txt_is_lf_only(self):
+        """强制 LF，否则 Windows 上 \n 会被翻成 \r\n，哈希跨平台不一致。"""
+        epub = self.dir / "1.epub"
+        make_epub(epub, {"OEBPS/Text/chapter01.xhtml": xhtml("甲", "乙")})
+        out = self.dir / "text"
+        main(["--epub", str(epub), "--out", str(out)])
+        raw = (out / "novel.txt").read_bytes()
+        self.assertNotIn(b"\r", raw)
+        self.assertTrue(raw.endswith(b"\n"))
+
 
 class TestMain(unittest.TestCase):
     def setUp(self):

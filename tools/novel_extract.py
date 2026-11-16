@@ -9,8 +9,12 @@
         --out .local/source/epub/text
 
 产物：
-    novel.txt          逐段一行，段号全局连续（跨章引用不会歧义）
-    novel_index.json   章 → 段区间 + 字数 + sha256
+    novel.txt          逐段一行，段号全局连续（跨章引用不会歧义），强制 LF
+    novel_index.json   章 → 段区间 + 字数 + 两个哈希
+
+`novel_index.json` 里的两个哈希用途不同：
+    sha256       纯文本内容哈希（不含文件尾部换行）
+    file_sha256  落盘文件字节哈希 —— `novel_ref.json` 的 source.text_sha256 对齐这个
 
 只取正文（chapter00..chapter05）。colorpages / Houji / Message / Writer 等
 一律排除，否则字数虚高约 6,000，sha256 也会跟着变。
@@ -40,7 +44,14 @@ def _clean(raw):
 
 
 def extract(epub_path):
-    """返回 (text, index)。text 每段一行；index 记录全局段号。"""
+    """返回 (text, index)。text 每段一行；index 记录全局段号。
+
+    index 里有两个哈希，含义不同，不要混用：
+    - `sha256`      纯文本内容的哈希（段之间用 \\n 连接，不含文件尾部换行）
+    - `file_sha256` 落盘后 novel.txt 文件字节的哈希
+    文件写入时强制 LF，所以同一份 epub 在任何平台产出的 file_sha256 都相同。
+    `novel_ref.json` 的 `source.text_sha256` 对齐的是 `file_sha256`。
+    """
     z = zipfile.ZipFile(str(epub_path))
     names = sorted(n for n in z.namelist() if BODY_RE.fullmatch(n))
     if not names:
@@ -74,8 +85,14 @@ def extract(epub_path):
         "total_paras": len(lines),
         "total_chars": sum(c["chars"] for c in chapters),
         "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "file_sha256": hashlib.sha256(render(text).encode("utf-8")).hexdigest(),
     }
     return text, index
+
+
+def render(text):
+    """落盘内容：每段一行 + 一个尾部换行。哈希与写盘都走这里，避免两处不一致。"""
+    return text + "\n"
 
 
 def main(argv=None):
@@ -97,15 +114,19 @@ def main(argv=None):
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "novel.txt").write_text(text + "\n", encoding="utf-8")
+    # newline="\n" 是必须的：默认文本模式在 Windows 上会把 \n 翻成 \r\n，
+    # 导致同一份 epub 在不同平台算出不同的 file_sha256。
+    (out / "novel.txt").write_text(render(text), encoding="utf-8", newline="\n")
     (out / "novel_index.json").write_text(
-        json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        json.dumps(index, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8", newline="\n")
 
     print(f"{index['source_file']}: {index['total_paras']} 段 "
           f"{index['total_chars']} 字 sha256 {index['sha256'][:12]}…")
     for c in index["chapters"]:
         print(f"  {c['file']:16s} {c['para_from']:>5}-{c['para_to']:<5} "
               f"{c['chars']:>6} 字  {c['title']}")
+    print(f"  file_sha256 {index['file_sha256'][:12]}…（novel_ref 的 source.text_sha256 用这个）")
     print(f"→ {out / 'novel.txt'}")
     return 0
 

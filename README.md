@@ -81,7 +81,7 @@ y=1821  └──────────────────────┘
 
 ```
 panelcast/   代码（15 模块 + editor/ 浏览器校对）
-tests/       247 用例
+tests/       250 用例
 tools/       novel_extract / contact_sheet / strip_sheet
 docs/        WORKFLOW（怎么做）/ ROADMAP（先做什么）/ PROJECT-MAP（目录与状态）
 m1/          出片产物区
@@ -101,7 +101,7 @@ m1/          出片产物区
 ## 测试
 
 ```bash
-python -m unittest discover -s tests -q     # 247 tests, OK (skipped=2)
+python -m unittest discover -s tests -q     # 250 tests, OK (skipped=2)
 ```
 
 ## 边界（当前）

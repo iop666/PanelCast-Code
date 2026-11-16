@@ -1,8 +1,9 @@
 # PanelCast 项目地图（审核用）
 
 > 生成于 2026-11-16。本文件描述**磁盘上真实存在的东西**，不是理想结构。
-> 主规范是 `docs/WORKFLOW-v1-vertical-manga-narration.md`（1,400 行），
-> 本文件是它的"目录 + 状态"摘要，两者冲突时以主规范为准、以磁盘为准。
+> 主规范是 `docs/WORKFLOW-v1-vertical-manga-narration.md`（约 1,800 行），
+> **优先级与排期看 `docs/ROADMAP.md`**。本文件是"目录 + 状态"摘要，
+> 三者冲突时：优先级以 ROADMAP 为准，做法以主规范为准，事实以磁盘为准。
 
 ---
 
@@ -20,6 +21,15 @@
 **最重要的一句**：`m1/` 下十章成片是**测试稿**。技术指标（15 条验收）全绿，
 但讲稿的底稿对齐（`novel_ref.json`）是 2026-11-16 才写进规范的，
 这十章全部产出于它之前，所以**没有任何一章的旁白可以追溯到小说段落**。
+
+**两件事必须分开记，永远不要混**：
+
+| | 含义 | 十章现状 |
+| --- | --- | --- |
+| **技术合格** | 视频生成成功、能播、音轨对、字幕参数对 | ✅ 15/15 |
+| **内容合格** | 每段旁白可追溯到小说原文或画面证据 | ❌ 0/10（见 ROADMAP P0） |
+
+技术合格不能推断内容合格。这是本轮审核最核心的结论。
 
 ---
 
@@ -55,12 +65,17 @@ D:\ClaudeCode\PanelCast\
 │   └── strip_sheet.py        88   【跑通】裁同一条横带竖拼（找章节横幅）
 │
 ├── docs/
-│   ├── WORKFLOW-v1-vertical-manga-narration.md   主规范（唯一权威）
-│   ├── PROJECT-MAP.md                            本文件
+│   ├── WORKFLOW-v1-vertical-manga-narration.md   主规范（唯一权威"怎么做"）
+│   ├── ROADMAP.md                                **优先级唯一依据**（P0–P5）
+│   ├── PROJECT-MAP.md                            本文件（目录 + 状态）
 │   ├── ADR-001-source-ingestion.md               摄取层决策记录
 │   ├── ADR-002-m1-render-stack.md                渲染栈决策记录
 │   ├── schemas/page-profile.schema.json          介绍页 schema
-│   └── tasks/                                    任务书 3 份（M0/M1/TASK-002）
+│   └── tasks/
+│       ├── P0-execution-plan.md                  P0 九项任务书
+│       ├── M0-content-validation.md
+│       ├── M1-minimal-loop.md
+│       └── TASK-002-ingest-hardening.md
 │
 ├── m0/                             早期内容验证，已归档，不再动
 │
@@ -128,6 +143,10 @@ ch02/
 两套编号并存。`m1 slice` 的 `find_chapter` 按 `id` 或 `number`（「第六章」）匹配，
 实际调用都传「第六章」这种章节号，所以两套 id 并存也能跑；
 但人工对数时要看 `label`（「第六章」），不要看 id。
+
+这是**待修项**（ROADMAP P0-08）：以后 `chapter_uid`（全书唯一）、
+`global_chapter_number`（全书编号）、`volume_chapter_number`（卷内编号）三者分开，
+`id` 不再同时承担两种含义。
 
 ---
 
@@ -228,6 +247,14 @@ python -m panelcast m1 verify --work m1/v1/ch02/work --out m1/v1/ch02/out --name
 
 出片耗时实测：38 页约 5 分钟（首次），改稿重跑约 2 分钟。
 
+### 2.5 横版模式（不在当前阶段）
+
+横版不是"把 1080×1920 改成 1920×1080"，而是另一套视觉生产层：人工切格（允许重叠）→
+阅读顺序确认 → 格级视觉时间轴 → 独立渲染器 → 独立验收（H1–H9）。
+
+边界、数据契约 `panel-cuts/v1`、切格工具要求见主规范 §15；排期见 ROADMAP P1–P2。
+**竖版现有整页流程不因横版改动**，横版也不得套用竖版页面时间轴。
+
 ---
 
 ## 3. 产物契约（五个 JSON）
@@ -318,11 +345,26 @@ y=1821  └──────────────────────┘
 
 ---
 
-## 7. 下一步（按优先级）
+## 7. 下一步
 
-1. **回填十章 `novel_ref.json`**，顺带按 §9.4 抽检第一～五章 —— 这是"测试稿"变"正式稿"的唯一路径
-2. **`m1 novel --align/--check`**：把 S5a 从流程变成命令
-3. **S3 接视觉模型**：291 份骨架填肉，同时解锁 V2 的素材复用
-4. **`m1 chapter`**：章节定界自动化（`tools/strip_sheet.py` 已证明横带法可行）
-5. 第十一、十二章出片
-6. 更新 `README.md`（现在还写着"只做 ingest"）
+**排期以 `docs/ROADMAP.md` 为准。** 当前处于 **P0：内容可信度与规范闭环**，
+具体任务书见 `docs/tasks/P0-execution-plan.md`。
+
+P0 九项，按依赖顺序：
+
+| ID | 任务 | 产出 |
+| --- | --- | --- |
+| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿的真实对应 | `m1/audit/chapter-map.md` |
+| P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10 |
+| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit.md` |
+| P0-04 | 改稿后重出受影响成片 | 十章 mp4 + 更新的 `delivery.md` |
+| P0-05 | `m1 novel --align/--check` | CLI + 测试 |
+| P0-06 | 正式出片门禁（`--draft` 分离） | `m1 run` 改动 + 测试 |
+| P0-07 | 文档与实现统一 | 主规范 / 本文件 / README / CLI 帮助 |
+| P0-08 | 章节身份统一 | `chapter_uid` + 三种编号 |
+| P0-09 | 规则冲突核查 | 已核两处（时间轴、字数），结论已写进主规范 |
+
+P0 之后的 P1（横版切格工具）**不得提前开始**。
+
+第十一、十二章出片（v2 p107–137 / p138–148）暂排在 P0-04 之后，
+因为它们的讲稿也应当走 S5a 流程，而不是重犯"只看画面写稿"的老路。

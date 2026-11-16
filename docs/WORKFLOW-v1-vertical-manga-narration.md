@@ -10,13 +10,13 @@
 
 ## 0. 这份文档怎么用
 
-这份文档定义 **V1 的输入契约、输出契约、十阶段工作方式、每页"介绍页"规范**。
+这份文档定义 **V1 的输入契约、输出契约、十阶段工作方式（含 S5a 底稿对齐）、每页"介绍页"规范**。
 它是给三类人看的：
 
 | 读者 | 该看哪几节 |
 | --- | --- |
-| 派任务的人（选题/审片） | §1 产品定义、§5 十阶段总览、§9 质检清单 |
-| 执行的人/模型（写代码、写讲稿、跑流程） | §3 输入、§4 输出、§5 每阶段细则、§6 介绍页 |
+| 派任务的人（选题/审片） | §1 产品定义、§5 阶段总览、§9 质检清单 |
+| 执行的人/模型（写代码、写讲稿、跑流程） | §3 输入（尤其 §3.4 小说底稿）、§4 输出、§5 每阶段细则、§6 介绍页 |
 | 后续接"无漫画素材复用"的人 | §6 全文，尤其 §6.7 检索单、§6.8 决策矩阵 |
 
 文中标 **【已实现】** 的是当前代码里已经能跑的能力，标 **【待建】** 的是本规范要求、
@@ -34,9 +34,11 @@
 | 章节标签（右上角） | 【已实现】 | `m1 run --chapter "第一章 …"` |
 | 成片自检（容器/帧率/音轨/视频轨时长） | 【已实现】 | `m1 run` 内置断言 |
 | 介绍页 schema + 八条质量门禁 | 【已实现】 | `python -m panelcast.profile … --ship` |
+| 15 条验收一键化 | 【已实现】 | `m1 verify`（含切页同步、内容密度） |
 | 章节自动定界 | 【待建】 | §5.3 |
 | 介绍页自动生成（读图填字段） | 【待建】 | §5.4 / §6.5 |
-| 13 条验收一键化 `m1 verify` | 【待建】 | §9.2 |
+| 小说正文抽取（epub → `novel.txt` + 索引） | 【已实现】 | `python tools/novel_extract.py` |
+| 底稿对齐 `novel_ref.json` | 【待建】 | §5.6.1 |
 | 无漫画素材复用（V2） | 【待建】 | §14.2 |
 
 ---
@@ -60,6 +62,7 @@
 | 单页停留 | 建议 8–14s，硬上限 26s | 一页挂多少字决定停多久；超上限说明这一段文字压在一页上（§9.2 第 12 条） |
 | 切页同步 | 页窗口必须落在讲这一页的段内 | 越界 >0.5s 就是画面与配音脱钩（§9.2 第 14 条） |
 | 内容密度 | 45–90 字/页 | 低于 45 页翻得太快、信息量不够（§9.2 第 15 条） |
+| 底稿可追溯 | 每段讲稿能回指小说段或明确标 `original` | 画面没画、小说没有的内容一个字都不许写（§3.4 / §9.4） |
 
 ### 1.3 V1 明确不做
 
@@ -83,6 +86,9 @@
 | **介绍页 / page profile** | 每一页的结构化描述（画面/人物/文字/复用建议），见 §6 |
 | **句锚点 / sentence anchor** | edge-tts 返回的真实句边界时间，用来给字幕对时 |
 | **素材检索单 / asset request** | 由介绍页派生、给"替代素材"用的检索规格，见 §6.7 |
+| **底稿 / novel_ref** | 一章一份的对齐表，把小说段落映射到漫画页，见 §4.3.9 |
+| **拍点 / beat** | 小说里一件连续发生的事，3–20 段，映射到 0–3 个漫画页 |
+| **fidelity** | 一个拍点和漫画的关系：`drawn` 画了 / `omitted` 没画 / `altered` 改了 / `original` 漫画原创 |
 | **工作区 / work** | 一次出片的中间目录，含 `pages/ panels/ audio/ cache/` |
 
 ---
@@ -94,7 +100,7 @@
 | 类型 | 格式 | 规模实测 | 说明 |
 | --- | --- | --- | --- |
 | 漫画 | `.mobi`（PDB 容器，内嵌 JPEG） | 1 卷 = 169 页；**62 种尺寸**，宽 160–768、高 240–1024，主力 672×1009（41 页）/ 648×1009（32 页），119 页高 1009 | 主视觉来源 |
-| 小说 | `.epub`（OPF spine + XHTML） | 1 卷 = 6 章，约 8.6 万字 | 讲稿的事实来源 |
+| 小说 | `.epub`（OPF spine + XHTML） | 1 卷 = 6 个正文文件（序章 + 4 章 + 终章），**2,627 段 / 83,599 字**；整个 epub 89,599 字符（多出的是人物介绍、后记、版权） | **剧情底稿**，见 §3.4 |
 
 目录约定（素材不进 git，`.gitignore` 已排除）：
 
@@ -127,6 +133,40 @@ V1 只真正支持 **模式 A**，但介绍页规范必须让 B/C 在未来能�
 | 同类输入唯一 | 一次传了 2 个 mobi | 退出码 2，且不写任何文件 |
 | 页图可解码 | `ffmpeg` 灰度解码字节数 ≠ w×h | 退出码 4 |
 
+### 3.4 小说是剧情底稿，不是参考读物
+
+**事实优先级（写稿时不可调换）**：
+
+```
+介绍页 OCR 到的画面事实   >   小说原文事实   >   不许推理
+```
+
+画面里有的，按画面写；画面里没有但小说写了的，按小说写；两边都没有的，**一个字都不许写**。
+
+漫画和小说之间只有四种关系，每段讲稿必须能归到其中一种（`novel_ref.json` 的 `fidelity`，见 §4.3.9）：
+
+| 值 | 含义 | 写稿规则 |
+| --- | --- | --- |
+| `drawn` | 漫画画了，小说也写了 | 两边都可用，画面优先 |
+| `omitted` | 小说写了，漫画没画 | 可以写，但只能写在"这段画面对应的小说情节"里，不能张冠李戴 |
+| `altered` | 漫画改了细节（换地点、换顺序、合并人物） | **按漫画写**，不按小说纠正；差异记进 `note` |
+| `original` | 漫画原创，小说里没有 | 只写画面能看见的，不加动机、不加台词 |
+
+**三条实测教训**（这是本节存在的理由）：
+
+1. **章标题是两套命名，不能用来对齐。** 小说第三章叫「在这座湖中加入鲜榨自称女神汁！」，
+   漫画同一段剧情叫「第六章 为这片湖献上自称女神的圣水！」。同一个故事，两个名字，
+   一个都不包含对方的关键词。
+2. **漫画会重排小说。** 「圣水」在小说里首次出现于第四章第 87 段（贝尔迪亚第 60 段登场之后），
+   漫画却把阿克娅卖圣水这段日常放在第一卷第五章，即无头骑士退走**之后**当卷末。
+   按"第 N 章对第 M 章"硬套，这一章必然错位。
+3. **有的漫画章小说里根本没有。** 第七章「遭到梦幻竹笋偷袭！」共 8 页，
+   在 18 卷小说正文里搜「竹笋」只命中 1 次（vol.13），第一卷 0 次。
+   这类章属于 `original`，只能"只写画面"，长度天然短——**不许为了凑时长硬编**。
+
+所以对齐是**逐章的人工/模型工作**，不是一条命令：先用人物事件锚点定位小说区间（§5.6.1），
+再把区间内的段落逐条判成上面四种关系，最后才写讲稿。
+
 ---
 
 ## 4. 输出
@@ -153,6 +193,8 @@ panelcast/
   .local/                          # 源素材缓存，git 忽略
     source/
       epub/  chapters/*.xhtml, chapters.json, source_manifest.json
+             text/novel.txt            # 去标签纯文本，段号连续，§5.6.1 用
+             text/novel_index.json     # 章 → 段区间 + 字数 + sha256
       mobi/  pages/*.jpg, pages.json
   library/                         # 长期资产，进 git
     profiles/
@@ -175,6 +217,7 @@ panelcast/
           frames/1080x1920-blurpad-white-b269-m10-t72/page_0005.png
           audio_concat.wav
         chapter_index.json
+        novel_ref.json             # 本章的底稿对齐表，见 §4.3.9
         script.json
         timeline.json
       out/
@@ -234,12 +277,17 @@ panelcast/
 ```json
 {
   "segments": [
-    {"id": "seg_0001", "pages": ["page_0005", "page_0006"], "text": "…"}
+    {"id": "seg_0001", "pages": ["page_0005", "page_0006"], "text": "…",
+     "beats": ["b01", "b02"]}
   ]
 }
 ```
 
 约束：`pages` 1–3 页；`text` 非空；`id` 唯一；引用页必须已确认。
+
+`beats`【待建】是可选字段（§5.6.2 门禁要求非空，但 `m1 run` 不校验它——现有十章成片
+都是在引入 S5a 之前写的，没有这个字段）。它指向 `novel_ref.json` 的 beat id，
+用途是"这句旁白从小说哪一段来"可追溯。
 
 #### 4.3.5 `tts_index_v3.json`【已实现】
 
@@ -300,9 +348,68 @@ panelcast/
 }
 ```
 
+#### 4.3.9 `novel_ref.json`【待建】
+
+一章一份，记录"这一章的画面，对应小说的哪几段，哪些照写、哪些没画、哪些改了"。
+它是 §5.6.2 写稿的唯一依据，也是事后追责"这句旁白从哪来"的凭据。
+
+```json
+{
+  "schema": "novel-ref/v1",
+  "chapter": "ch02",
+  "label": "第二章 替华美的高阶职业带来愉悦！",
+  "pages": [45, 74],
+  "source": {
+    "file": "この素晴らしい世界に祝福を！/正文/1.epub",
+    "sha256": "…",
+    "volume": 1,
+    "text_sha256": "…"
+  },
+  "novel_chapters": [
+    {"index": "ch01", "title": "第一章 和这个自称女神转生到异世界！",
+     "para_from": 338, "para_to": 563, "chars": 7900},
+    {"index": "ch02", "title": "第二章 以这只右手偷取宝物（内裤）！",
+     "para_from": 1, "para_to": 40, "chars": 1400}
+  ],
+  "order": "in_order",
+  "beats": [
+    {"id": "b01", "para": [338, 352], "gist": "惠惠在公会门口拦下和真，要求陪她练爆裂魔法",
+     "pages": ["page_0045", "page_0046"], "fidelity": "drawn", "note": ""},
+    {"id": "b02", "para": [353, 371], "gist": "两人去城外空地，惠惠每天只放一发",
+     "pages": ["page_0047"], "fidelity": "drawn", "note": ""},
+    {"id": "b03", "para": [372, 400], "gist": "达克妮丝在公会上提出入队",
+     "pages": [], "fidelity": "omitted", "note": "漫画直接让达克妮丝在战斗中登场，省掉这段对话"},
+    {"id": "b04", "para": null, "gist": "漫画原创：惠惠用爆裂魔法把练习场的树全烧了",
+     "pages": ["page_0052"], "fidelity": "original", "note": "小说无对应段落"}
+  ],
+  "coverage": {
+    "novel_chars": 9300,
+    "script_chars": 1558,
+    "beats_total": 24,
+    "by_fidelity": {"drawn": 17, "omitted": 4, "altered": 2, "original": 1},
+    "note": "omitted 的 4 段是本卷刻意压缩的日常，不影响主线"
+  }
+}
+```
+
+字段约束：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `source.sha256` / `text_sha256` | 是 | epub 与抽取文本的哈希。文本一变，本章所有讲稿作废（§11.2） |
+| `novel_chapters[].para_from/to` | 是 | **段号是 `novel.txt` 的全局段号**，不是章内序号，否则跨章区间没法表达 |
+| `order` | 是 | `in_order` / `reordered` / `partial`。`reordered` 必须在 `note` 写明哪几段被挪动 |
+| `beats[].para` | 是（`original` 可为 `null`） | 小说段区间；`null` 就是"小说里没有" |
+| `beats[].pages` | 是 | 可空数组；空 = 这一段漫画没画 |
+| `beats[].fidelity` | 是 | `drawn / omitted / altered / original`（§3.4） |
+| `beats[].gist` | 是 | ≤ 40 字，一句话说清这一段发生了什么 |
+
+**它不是必须 100% 覆盖的文档，而是必须 100% 诚实的文档**：宁可写 8 条 `omitted`，
+也不许把没读过的段落标成 `drawn`。
+
 ---
 
-## 5. 工作方式：十阶段
+## 5. 工作方式：十阶段 + 底稿对齐
 
 ### 5.0 总览
 
@@ -313,27 +420,33 @@ mobi ─S1─► pages/*.jpg ─S2─► chapter_index.json
                             │
                             └─S4─► *.candidates.json ──人工──► *.panels.json
                                                                     │
-epub ─S1─► chapters/*.xhtml ─S5─► script.json ◄──────────────────────┘
-                                    │
-                                    ├─S6─► audio/*.wav + tts_index_v3.json
-                                    ├─S7─► timeline.json
-                                    └─S8─► <章节名>.mp4 / .srt / .ass
-                                              │
-                                              └─S9─► run_report.json
+epub ─S1─► chapters/*.xhtml ─S1'─► novel.txt + novel_index.json     │
+                                       │                            │
+                            S5a 底稿对齐 ──► novel_ref.json         │
+                                       │                            │
+                                       └──► S5 讲稿 ──► script.json ◄┘
+                                                          │
+                                                          ├─S6─► audio/*.wav + tts_index_v3.json
+                                                          ├─S7─► timeline.json
+                                                          └─S8─► <章节名>.mp4 / .srt / .ass
+                                                                    │
+                                                                    └─S9─► run_report.json
 ```
 
 | 阶段 | 名称 | 执行者 | 产物 | 现状 |
 | --- | --- | --- | --- | --- |
 | S0 | 能力探测 | 机器 | `capability_report.md` | 【已实现】 |
 | S1 | 素材摄取 | 机器 | `pages/*.jpg` + `pages.json` | 【已实现】 |
+| S1' | 小说纯文本化 | 机器 | `text/novel.txt` + `novel_index.json` | 【已实现】`tools/novel_extract.py` |
 | S2 | 章节定界 | 机器 + 人 | `chapter_index.json` | 【待建】（方法已定，见下） |
 | S3 | 页面解读 | 视觉模型 + 人 | `page_XXXX.profile.json` | 【待建】 |
 | S4 | 分格与确认 | 机器 + 人 | `*.panels.json` | 【已实现】 |
+| **S5a** | **底稿对齐** | **人 + 模型** | **`novel_ref.json`** | **【待建】**（流程已定，见 §5.6.1） |
 | S5 | 讲稿 | 模型 + 人 | `script.json` | 半自动（当前人工） |
 | S6 | 配音 | 机器 | `audio/*.wav` + 索引 | 【已实现】 |
 | S7 | 时间轴 | 机器 | `timeline.json` | 【已实现】 |
 | S8 | 渲染 | 机器 | `<章节名>.mp4` | 【已实现】 |
-| S9 | 质检交付 | 机器 + 人 | `run_report.json` | 部分（校验内建于 S8） |
+| S9 | 质检交付 | 机器 + 人 | `run_report.json` | 【已实现】 |
 
 ### 5.1 S0 能力探测
 
@@ -395,20 +508,122 @@ epub ─S1─► chapters/*.xhtml ─S5─► script.json ◄──────�
 - **门禁**：任一页缺 `panels.json` 或 `source != manual` → 退出码 3，列出页名
 - **耗时**：自动 0.3s/页；人工修正 10–30s/页（V1 整页出片时可直接满页框）
 
-### 5.6 S5 讲稿
+### 5.6 S5a 底稿对齐 → S5 讲稿
 
-- **输入**：`page_XXXX.profile.json`（画面事实）+ epub 章节文本（剧情事实）+ `panels.json`
-- **动作**：按 1–3 页一段写旁白。**画面里有的才写画面，剧情靠小说补，不许编**
+写稿前必须先有底稿。跳过这一步直接看漫画写，就会写出"哥布林绑票、竹筏漂向湖心、
+大青蛙吞掉铁笼"这种画面里根本没有、小说里也根本没有的段落（实测事故，见 §13 第 15 条）。
+
+#### 5.6.1 S5a 底稿对齐【待建】
+
+**第一步：小说纯文本化**（`tools/novel_extract.py`，已实现）
+
+```bash
+python tools/novel_extract.py \
+  --epub "この素晴らしい世界に祝福を！/正文/1.epub" \
+  --out  .local/source/epub/text
+# 1.epub: 2627 段 83599 字 sha256 6eb5912fa36f…
+#   chapter00.xhtml      0-148     4536 字  序章
+#   chapter01.xhtml    149-711    19142 字  第一章 和这个自称女神转生到异世界！
+#   …
+```
+
+epub 就是 zip，取出 XHTML 去标签后逐段落行。**不要用第三方库**，
+`zipfile` + `re` + `html.unescape` 足够。核心逻辑：
+
+```python
+import zipfile, re, html, hashlib
+
+def extract(epub_path):
+    z = zipfile.ZipFile(epub_path)
+    # 只取正文：chapter00..chapter05。colorpages/Houji/Message/Writer 等一律排除，
+    # 否则字数会多出约 3,400（人物介绍、后记、版权、转载信息）。
+    # 本卷的文件名排序恰好等于 spine 顺序；换出版社的 epub 要读 OPF 的 <spine><itemref>。
+    names = sorted(n for n in z.namelist()
+                   if re.fullmatch(r".*/chapter\d+\.xhtml", n))
+    chapters, lines = [], []
+    for n in names:
+        raw = z.read(n).decode("utf-8", "replace")
+        b = re.sub(r"(?is)<(script|style).*?</\1>", "", raw)
+        b = re.sub(r"(?i)<br\s*/?>", "\n", b)
+        b = re.sub(r"(?i)</p>", "\n", b)
+        b = re.sub(r"<[^>]+>", "", b)
+        ps = [l.strip() for l in html.unescape(b).splitlines() if l.strip()]
+        if not ps:
+            continue
+        start = len(lines)
+        lines.extend(ps)
+        chapters.append({"file": n.split("/")[-1], "title": ps[0][:40],
+                         "para_from": start, "para_to": len(lines) - 1,
+                         "chars": sum(len(p) for p in ps)})
+    text = "\n".join(lines)
+    return text, {"schema": "novel-index/v1",
+                  "chapters": chapters,
+                  "total_paras": len(lines),
+                  "total_chars": sum(c["chars"] for c in chapters),
+                  "sha256": hashlib.sha256(text.encode()).hexdigest()}
+```
+
+落盘 `.local/source/epub/text/novel.txt` + `novel_index.json`。
+**段号是全局连续的**，跨章引用才不会歧义。
+
+第一卷实测分章（`1.epub`，字数不含换行）：
+
+| 文件 | 标题 | 段区间 | 段数 | 字数 |
+| --- | --- | --- | ---: | ---: |
+| chapter00 | 序章 | 0–148 | 149 | 4,536 |
+| chapter01 | 第一章 和这个自称女神转生到异世界！ | 149–711 | 563 | 19,142 |
+| chapter02 | 第二章 以这只右手偷取宝物（内裤）！ | 712–1280 | 569 | 19,403 |
+| chapter03 | 第三章 在这座湖中加入鲜榨自称女神汁！ | 1281–2013 | 733 | 22,906 |
+| chapter04 | 第四章 解决这场不像话的战斗！ | 2014–2550 | 537 | 15,758 |
+| chapter05 | 终章 | 2551–2626 | 76 | 1,854 |
+| — | **正文合计** | 0–2626 | **2,627** | **83,599** |
+
+> 89,599 是整个 epub 的字符数（含人物介绍、后记、版权、转载信息，约多 6,000 字）。
+> **别拿它当正文规模**，也别用它估"这章该写多长"。
+
+**第二步：用人物事件锚点定位区间**
+
+按关键词统计 + 首次出现段号，先粗定"这个漫画章大概在小说哪一段"。
+第一卷实测（`首次出现：章 段`）：
+
+| 锚点 | 序章 | 一章 | 二章 | 三章 | 四章 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 惠惠 | – | **338** | 6 | 29 | 4 |
+| 达克妮丝 | – | – | **40** | 29 | 4 |
+| 墓地 | – | – | **415** | – | – |
+| 净化 | – | – | 493 | 286 | 502 |
+| 维兹 | – | – | **511** | – | – |
+| 御剑 | – | – | – | **534** | 206 |
+| 无头骑士 | – | – | – | **33** | 33 |
+| 贝尔迪亚 | – | – | – | – | **60** |
+| 圣水 | – | – | – | – | **87** |
+
+**第三步：逐段判 fidelity，写 `novel_ref.json`**（schema 见 §4.3.9）
+
+- 一个 beat = 小说里一件连续发生的事（通常 3–20 段），映射到 0–3 个漫画页
+- 顺序对不上就写 `order: "reordered"` 并在 `note` 里写明挪动方向
+- 漫画页上没有的 beat，`pages` 留空数组、`fidelity: omitted`——**这不丢人，是信息**
+- 反过来，漫画页上有但小说没有的，`para: null`、`fidelity: original`
+
+- **门禁**：每章 `beats` 覆盖全部漫画页；`by_fidelity` 四类计数之和 = `beats_total`；
+  `original` 的 beat 必须有 `pages`（否则就是凭空写的）
+- **耗时**：一章 8–30 页，约 20–40 分钟（读小说 + 对页）
+
+#### 5.6.2 S5 讲稿
+
+- **输入**：`novel_ref.json`（**主依据**）+ `page_XXXX.profile.json`（画面细节）+ `panels.json`
+- **动作**：按 1–3 页一段写旁白，**每段必须回指至少一个 beat id**（写进 `script.json` 的
+  `beats` 字段，见 §4.3.4）。`original` 的 beat 只能写画面能看见的东西
 - **产物**：`script.json`
 - **门禁**（写稿自检）：
   - 每段 ≤ 130 字（超过会被切成 9 条以上字幕，观感碎）
   - 引用页必须在 `chapter_index` 的本章范围内
   - 人名只用介绍页里出现过的写法
-  - **45–90 字/页**（§9.2 第 15 条）。低于 45 就是"内容不充实"，靠补小说细节而不是拖长句子
-  - **画面里没有的东西不许写**。漫画省略的情节不能凭空补；漫画没画但小说有的事件，
-    要么不写，要么写在"这段画面对应的小说情节"里，不能张冠李戴
-  - 写完必须回看对应页：翻三页抽查一次，确认旁白里的动作/人物真的在那页上
-- **耗时**：38 页 / 25 段约 1.5 小时（人工）
+  - **45–90 字/页**（§9.2 第 15 条）。低于 45 就是"内容不充实"，靠补小说细节而不是拖长句子；
+    但如果本章 `by_fidelity.original` 占比高（小说无底稿），密度天然偏低，**不许硬灌**
+  - 每段的 `beats` 非空，且指向的 beat 里有这个段提到的动作/人物
+  - 写完必须回看对应页：翻三页抽查一次，确认旁白里的动作/人物真的在那页上（§9.4）
+- **耗时**：38 页 / 25 段约 1.5 小时（人工，含回看）
 
 ### 5.7 S6 配音
 
@@ -437,7 +652,8 @@ epub ─S1─► chapters/*.xhtml ─S5─► script.json ◄──────�
 ### 5.10 S9 质检交付
 
 - **输入**：成片 + 全部中间产物
-- **动作**：跑 §9.2 的 13 条验收，写 `run_report.json`；抽 6 帧人工看
+- **动作**：跑 §9.2 的 15 条验收，写 `run_report.json`；抽 6 帧人工看（§9.3）；
+  抽 3 段对底稿（§9.4）
 - **产物**：`run_report.json` + 验收单
 - **门禁**：任一硬指标不过 → 不出片，回退到对应阶段
 
@@ -861,9 +1077,11 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 | 阶段 | 门禁 | 不过的退出码 |
 | --- | --- | --- |
 | S1 | 页数/章数 > 0 | 3 |
+| S1' | `novel.txt` 非空、`novel_index.json` 段号连续、`sha256` 与文本一致 | 3 |
 | S2 | 章节标题页人工确认 | 3 |
 | S3 | 介绍页 §6.6 全过 + `reviewed=true` | 3 |
 | S4 | 每页有 `panels.json` 且 `source=manual` | 3 |
+| **S5a** | `novel_ref.json` 覆盖全部漫画页；四类 `fidelity` 计数自洽；`original` 必带 `pages` | 3 |
 | S6 | 音频存在且 > 44 字节、时长 > 0 | 4 |
 | S7 | 总时长与音频累加差 < 0.05s | 4 |
 | S8 | §9.2 全部硬指标 | 4 |
@@ -892,6 +1110,21 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 
 取 `t = 0.5s`、`1/6`、`2/6`、`3/6`、`4/6`、`5/6` 六个时刻，逐帧确认：
 画面内容与字幕语义一致、标签在、字幕不裁切。**这一条不能自动化，必须人看。**
+
+### 9.4 底稿抽检（人工，每章 3 段）
+
+§9.2 的 15 条全是"技术指标合格"，一条都不能证明**旁白说的是不是这页的事**。
+这一条专门抓这个，只抽查、不自动化：
+
+1. 从本章随机取 3 段（首、中、末各一），把该段覆盖的页图打开
+2. 逐句问：**这句话描述的动作/人物，在这一页上能看见吗？**
+3. 三种回答都要记：
+   - 看得见 → 过
+   - 看不见但小说写了（`fidelity: omitted`）→ 过，但确认它没写在错的页上
+   - 看不见、小说也没有 → **不过**，回 S5 重写
+
+> 自动化的那半边留给 `m1 novel --check`（§14.1）：只能校验"每段有 beat 且 beat 存在"，
+> 校验不了"beat 和这一页对不对得上"。那一半永远是人眼。
 
 ---
 
@@ -985,6 +1218,23 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 12. **切页不能全局均分**。按"总时长÷总页数"均分，某页的切页时刻会跑到别的段的区间里——
     实测第三章最大偏移 32 秒，全片 249 次切页有 209 次偏移 >0.5 秒，画面和配音彻底脱钩。
     切页点必须由**本段的句边界**决定（`_segment_cuts`），停留上限只做体检、不做掩盖。
+13. **章标题是两套命名，不能用标题对齐**。小说第三章「在这座湖中加入鲜榨自称女神汁！」
+    和漫画第六章「为这片湖献上自称女神的圣水！」是同一段剧情，两个标题没有一个共同关键词。
+    对齐只能靠人物/事件锚点（§5.6.1 第二步）。
+14. **漫画会重排小说**。阿克娅卖圣水在小说第四章第 87 段（贝尔迪亚登场之后、决战之前），
+    漫画挪到第一卷第五章（无头骑士退走之后）当卷末日常。按"第 N 章 ↔ 第 M 章"硬套必错，
+    必须写 `order: "reordered"`。
+15. **只看画面写稿会编出不存在的情节**。实测事故：漫画是"和真把阿克娅装进公会借的铁笼，
+    泡在湖边净化，鳄鱼啃了七小时笼子"，被写成"哥布林从芦苇里窜出来绑票、竹筏漂向湖心、
+    大青蛙把笼子吞了"——三个事件画面里没有、小说里也没有。**旁白只能来自画面 OCR 或小说原文**。
+16. **有的漫画章小说里根本没有**。第七章「梦幻竹笋」8 页，18 卷小说正文里搜「竹笋」
+    只命中 1 次（vol.13），第一卷 0 次。这类章只能"只写画面"，密度天然低，
+    **不许为了凑 45 字/页硬编**——第 15 条验收在 `original` 占比高的章要放宽解释。
+17. **搜关键词前先试两三种写法**。中文版是简体，搜「神聖解咒」0 命中、搜「神圣」才有；
+    角色名也有「贝尔迪亚 / 貝爾迪亞」两种。一次搜不到不等于小说里没有。
+18. **小说字数别拿全 epub 算**。`1.epub` 整个 89,599 字符，正文只有 **83,599 字**
+    （6 个 `chapter*.xhtml`，2,627 段；多出的约 6,000 字是人物介绍、后记、版权、转载信息）。
+    抽取时必须按文件名白名单过滤，否则字数虚高、`sha256` 也会跟着变。
 
 ---
 
@@ -992,15 +1242,21 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 
 ### 14.1 V1.1 待补（按优先级）
 
-1. `m1 chapter`：S2 章节定界自动化 + 人工确认（现在靠人肉看横幅）
-2. `m1 profile`：S3 页面解读**自动生成**（字段规范与自检已就绪，见下条；缺的是"读图填字段"这一步）
-3. `m1 verify`：把 §9.2 的 13 条做成一条命令，出 `run_report.json`
-4. 编辑器加"介绍页校对"面板（现在只改分格）
-5. 长段拆页：让单页停留稳定落在 8–12 秒
+1. **`m1 novel`：S5a 一条命令**。抽取半边已经有了（`tools/novel_extract.py`）；
+   缺的是 `novel --align --work …`（按锚点给候选段区间、生成 `novel_ref.json` 骨架）
+   与 `novel --check`（跑 §9.1 的 S5a 门禁）。**这是"内容不充实/编错"的根因，优先级最高**
+2. `m1 chapter`：S2 章节定界自动化 + 人工确认（现在靠人肉看横幅，`tools/strip_sheet.py` 是经济解法）
+3. `m1 profile`：S3 页面解读**自动生成**（字段规范与自检已就绪，见下条；缺的是"读图填字段"这一步）
+4. 回填十章 `novel_ref.json` 与 `script.json` 的 `beats`：现有十章成片全部是在 S5a 之前写的，
+   技术上合格但**底稿不可追溯**。回填时顺带按 §9.4 抽检一遍
+5. 长段拆页：让单页停留稳定落在 8–14 秒（现在一页停多久 = 这段文字多长，上限 26s 只抓病态）
 
-其中第 2 条的**校验半边已经落地**：`panelcast/profile.py` + `docs/schemas/page-profile.schema.json`
+其中第 3 条的**校验半边已经落地**：`panelcast/profile.py` + `docs/schemas/page-profile.schema.json`
 能对一份介绍页跑完 §6.6 八条门禁（`python -m panelcast.profile … --ship`，37 个测试覆盖）。
 剩下的是生成半边——按 §6.5 的规则逐页读图填字段，这一步要接视觉模型。
+
+已完成、不必再列：`m1 verify`（15 条）、编辑器"介绍页校对"面板、切页同步（§9.2 第 14 条）、
+`tools/contact_sheet.py` / `tools/strip_sheet.py`。
 
 ### 14.2 V2 展望（无漫画素材复用）
 
@@ -1025,27 +1281,43 @@ page_XXXX.profile.json
 # S0/S1 摄取（一次一对输入）
 python -m panelcast ingest "この素晴らしい世界に祝福を！/漫画/1卷.mobi" -o .local/src_v1
 
+# S1' 小说纯文本化（§5.6.1 第一步）
+python tools/novel_extract.py \
+  --epub "この素晴らしい世界に祝福を！/正文/1.epub" \
+  --out  .local/source/epub/text
+
+# S2 切章：把整卷 work 按章节切出一个章级 work
+python -m panelcast m1 slice --work m1/v1/work --chapter 第二章 --out m1/v1/ch02/work
+
 # S4 分格候选 + 人工确认
-python -m panelcast m1 panels --work m1/ch1/work
-python -m panelcast m1 edit   --work m1/ch1/work --port 8642
+python -m panelcast m1 panels --work m1/v1/ch02/work
+python -m panelcast m1 edit   --work m1/v1/ch02/work --port 8642
 
 # S6–S8 一键出片
 python -m panelcast m1 run \
-  --work m1/ch1/work --out m1/ch1/out \
+  --work m1/v1/ch02/work --out m1/v1/ch02/out \
   --voice zh-CN-YunxiNeural --rate "+20%" \
   --size 1080x1920 --fit blurpad --bg white --subs burn \
-  --chapter "第一章 与自称是女神的家伙一起转生到异世界！" \
-  --name 第一章
+  --chapter "第二章 替华美的高阶职业带来愉悦！" \
+  --name 第二章
+
+# S9 验收（15 条，出 run_report.json）
+python -m panelcast m1 verify --work m1/v1/ch02/work --out m1/v1/ch02/out --name 第二章
+
+# 辅助：拼联系表 / 裁横带找章节横幅（--out 是前缀，strip 会按批加页码后缀）
+python tools/contact_sheet.py --pages m1/v1/work/pages --from 5 --to 13 --out contact.jpg --cols 3
+python tools/strip_sheet.py  --pages m1/v2/work/pages --from 31 --to 40 \
+  --band bottom --ratio 0.15 --count 10 --out strip.jpg
 
 # 测试
 python -m unittest discover -s tests -q
 
 # 介绍页校验（§6.6 八条门禁）
-python -m panelcast.profile m1/ch1/work/profiles/*.json --ship
+python -m panelcast.profile m1/v1/ch02/work/profiles/*.json --ship
 
 # 质检：视频轨 vs 音频
 ffprobe -v error -show_entries stream=codec_type,duration,nb_frames \
-  -of default=nw=1 "m1/ch1/out/第一章.mp4"
+  -of default=nw=1 "m1/v1/ch02/out/第二章.mp4"
 ```
 
 ## 附录 B 介绍页完整示例（page_0021，已逐格核对原图）
@@ -1149,4 +1421,8 @@ ffprobe -v error -show_entries stream=codec_type,duration,nb_frames \
 | 12498 帧 | `ffprobe stream=nb_frames` |
 | 句锚点误差 3ms/5ms | 锚点插值 vs 实际切点对比 |
 | 旧方法误差 205/463/805ms | 按字数比例 vs 锚点基准对比 |
-| 测试 80 个 | `python -m unittest discover -s tests` |
+| 小说正文 83,599 字 / 2,627 段 | `1.epub` 只取 `chapter*.xhtml`，去标签后逐段统计（§5.6.1） |
+| 序章 149 段 / 一章 563 / 二章 569 / 三章 733 / 四章 537 / 终章 76 | 同上，段号 0–2626 全局连续 |
+| 人物锚点首次出现段号（惠惠 1-338、达克妮丝 2-40、维兹 2-511…） | 同上，逐段 `in` 判断 |
+| 「竹笋」在 18 卷正文仅 vol.13 命中 1 次 | 全部 epub 去标签后 `count()` |
+| 测试 247 个 | `python -m unittest discover -s tests` |

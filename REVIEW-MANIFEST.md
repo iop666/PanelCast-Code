@@ -5,25 +5,25 @@
 
 | 项 | 值 |
 | --- | --- |
-| 本地代码 HEAD | `12e8c3f` — P0-REVIEW-07：身份与审计校验改为 fail-closed |
-| 上一提交 | `006c98e` — 合并为单一仓库 PanelCast-Code |
-| 更早基线 | `feb9649` — P0-08 主体；`77735c0` — 项目负责人指定审核基线 |
+| 本地代码 HEAD | `69f2913` — P0-REVIEW-08：JSON 结构 fail-closed + Schema/Linter 对齐 |
+| 上一提交 | `d5dfd6c` — 清单：384 tests、跳过项、P0-REVIEW-07 哈希 |
+| 更早基线 | `12e8c3f` — P0-REVIEW-07；`006c98e` — 合并为单一仓库；`feb9649` — P0-08 主体 |
 | 原文档镜像（已删除） | `iop666/ChatGPT-Read` @ `61b685c` |
 | 原代码审查镜像（已改名并覆盖） | `iop666/PanelCast-Code-Review` @ `38c5bed` → `iop666/PanelCast-Code` |
 | 纳入文件数 | 122 |
-| 全量测试（本机） | `Ran 384 tests` / `OK (skipped=2)` |
+| 全量测试（本机） | `Ran 401 tests` / `OK (skipped=2)` |
 | 跳过项（本机） | 2 项：缺真实 EPUB、缺真实 MOBI（见下节） |
 | 索引侧 CRLF blob | `git ls-files --eol \| grep -c "i/crlf"` → `0` |
 
 ## 测试环境与跳过项
 
 **同一份代码在不同环境下的跳过数不同，这是环境差异，不是功能失败。**
-本清单记录的是本机（Windows / Python 3.13 / 带 `.git` / 装了 ffmpeg）的结果。
+本清单记录的是本机（Windows / Python 3.14.6 / 带 `.git` / 装了 ffmpeg）的结果。
 
 | 环境 | 结果 | 跳过构成 |
 | --- | --- | --- |
-| 本机（完整仓库） | `384 / skipped=2` | 缺真实 EPUB 1、缺真实 MOBI 1 |
-| ZIP 解压（无 `.git`、无 ffmpeg） | `384 / skipped=8` | EPUB 1、MOBI 1、git 元数据 3、ffmpeg 3 |
+| 本机（完整仓库） | `401 / skipped=2` | 缺真实 EPUB 1、缺真实 MOBI 1 |
+| ZIP 解压（无 `.git`、无 ffmpeg） | 本轮未复跑 | P0-REVIEW-07 时为 `384 / skipped=8`；本轮新增 17 例未在该环境实测，不写成通过 |
 
 本机的两个跳过项逐条列出（不是笼统归因于 ffmpeg）：
 
@@ -68,18 +68,18 @@ GitHub Git Tree API 返回的 sha 比对。
 | --- | ---: | --- | --- | --- |
 | `.gitattributes` | 865 | `a65264297f26763de8d2cef587c5196c5034748e6583e7773b9c713671ba30ec` | `a1a9971cd2` | HEAD |
 | `.gitignore` | 1500 | `1e6ad7aad0b46f691bfd8c7b04eb6f07b7c7a9bacefe4b9381ca140f0f8a6f30` | `7d513943c2` | HEAD |
-| `README.md` | 6474 | `e7b1aadadffaded2ee1820da53987813a353c28304c370df8249c1ada4317a3d` | `81a7702190` | HEAD |
+| `README.md` | 6474 | `a4cd328868dd7f59f18304a08687c1ab8e0e7cc4e4b57a1a4b8e58ccd61aed43` | `9c7d51ec1d` | HEAD |
 | `docs/ADR-001-source-ingestion.md` | 6631 | `bb382d750b82d80145455121c61c481333bd39c6e94b5f224f054628025fba44` | `cb9a9f4cff` | HEAD |
 | `docs/ADR-002-m1-render-stack.md` | 4469 | `43acdc4882f671d5faec9027caa23ac8e89faf08c28d772cbc752618b5499fd5` | `6777f04036` | HEAD |
-| `docs/PROJECT-MAP.md` | 23480 | `6073bb07d9ae9d7fb6bb893e8c2305ceb706521cde395e15e5462997938f49df` | `8d70e37546` | HEAD |
-| `docs/REVIEW-INDEX.md` | 11041 | `1f54565e3dae35361208b70c3b74a2ae840fef50c0bdc2441c3d839b8affbd5c` | `94207bd259` | HEAD |
-| `docs/ROADMAP.md` | 25695 | `5ffc13614b886522557876f7245c965eeb98e58ff551785616568fc963f4e81c` | `a3c8ff800b` | HEAD |
+| `docs/PROJECT-MAP.md` | 23495 | `076d3d2e8942725eb9a70c2f6033fa4acc0605a4332ff3a13feb552a061cbc41` | `6a345eac2b` | HEAD |
+| `docs/REVIEW-INDEX.md` | 12464 | `b95a8eb47f6e0865a35ab27497926345b1dd2d8800f951fd43b7296d88da2b68` | `2e03c126b3` | HEAD |
+| `docs/ROADMAP.md` | 27427 | `7e7ede87222c2bdbc0b1ed8fd7b213981277105cbc8b17cd7a48ddd30ed3d7e0` | `734fb23f2a` | HEAD |
 | `docs/WORKFLOW-v1-vertical-manga-narration.md` | 126238 | `652762665f03227c653bad549506aaff439e5d1e6a51a82131ddfc38080d476a` | `4c9fa48037` | HEAD |
 | `docs/schemas/page-profile.schema.json` | 7339 | `7f627622a0e8b65dd9f6c3fbbc9084be72d828fca1d75d37a4a653f0b425427d` | `d0ea1ee32a` | HEAD |
 | `docs/schemas/script-audit.schema.json` | 11444 | `b11ea053398fcd050f9392af6e9b8a1b0fd608f1d63bec205d6db96feaf7695f` | `565ab31a61` | HEAD |
 | `docs/tasks/M0-content-validation.md` | 10621 | `585e55374ac111baa4d87849db7a29b77fcb9af4785f4eee1fb37c627799085f` | `11056e5ad3` | HEAD |
 | `docs/tasks/M1-minimal-loop.md` | 11666 | `46ebea01efa71267f0d38eb76bad8da16d876a6dda958937aade6af97e69d988` | `dbc7d683aa` | HEAD |
-| `docs/tasks/P0-execution-plan.md` | 37241 | `d878258b6025f67ed83e9317e0d4b0ec00e36e4581c5f7ad04dd6a9918a412ed` | `5cbb11b58a` | HEAD |
+| `docs/tasks/P0-execution-plan.md` | 39626 | `dd1b03ed20e5537f1de8c50d3dd30420e64eb22f16a460f535a4404e6bd96329` | `cab783aacb` | HEAD |
 | `docs/tasks/TASK-002-ingest-hardening.md` | 7250 | `8dcb085aa23d392c0ab225ca16c1a3635fed498f513acc8a06ddc64a2959e447` | `3ae7359883` | HEAD |
 | `m0/alignment_note.md` | 2244 | `1bcee4f44f086d2ef6f5fc94a4d277432b58d52c741bc101c9bebb129a1714fa` | `34b182ce9b` | HEAD |
 | `m0/prompts/V1.txt` | 1404 | `15fda37fd55b9a8235c6eb0a8172c67914d14b91f9eb1c3c4b0537bb1c1b99e6` | `184eeb49c5` | HEAD |
@@ -148,17 +148,17 @@ GitHub Git Tree API 返回的 sha 比对。
 | `m1/work/script.json` | 2166 | `ac9c3338128fab2121a57115d5614b5bcbe59b70c1b07e274b4f5ca46b58e5c8` | `aef7b2eade` | HEAD |
 | `m1/work/timeline.json` | 6349 | `9daae796d5fb8e1c05d864ecca31ee7b4ba497667fc8859cdd1057f4df3207db` | `2f786dffd6` | HEAD |
 | `panelcast/__init__.py` | 86 | `5507001c8992326e6693ae8f724d0b2a42868a99104b2e4b54a343ac28ff6704` | `7f917a9f5c` | HEAD |
-| `panelcast/__main__.py` | 26754 | `5e884d901754bd11b1f3cb0bedf8446e77d876d6253d4c6733914f346d9b6a3c` | `44cba61711` | HEAD |
+| `panelcast/__main__.py` | 26671 | `558ff9d8b71bd1bde1f740fe16237344fe72862ea46364fb6ab156ba1a6c92b8` | `f4b5519850` | HEAD |
 | `panelcast/chapters.py` | 14921 | `45f71d8db24b6c13ce81ac13a552cb7c93941cc5118ae20a466eabf86f3e4aa8` | `9d11ea2afd` | HEAD |
 | `panelcast/editor/server.py` | 16252 | `17402694bd39059c07545f72c2b7ca17a5a48571fb62a258a9fc561b244f4027` | `0a28f65a9d` | HEAD |
 | `panelcast/editor/static/index.html` | 24230 | `ce76ca9bc44a7c976286484f065f6c5b973917c76b94a52c359e86acebeeb818` | `5649980a0e` | HEAD |
 | `panelcast/epub_ingest.py` | 4364 | `88df0fd69ddfa0543a0ec8647f10500894167ad1bc5a9cf2bfd0d8a3bad54d47` | `45e37261cc` | HEAD |
 | `panelcast/errors.py` | 115 | `afab242f8b9ac2e6e3e2ccc6aacb27fa31031d3dc2b2ddd7e20ac7e9dc117171` | `b9e7c16f65` | HEAD |
-| `panelcast/identity.py` | 20686 | `de5ca78911deb0bbb3d94583368b0d2b189f1b6737ec2526f6dad841f1299a16` | `c8c87f3240` | HEAD |
+| `panelcast/identity.py` | 24344 | `3196d119a6c135d22534db951f4acf892536310d3dfbad4446e1726712a49a4c` | `ba8e64aaab` | HEAD |
 | `panelcast/jpeg.py` | 1784 | `b0e2ce02ab9080b6fb21edf66fef08c194b0d09961eafc19e8fc61a342990c76` | `610b31bcbb` | HEAD |
 | `panelcast/manifest.py` | 4628 | `abfeec0bb8b88d386d8e0b7f5e834a36bbccc260af1c33a8751209fdee1eff18` | `c951d2dc20` | HEAD |
 | `panelcast/mobi_ingest.py` | 2764 | `5eb15c6bcacbffa1a6ba1c667b8a65e21979826c39fbdf8bfc3f7c3fa59a04a0` | `77c477fd63` | HEAD |
-| `panelcast/novel.py` | 35366 | `6164f631199fd8cf57aad978b6663c6430e238595cde42d8dc617877e2478c91` | `918fb6033b` | HEAD |
+| `panelcast/novel.py` | 40519 | `e46eec8c48e325091adbe6ee36b356c2da698eea8212ac49041bc909e027d357` | `d9cc58ced3` | HEAD |
 | `panelcast/panels.py` | 14815 | `f4752ceb12587b95961bb80945e8bca68a18af8f4f17f9c0f452c2d2e0d03b47` | `2ad48721bc` | HEAD |
 | `panelcast/profile.py` | 11137 | `ec9627d77d091c1e1c37810c2754b1c57a4146648cca851ec58a2c19871e3ea9` | `231b0c78f6` | HEAD |
 | `panelcast/profile_auto.py` | 9689 | `0ba66aef171d01075e1b136898dc81a10dda20ab24193a33451759fe0314b1ab` | `aca4d7a01f` | HEAD |
@@ -171,11 +171,11 @@ GitHub Git Tree API 返回的 sha 比对。
 | `tests/test_cli.py` | 15655 | `80381b7858ae2a0f8737830ab269499ba9b5fb02c349438ba6de7b8cb34706dd` | `05150e9bb0` | HEAD |
 | `tests/test_editor.py` | 8926 | `525c10e23bf1254eecd8f2ee42701b3a39e6d95227cbf8496e7f92a6877badac` | `f2cd9f3149` | HEAD |
 | `tests/test_epub.py` | 4564 | `86af2c6450b97bdd455cf26bcc28f37777963624b4bf868f44c109545dcf20a3` | `7b661eb061` | HEAD |
-| `tests/test_identity.py` | 26594 | `e376d588f68796b0a52f0d4a541bfcc7f8e4d30888731fea94c31f5164d0b6c0` | `b6da38e0f8` | HEAD |
+| `tests/test_identity.py` | 31450 | `89f0a61d51ac38c7540521e8e0e9cfe64e1a57fd3f257f6da8baf9189debdddd` | `8cda7e6183` | HEAD |
 | `tests/test_lf.py` | 9294 | `76ef5f4652ea0db6dee21c1dcdc68114cf5c54290f061c57821a3be85a3c6bb3` | `0227afef31` | HEAD |
 | `tests/test_manifest.py` | 5434 | `4f27b5a5f09c2410808642630848c08ddad2a073cb15907981cd7fcf07a70eb4` | `2696ad3085` | HEAD |
 | `tests/test_mobi.py` | 4079 | `a88db279f0887df762c8280ad00d14f858ef0b4d087ea567716401b0c64bab84` | `8db17357ba` | HEAD |
-| `tests/test_novel.py` | 40770 | `5ca9c465e3cf84d1971d0dc50bd52714adebb8c6199fcca3577156b97709ab54` | `ca39053ffb` | HEAD |
+| `tests/test_novel.py` | 47224 | `8363dcae5307d04b6b22b6e80cecc698ed43e4bfa2503789a773e0185567544b` | `ab1184e503` | HEAD |
 | `tests/test_novel_extract.py` | 6831 | `0ea6f375505e2bf22b30a10cdc0e44eebbd1211aa5d1b7d0351069771d3da325` | `fbe2427294` | HEAD |
 | `tests/test_page_windows.py` | 7459 | `8c7adf405067245a9bc9977ee7fcef76896be495b507ddfacc8025e95b95f69f` | `5f86ce2f37` | HEAD |
 | `tests/test_panels.py` | 4284 | `c564420a395285a6726363246d6ccd8a8ac82d9fd8d72b76a72decf236431b7f` | `6c698eec26` | HEAD |
@@ -201,7 +201,7 @@ GitHub Git Tree API 返回的 sha 比对。
 | 渲染缓存 | `*/cache/`、`*/audio/`、`*/pages/` | 中间产物，无审计价值 |
 | 本地工作区 | `.local/`、`.workbuddy-ai/` | 个人配置与 Agent 痕迹，非项目交付物 |
 
-被追踪的 121 个文件（另加本次新增的 2 个）全部纳入；
+被追踪的 122 个文件（不含本清单）全部纳入；
 以上类别由 `.gitignore` 排除，不属于「代码内容」。
 
 ## 复核方式
@@ -209,7 +209,7 @@ GitHub Git Tree API 返回的 sha 比对。
 ```bash
 git clone https://github.com/iop666/PanelCast-Code.git
 cd PanelCast-Code
-python -m unittest discover -s tests      # Ran 384 tests / OK (skipped=2)
+python -m unittest discover -s tests      # Ran 401 tests / OK (skipped=2)
 git ls-files --eol | grep -c "i/crlf"    # 0
 
 # 逐文件核对：取本清单表格，对每个文件重算 sha256 与 blob sha，

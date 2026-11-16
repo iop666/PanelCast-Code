@@ -200,7 +200,7 @@
 | 门禁 | `m1 novel check` 第 1 步先验身份 |
 | 数据迁移 | 2 份索引 + 10 份 `chapter.json` + 2 份 labels 全部补齐 |
 | 实测 | 两卷索引 + 十个章级 work `--verify` 全过 |
-| 测试 | `tests/test_identity.py` 41 例 + `tests/test_lf.py` 6 例；全量 **361 tests OK (skipped=2)** |
+| 测试 | `tests/test_identity.py` 50 例 + `tests/test_novel.py` 78 例 + `tests/test_lf.py` 6 例；全量 **384 tests OK (skipped=2)** |
 
 **审核意见里的反例已写成测试**（`test_counter_example_from_review`）：
 目录 `ch06` + `chapter.json` 说 A + `novel_ref` 说 B + `script-audit` 说 C
@@ -351,6 +351,52 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 真正决定检出结果的是 `.gitattributes` 而不是操作系统。
 真仓库那条用例用 `--depth 1 --no-local` 克隆当前仓库、比 `novel_ref` 与 `script-audit`
 的字节哈希，跑在 `autocrlf=true` 下——这是最接近"新克隆"的验证。
+
+---
+
+### P0-REVIEW-07 fail-closed 身份与审计完整性【已完成】
+
+**来源**：项目负责人基于源码（`PanelCast-Code-main.zip`）做的独立代码复核，
+给出可直接复现的反例。审核结论：**P0-08 暂不签最终验收**，因为存在静默放行路径。
+
+**六个问题与处理**：
+
+| # | 问题 | 实测表现 | 处理 |
+| --- | --- | --- | --- |
+| 1 | 权威表缺失时静默放行 | `chapter_index.json` 不存在 → `([], [])` | `authority=None` 找不到表即报错；唯一跳过方式是显式传 `authority=False` |
+| 2 | 损坏 JSON 被当成不存在 | `novel_ref.json` 写成 `{broken` → `([], [])` | `_read_json` 返回 `(data, status)`，区分 `missing` / `corrupt`；损坏一律报错 |
+| 3 | 章级不验整份权威索引 | 索引里另一章 `id` 重复、编号跳号，章级仍通过 | 加载权威表后先跑 `index_problems`，再查当前 uid |
+| 4 | 重复 `segment_id` 可藏无效判定 | 无效记录在前、合法记录在后 → `[]` | 检测重复并报错，不做 first-wins / last-wins；另查"多余记录"与"未覆盖该段" |
+| 5 | Schema 与 Linter 不一致 | `severity="catastrophic"` → `[]` | 补齐 `severity` 枚举、必填字段、`text_sha256` / `page_XXXX` 格式、`script_schema` 枚举 |
+| 6 | 文档过期 | README 仍写 `250 tests`；PROJECT-MAP 同一文件内 P0-08 一处"待修"、一处"已完成" | 全部改为已实现 + 384 tests |
+
+**额外查出一个比审核意见更严重的问题**：
+
+真实布局 `m1/v1/ch01/work` 的索引在 `m1/v1/work/chapter_index.json`，
+而旧实现只找 `work.parent` / `work.parent.parent`（= `m1/v1/ch01` / `m1/v1`），
+**两个都不对**。所以真实仓库的章级 `--verify` 从来没有加载过权威表——
+审核意见里"正常路径通过"的十次，实际是"根本没校验权威表就通过"。
+已改为依次尝试 `<work>/`、`<work>/work/`、`<父>/`、`<父>/work/`、`<祖父>/`、`<祖父>/work/`。
+
+**验收（逐条实跑，均为退出码 3）**：
+
+| 场景 | 命令 | 结果 |
+| --- | --- | --- |
+| 无权威表 | `m1 chapter --verify --work <无索引的章级 work>` | exit 3，"找不到权威章节映射表" |
+| 权威表损坏 | 同上，索引写成 `{broken` | exit 3，"无法解析（corrupt）" |
+| 索引重复 id / 跳号 | 章级 `--verify` | exit 3，"权威索引自身不合格"（3 项） |
+| 同上，卷级 | `m1 chapter --verify --work m1/v2/work` | exit 3 |
+| `novel_ref.json` 损坏 | 章级 `--verify` | exit 3 |
+| 重复审计段落 | `m1 novel lint` | exit 3，"segment_id 重复" |
+| `severity=catastrophic` | `m1 novel lint` | exit 3，"severity 非法" |
+| 审计 JSON 损坏 | `m1 novel lint` | exit 3，"存在但无法解析" |
+
+**测试**：`test_identity.py` 41 → 50 例（新增 `TestFailClosed` 9 例）、
+`test_novel.py` 64 → 78 例（新增 `TestAuditIntegrity` 12 例 + Schema 枚举 2 例）。
+全量 **384 tests OK (skipped=2)**。第一章样张 `lint` 仍全过、`check` 仍卡在第 5 步。
+
+**未变**：第一章 `review_status` 仍是 `pending_human`、`reviewed_by` 为 `null`；
+第二章、九章批量、P0-06、P0-10、横版继续冻结。
 
 ---
 

@@ -49,6 +49,7 @@
     "audited_segments": {
       "type": "array",
       "minItems": 1,
+      "$comment": "segment_id 必须唯一，且必须与讲稿逐段一一对应（不多不少）。JSON Schema 无法表达数组元素按键唯一，唯一性与一一对应由 panelcast.novel.lint_audit() 强制执行；重复 id 一律拒绝，不做 first-wins/last-wins。",
       "items": {
         "type": "object",
         "required": [

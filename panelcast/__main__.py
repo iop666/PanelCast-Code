@@ -322,7 +322,13 @@ def _m1_novel(args):
             _d, segs, _s = script_segments(work)
         except GateError:
             segs = None
-        problems = lint_audit(_read_json(audit_path), segs=segs, page_set=page_set)
+        try:
+            audit = _read_json(audit_path)
+        except (OSError, ValueError) as exc:
+            print(f"error: {audit_path} 存在但无法解析（{exc}）；"
+                  f"损坏的文件不能当成不存在", file=sys.stderr)
+            return 3
+        problems = lint_audit(audit, segs=segs, page_set=page_set)
         if not problems:
             print(f"novel lint: Schema 合法 -> {audit_path}")
             print("  注意：这只证明格式对，不证明已签核；出片仍需 review_status=approved")

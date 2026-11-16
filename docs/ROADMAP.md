@@ -200,10 +200,23 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   **迁移**：两卷索引 + 十个章级 `chapter.json` 全部补齐身份字段，
   十个目录 `--verify` 全过；`m1/v2/ch06–ch10` 的 `id` 仍为 `ch01–ch05`（卷内），
   `chapter_uid` / `global_chapter_number` 为 6–10。**目录名未改**。
-  **测试**：`tests/test_identity.py` 41 例（含审核意见里的反例：
+  **测试**：`tests/test_identity.py` 50 例（含审核意见里的反例：
   目录 ch06 / novel_ref 说 A / script-audit 说 B → 必须报错）；
   `tests/test_lf.py` 6 例（含"索引侧零 CRLF blob"与"去掉 .gitattributes 后确实泄漏"的反证）。
-  全量 361 tests OK。
+  全量 384 tests OK。
+
+- [x] **P0-REVIEW-07 fail-closed 身份与审计完整性**【已完成】
+  **来源**：项目负责人基于源码（ZIP 解压）的独立复核，给出可直接复现的反例。
+  - **身份校验 fail-closed**：权威表缺失 / 损坏 / 为空 / 索引自身不合格一律报错；
+    损坏的 JSON 不再被当成不存在；章级校验也验证**整份**权威索引。
+  - **查出一个比审核意见更严重的问题**：真实布局的索引在
+    `m1/v1/work/chapter_index.json`，旧搜索路径只找 `work.parent` 与
+    `work.parent.parent`，两者都不指向 `work/` 子目录——**章级校验从未加载过权威表**，
+    "正常路径通过"其实是"根本没校验就通过"。
+  - **审计完整性**：拒绝重复 `segment_id`（不做 first-wins / last-wins）、
+    拒绝多余记录与未覆盖段；补齐 `severity` 枚举、必填字段与 `page_XXXX` / 哈希格式。
+  - 测试：`test_identity.py` 50 例、`test_novel.py` 78 例；全量 **384 tests OK (skipped=2)**。
+  - 第一章样张仍 `pending_human`，未签核。
 
 - [~] **P0-09 规则冲突核查（以代码为准）**【部分完成，需补一轮】
   已核实并写进规范的冲突：

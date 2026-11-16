@@ -217,7 +217,7 @@ class TestWorkIdentity(unittest.TestCase):
         self._write(work, "script-audit.json", {
             "schema": "script-audit/v2",
             "chapter_uid": "konosuba-manga-v02-ch06"})
-        errors, warnings = check_work_identity(work)
+        errors, warnings = check_work_identity(work, authority=False)
         self.assertEqual(errors, [])
         self.assertTrue(any("script.json" in w for w in warnings) or not warnings)
 
@@ -232,7 +232,7 @@ class TestWorkIdentity(unittest.TestCase):
         self._write(work, "script-audit.json", {
             "schema": "script-audit/v2",
             "chapter_uid": "konosuba-manga-v02-ch08"})         # uid C
-        errors, _ = check_work_identity(work)
+        errors, _ = check_work_identity(work, authority=False)
         joined = " | ".join(errors)
         self.assertIn("novel_ref.json", joined)
         self.assertIn("script-audit.json", joined)
@@ -245,7 +245,7 @@ class TestWorkIdentity(unittest.TestCase):
         work = self._work("ch06")
         self._write(work, "chapter.json", chapter(global_chapter_number=7,
                                                   chapter_uid="konosuba-manga-v02-ch07"))
-        errors, _ = check_work_identity(work)
+        errors, _ = check_work_identity(work, authority=False)
         self.assertTrue(any("目录名" in e for e in errors), errors)
 
     def test_parent_directory_is_checked_for_work_layout(self):
@@ -253,7 +253,7 @@ class TestWorkIdentity(unittest.TestCase):
         work = self._work("ch09") / "work"
         work.mkdir()
         self._write(work, "chapter.json", chapter())   # 全书第 6 章
-        errors, _ = check_work_identity(work)
+        errors, _ = check_work_identity(work, authority=False)
         self.assertTrue(any("ch09" in e and "global_chapter_number=6" in e
                             for e in errors), errors)
 
@@ -262,7 +262,7 @@ class TestWorkIdentity(unittest.TestCase):
         doc = chapter()
         doc.pop("chapter_uid")
         self._write(work, "chapter.json", doc)
-        errors, _ = check_work_identity(work)
+        errors, _ = check_work_identity(work, authority=False)
         self.assertTrue(any("chapter_uid" in e for e in errors), errors)
 
     def test_v1_script_without_chapter_is_only_a_warning(self):
@@ -270,13 +270,13 @@ class TestWorkIdentity(unittest.TestCase):
         work = self._work()
         self._write(work, "chapter.json", chapter())
         self._write(work, "script.json", {"segments": []})
-        errors, warnings = check_work_identity(work)
+        errors, warnings = check_work_identity(work, authority=False)
         self.assertEqual(errors, [])
         self.assertTrue(any("script.json" in w for w in warnings), warnings)
 
     def test_missing_chapter_json_is_an_error(self):
         work = self._work()
-        errors, _ = check_work_identity(work)
+        errors, _ = check_work_identity(work, authority=False)
         self.assertTrue(any("chapter.json" in e for e in errors), errors)
 
 
@@ -482,6 +482,108 @@ class TestIdentityMatrix(unittest.TestCase):
         self.assertEqual(r.returncode, 3, f"stderr={r.stderr}\nstdout={r.stdout}")
         self.assertIn("权威章节映射表", r.stderr)
         self.assertIn(orphan_uid, r.stderr)
+
+
+class TestFailClosed(unittest.TestCase):
+    """P0-REVIEW-07：身份校验必须 fail-closed。
+
+    这几条针对的都是"静默放行"：权威表缺失、文件损坏、索引自身不合格，
+    以前都可能被当成"没问题"。审核意见要求全部拒绝，且只留一个显式逃生口。
+    """
+
+    UID = "konosuba-manga-v02-ch06"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write(self, folder, name, doc):
+        folder = Path(folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_text(
+            json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _work(self, name="ch06"):
+        work = self.root / name / "work"
+        work.mkdir(parents=True)
+        self._write(work, "chapter.json", chapter())
+        return work
+
+    def _joined(self, work, **kw):
+        errors, _warnings = check_work_identity(work, **kw)
+        return " | ".join(errors)
+
+    def test_missing_authority_table_is_rejected(self):
+        """authority=None 且根本找不到索引 —— 必须报错，不能静默放行。"""
+        joined = self._joined(self._work())
+        self.assertIn("找不到权威章节映射表", joined)
+
+    def test_corrupt_authority_table_is_rejected(self):
+        work = self._work()
+        (self.root / "chapter_index.json").write_text("{broken", encoding="utf-8")
+        self.assertIn("无法解析", self._joined(work))
+
+    def test_empty_authority_table_is_rejected(self):
+        work = self._work()
+        self._write(self.root, "chapter_index.json",
+                    {"series_slug": "konosuba-manga", "volume_number": 2,
+                     "chapters": []})
+        joined = self._joined(work)
+        self.assertIn("权威索引自身不合格", joined)
+        self.assertIn("为空", joined)
+
+    def test_corrupt_chapter_json_is_not_treated_as_missing(self):
+        work = self._work()
+        (work / "chapter.json").write_text("{broken", encoding="utf-8")
+        joined = self._joined(work, authority=False)
+        self.assertIn("chapter.json 存在但不是合法 JSON", joined)
+
+    def test_corrupt_novel_ref_is_rejected(self):
+        """损坏的 novel_ref 以前被当成不存在而跳过——现在必须报错。"""
+        work = self._work()
+        self._write(self.root, "chapter_index.json", index_of(chapter()))
+        self._write(work, "novel_ref.json", {"chapter_uid": self.UID})
+        (work / "novel_ref.json").write_text("{broken", encoding="utf-8")
+        self.assertIn("novel_ref.json 存在但不是合法 JSON", self._joined(work))
+
+    def test_chapter_level_validates_the_whole_authority_index(self):
+        """当前章完全正确，但索引里另一章重复 id —— 章级也必须拒绝。"""
+        work = self._work()
+        self._write(self.root, "chapter_index.json",
+                    index_of(chapter(), chapter(self.UID)))
+        self.assertIn("权威索引自身不合格", self._joined(work))
+
+    def test_real_layout_finds_volume_index(self):
+        """真实布局 `v2/ch06/work` 的索引在 `v2/work/chapter_index.json`。
+
+        旧实现只找 `work.parent` / `work.parent.parent`（= `v2/ch06` / `v2`），
+        两个都不对——所以真实仓库的章级校验从来没加载过权威表，
+        "正常路径通过"其实是"根本没校验就通过"。
+        """
+        work = self.root / "v2" / "ch06" / "work"
+        work.mkdir(parents=True)
+        self._write(work, "chapter.json", chapter())
+        self._write(self.root / "v2" / "work", "chapter_index.json",
+                    index_of(chapter()))
+        errors, _warnings = check_work_identity(work)
+        self.assertEqual(errors, [], " | ".join(errors))
+
+    def test_explicit_false_is_the_only_escape(self):
+        """显式 authority=False 是唯一允许跳过权威表的入口。"""
+        errors, _warnings = check_work_identity(self._work(), authority=False)
+        self.assertEqual(errors, [])
+
+    def test_cli_rejects_missing_authority_table(self):
+        work = self._work()
+        r = subprocess.run(
+            [sys.executable, "-m", "panelcast", "m1", "chapter",
+             "--verify", "--work", str(work)],
+            cwd=str(ROOT), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 3, f"stderr={r.stderr}")
+        self.assertIn("找不到权威章节映射表", r.stderr)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@
 ```
 PanelCast\
 │
-├── panelcast/                      【跑通】代码，5,384 行，仅标准库
+├── panelcast/                      【跑通】代码，5,649 行，仅标准库
 │   ├── novel.py             674   S5a 底稿对齐 + script-audit 校验（m1 novel）
 │   ├── __main__.py          657   CLI 入口（ingest / m1 slice|panels|edit|run|verify|novel|chapter）
 │   ├── timeline.py          514   时间轴：段时长、页窗口、切页同步
@@ -46,7 +46,7 @@ PanelCast\
 │   ├── chapters.py          386   章节定界 + 按章切 work（m1 slice）
 │   ├── verify.py            385   成片 15 条验收，出 run_report.json
 │   ├── render.py            321   逐页画布 → concat → 烧字幕
-│   ├── identity.py          303   章节身份：uid 生成/解析 + 跨文件强校验（P0-08）
+│   ├── identity.py          460   章节身份：uid 解析 + 跨文件强校验 + fail-closed（P0-08/07）
 │   ├── profile.py           303   介绍页 schema 校验（§6.6 八条门禁）
 │   ├── tts.py               295   edge-tts，stream() 收句锚点
 │   ├── profile_auto.py      279   介绍页**骨架**生成（内容留空，见 §5）
@@ -59,7 +59,7 @@ PanelCast\
 │       ├── server.py              HTTP + 分格/介绍页读写
 │       └── static/index.html      浏览器界面（两个页签）
 │
-├── tests/                          【跑通】18 个文件 / 361 用例 / OK(skipped=2)
+├── tests/                          【跑通】18 个文件 / 384 用例 / OK(skipped=2)
 │
 ├── tools/                          三个不进 CLI 的辅助脚本
 │   ├── novel_extract.py     114   【跑通】epub → novel.txt + novel_index.json
@@ -147,13 +147,17 @@ ch02/
 | 目录名 | `m1/v2/ch06` … `m1/v2/ch10`（按全书连续编号） |
 | `chapter_index.json` | `ch01` … `ch07`（按卷内编号） |
 
-两套编号并存。`m1 slice` 的 `find_chapter` 按 `id` 或 `number`（「第六章」）匹配，
-实际调用都传「第六章」这种章节号，所以两套 id 并存也能跑；
-但人工对数时要看 `label`（「第六章」），不要看 id。
+两套编号并存。`find_chapter` 支持 `chapter_uid` / `id` / `number`（「第六章」）三种键，
+但**多命中直接报错**，不挑"最接近"的——`chapter_uid` 是唯一无歧义的身份。
 
-这是**待修项**（ROADMAP P0-08）：以后 `chapter_uid`（全书唯一）、
-`global_chapter_number`（全书编号）、`volume_chapter_number`（卷内编号）三者分开，
-`id` 不再同时承担两种含义。
+**P0-08 已实现**：`chapter_uid`（全书唯一）、`global_chapter_number`（全书编号）、
+`volume_chapter_number`（卷内编号）三者分开，`id` 只作兼容字段、不再承担第二种含义。
+目录名 `ch06` 的含义固定为**全书号**，由 `m1 chapter --verify` 强制校验。
+
+**校验边界（P0-REVIEW-07 起 fail-closed）**：权威表 `chapter_index.json`
+缺失、损坏、为空，或索引自身不合格（uid / id / number 重复、卷内编号不连续）
+一律拒绝；身份文件存在但 JSON 损坏也拒绝，不再当成"不存在"。
+唯一跳过方式是代码里显式传 `authority=False`，只用于确实没有卷级索引的临时目录。
 
 ---
 
@@ -316,7 +320,7 @@ y=1821  └──────────────────────┘
 | 验收 | 15 条，`run_report.json` 逐条留痕 |
 | 分格编辑器 | 分格页签 + 介绍页页签（schema 驱动表单） |
 | 小说抽取 | 2,627 段 / 83,599 字；`sha256`（内容）与 `file_sha256`（落盘字节）双哈希稳定 |
-| 测试 | 361 用例通过 |
+| 测试 | 384 用例通过 |
 
 ### 5.2 半自动的
 
@@ -370,10 +374,10 @@ P0 十一项，按依赖顺序：
 | P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10（**ch01 已建，34 beats 全 needs_review**） |
 | P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**ch01 已审，13 段待改写 / 1 段待修页映射**） |
 | P0-04 | 改稿后重出受影响成片 | 十章 mp4 + 更新的 `delivery.md` |
-| P0-05 | `m1 novel --align/--check`（五步链）+ `lint`（Schema 校验） | CLI + 测试（`test_novel.py` 64 例） |
+| P0-05 | `m1 novel --align/--check`（五步链）+ `lint`（Schema 校验） | CLI + 测试（`test_novel.py` 78 例） |
 | P0-06 | 正式出片门禁（`--draft` 分离 + 审核报告校验） | `m1 run` 改动 + 测试 |
 | P0-07 | 文档与实现统一 | 主规范 / 本文件 / README / CLI 帮助 |
-| P0-08 | 章节身份统一 | ✅ `panelcast/identity.py` + `m1 chapter --verify`（`test_identity.py` 41 例） |
+| P0-08 | 章节身份统一 | ✅ `panelcast/identity.py` + `m1 chapter --verify`（`test_identity.py` 50 例） |
 | P0-09 | 规则冲突核查 | 已核三处（时间轴、字数、哈希口径），结论已写进主规范 |
 | P0-10 | `m1 verify --visual` 视觉验收 | 抽帧判据 + 测试 |
 | P0-11 | `script.json` v1→v2 迁移 | 十章 v2 脚本 + 迁移脚本 |

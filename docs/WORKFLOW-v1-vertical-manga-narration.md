@@ -348,6 +348,25 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 第 4 条是重点。迁移前 `find_chapter` 按 `id` 或 `number` 都能命中，
 猜对是运气，猜错是静默错配。现在**多命中就是错误**。
 
+**权威表与 fail-closed（P0-REVIEW-07）**：
+
+五份文件自己一致，**证明不了它们没有一起抄错**一个不存在的章号。
+能发现"集体一致地错"的只有卷级权威表 `chapter_index.json`，所以它不能"找不到就算了"：
+
+| 情形 | 行为 |
+| --- | --- |
+| 找不到 `chapter_index.json` | **报错**（退出码 3）；只有代码里显式传 `authority=False` 才允许跳过 |
+| 权威表存在但 JSON 损坏 | **报错**；损坏不等于没有 |
+| 权威表 `chapters` 为空 | **报错** |
+| 权威索引自身不合格（uid / id / number 重复、卷内编号不连续） | **报错**；章级与卷级都必须拒绝 |
+| 身份文件（`chapter.json` / `novel_ref.json` / `script.json` / `script-audit.json`）存在但损坏 | **报错**；损坏不等于不存在 |
+
+**权威表的搜索路径**：真实布局 `m1/v1/ch01/work` 的索引在
+`m1/v1/work/chapter_index.json`。实现依次尝试
+`<work>/…`、`<work>/work/…`、`<父>/…`、`<父>/work/…`、`<祖父>/…`、`<祖父>/work/…`。
+早先只找 `work.parent` 与 `work.parent.parent`，两者都不指向 `work/` 子目录，
+导致**章级校验从来没有真正加载过权威表**——"正常路径通过"其实是"根本没校验就通过"。
+
 **目录名的含义固定为全书号**：`m1/v2/ch06` 的 `ch06` 指全书第 6 章，
 不是卷内第 1 章。所以 `id=ch01` 与目录名 `ch06` 并存是**合法的**（前者卷内、后者全书），
 但 `global_chapter_number` 必须等于 6，否则报错：
@@ -757,6 +776,29 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 | 4 | `narration` 不许 `disposition=keep` | 旁白自己编的内容保留，等于承认这段没有来源 |
 | 5 | `unknown` 不许 `status=approved` | 来源没查清不是一种结论，不能据它放行某一段 |
 | 6 | 有 `unknown` 时整份不许 `review_status=approved` | 没查清就不许签核通过 |
+
+##### 记录完整性与 Schema 对齐（P0-REVIEW-07）
+
+六条规则之外，还有三类"错误能被藏起来"的情况，现在一并由 `lint` 拒绝：
+
+| 情形 | 为什么危险 | 处理 |
+| --- | --- | --- |
+| `segment_id` 重复 | 转成 dict 时后一条覆盖前一条：一条自相矛盾的记录在前、一条合法记录在后，就"看起来全对" | **直接报错**，不做 first-wins / last-wins |
+| 报告里有讲稿中不存在的段落 | 多余记录不会被任何一处校验看到 | **报错**（多余记录） |
+| 讲稿某段没有审计记录 | 未覆盖的段落等于没审 | **报错**（未覆盖该段） |
+
+**Schema 与 Linter 必须执行同一套约束**。`severity` 的 enum 一度只写在 Schema 里、
+Linter 没查，`severity="catastrophic"` 能一路通过。现在：
+
+- 顶层必填字段、逐段必填字段、`severity` 枚举、`script_schema` 枚举、
+  `text_sha256` / `novel_ref_sha256` 的 64 位十六进制格式、
+  `pages_declared` 的 `page_XXXX` 格式，全部由 `lint` 执行；
+- `segment_id` 的唯一性与"逐段一一对应"无法用 JSON Schema 表达，
+  由 `lint_audit()` 强制，Schema 里用 `$comment` 写明这一点；
+- 每个枚举与必填项都有正反测试（`tests/test_novel.py::TestAuditIntegrity`）。
+
+**损坏的 JSON 不等于不存在**：`script-audit.json` / `novel_ref.json` / `script.json`
+存在但无法解析时，门禁报"存在但无法解析"，而不是当成缺失继续往下跑。
 
 **第 3 条为什么单独设字段**：`mixed` 的诱惑太大——一句"又像漫画又像原创"就能绕开举证，
 把真正无来源的部分藏在"混合"里。所以要求把两部分**分开写**：
@@ -1755,10 +1797,12 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 ```
 script.json
    │
-   ├─1. 章节身份一致 + novel_ref.json 存在？
+   ├─1. 章节身份一致 + 权威表 + novel_ref.json 存在？
    │     · chapter_uid 在 chapter.json / novel_ref / script / script-audit 中一致
    │     · 目录名的全书号 == global_chapter_number
-   │     · id / number 与 chapter_uid 自洽         否 → 禁止出片（身份错了，后面全无意义）
+   │     · id / number 与 chapter_uid 自洽
+   │     · 权威表 chapter_index.json 存在、可解析、非空、自身合格，
+   │       且 chapter_uid 在表中唯一命中     否 → 禁止出片（身份错了，后面全无意义）
    ├─2. novel_ref.source.text_sha256
    │     == novel_index.json 的 file_sha256？   否 → 底稿失效，回 S5a 重对齐
    ├─3. 每段 source_refs 非空且 beat 存在？      否 → 禁止出片
@@ -1788,6 +1832,11 @@ script.json
 
 第 5 步内部**先格式后哈希**：`lint` 不过就只报格式错，不再往下比哈希。
 顺序反了会误导——人会以为"哈希不符"是讲稿被改了，其实只是枚举写错了。
+
+**第 1 步是 fail-closed 的**（P0-REVIEW-07）：找不到权威表、权威表损坏或为空、
+索引自身不合格（uid / id / number 重复、卷内编号不连续）、身份文件存在但 JSON 损坏，
+**全部报错并退出码 3**。五份文件自己一致不作数——它们可能一起抄错了一个不存在的章号。
+唯一跳过权威表的方式是在代码里显式传 `authority=False`，CLI 不提供这个开关。
 
 单独跑格式校验用 `m1 novel lint --work <work>`（不要求签核），
 它和 `check` 的分工见 §5.6.1。

@@ -27,6 +27,8 @@ from panelcast.novel import (  # noqa: E402
     FIDELITIES,
     REVIEW_STATUSES,
     SCOPES,
+    SCRIPT_SCHEMAS,
+    SEVERITIES,
     GateError,
     build_novel_ref,
     check,
@@ -36,6 +38,7 @@ from panelcast.novel import (  # noqa: E402
     load_novel,
     novel_chapter_range,
     render,
+    script_segments,
     write_novel_ref,
 )
 
@@ -85,6 +88,36 @@ def write_novel(dirpath, paras=None):
     return index
 
 
+_CN_DIGITS = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+
+
+def authority_index(chapter):
+    """给夹具造一份自洽的卷级索引。
+
+    P0-REVIEW-07 之后身份校验是 fail-closed：没有权威表就拒绝。夹具如果
+    不提供 `chapter_index.json`，所有门禁测试都会卡在第 1 步——这恰恰说明
+    旧夹具一直在"没有权威表"的条件下跑，才没发现静默放行。
+    """
+    slug = chapter["series_slug"]
+    vol = chapter["volume_number"]
+    vcn = chapter["volume_chapter_number"]
+    glob = chapter["global_chapter_number"]
+
+    def ident(pos, g):
+        return {
+            "chapter_uid": f"{slug}-v{vol:02d}-ch{g:02d}",
+            "series_slug": slug, "volume_number": vol,
+            "global_chapter_number": g, "volume_chapter_number": pos,
+            "id": f"ch{pos:02d}",
+            "number": f"第{_CN_DIGITS[g]}章" if 0 <= g < len(_CN_DIGITS) else str(g),
+        }
+
+    chapters = [ident(i, glob - (vcn - i)) for i in range(1, vcn + 1)]
+    return {"schema": "chapter-index/v1", "series": chapter.get("series"),
+            "volume": chapter.get("volume"), "series_slug": slug,
+            "volume_number": vol, "chapters": chapters}
+
+
 def write_chapter_work(dirpath, pages=("page_0045", "page_0046", "page_0047"),
                        segments=None, schema=None):
     d = Path(dirpath)
@@ -106,6 +139,11 @@ def write_chapter_work(dirpath, pages=("page_0045", "page_0046", "page_0047"),
     }
     (d / "chapter.json").write_text(json.dumps(chapter, ensure_ascii=False,
                                               indent=2) + "\n", encoding="utf-8")
+    # 卷级权威索引放在 work 的上一层：真实布局 `m1/v1/ch01/work` 的索引在
+    # `m1/v1/work/chapter_index.json`，这里用 `tmp/chapter_index.json` 等价模拟。
+    (d.parent / "chapter_index.json").write_text(
+        json.dumps(authority_index(chapter), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8")
     segs = segments if segments is not None else [
         {"id": "seg_0001", "pages": ["page_0045", "page_0046"],
          "text": "冒险者公会的后院有一口大浴池，热水是从地底引上来的。"},
@@ -659,6 +697,126 @@ class TestAuditSchema(Base):
         self.assertIn("通过了就不该还挂着要改", self._text(problems))
 
 
+class TestAuditIntegrity(Base):
+    """P0-REVIEW-07：审计记录完整性 + Schema/Linter 真正一致。
+
+    这一组针对的不是"字段写错"，而是"错误能被藏起来"：
+    重复 `segment_id` 让后一条覆盖前一条、`severity` 枚举写在 Schema 里却没人查、
+    损坏的 JSON 被当成不存在。三者都会让校验器"看起来通过"。
+    """
+
+    PAGES = {"page_0045", "page_0046", "page_0047"}
+
+    def _base_audit(self):
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        return json.loads((self.work / "script-audit.json").read_text(encoding="utf-8"))
+
+    def _text(self, problems):
+        return " ".join(m for _sid, m in problems)
+
+    def _lint(self, audit, **kw):
+        kw.setdefault("page_set", self.PAGES)
+        return lint_audit(audit, **kw)
+
+    def test_duplicate_segment_id_is_rejected_in_either_order(self):
+        """审核意见的原反例：无效记录在前、合法记录在后，不能靠覆盖洗白。"""
+        audit = self._base_audit()
+        valid = audit["audited_segments"][0]
+        invalid = dict(valid, disposition="rewrite")   # 与 status=approved 矛盾
+        for order, label in (([invalid, valid], "无效在前"),
+                             ([valid, invalid], "无效在后")):
+            with self.subTest(order=label):
+                doc = json.loads(json.dumps(audit))
+                doc["audited_segments"] = order
+                problems = self._lint(doc)
+                self.assertIn("segment_id 重复", self._text(problems))
+
+    def test_extra_record_not_in_script_is_rejected(self):
+        audit = self._base_audit()
+        extra = dict(audit["audited_segments"][0], segment_id="seg_0099")
+        audit["audited_segments"].append(extra)
+        _doc, segs, _schema = script_segments(self.work)
+        problems = self._lint(audit, segs=segs)
+        self.assertIn("多余记录", self._text(problems))
+
+    def test_missing_segment_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"] = audit["audited_segments"][:1]
+        _doc, segs, _schema = script_segments(self.work)
+        problems = self._lint(audit, segs=segs)
+        self.assertIn("未覆盖该段", self._text(problems))
+
+    def test_invalid_severity_is_rejected(self):
+        """Schema 里有 severity enum，Linter 以前没查——这是漏检。"""
+        audit = self._base_audit()
+        audit["audited_segments"][0]["severity"] = "catastrophic"
+        self.assertIn("severity 非法", self._text(self._lint(audit)))
+
+    def test_bad_segment_id_format_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"][0]["segment_id"] = "seg_1"
+        self.assertIn("segment_id 格式非法", self._text(self._lint(audit)))
+
+    def test_bad_text_sha256_format_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"][0]["text_sha256"] = "abc"
+        self.assertIn("text_sha256 必须是 64 位", self._text(self._lint(audit)))
+
+    def test_bad_page_name_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"][0]["pages_declared"] = ["p45"]
+        self.assertIn("page_XXXX", self._text(self._lint(audit)))
+
+    def test_every_required_top_level_field_is_enforced(self):
+        required = ["schema", "audit_spec_version", "judgement_scope", "chapter_uid",
+                    "script_schema", "script_sha256", "novel_ref_sha256",
+                    "audited_segments", "review_status"]
+        for key in required:
+            with self.subTest(field=key):
+                audit = self._base_audit()
+                audit.pop(key)
+                problems = self._lint(audit)
+                self.assertTrue(
+                    any(key in m and "缺必填字段" in m for _s, m in problems),
+                    f"{key}: {self._text(problems)}")
+
+    def test_every_required_segment_field_is_enforced(self):
+        for key in ("segment_id", "text_sha256", "status", "fidelity",
+                    "disposition", "evidence"):
+            with self.subTest(field=key):
+                audit = self._base_audit()
+                audit["audited_segments"][0].pop(key)
+                problems = self._lint(audit)
+                self.assertTrue(
+                    any(key in m and "缺必填字段" in m for _s, m in problems),
+                    f"{key}: {self._text(problems)}")
+
+    # ---- 损坏的 JSON 不能当成不存在 ----
+    def test_corrupt_audit_fails_the_gate_at_step_5(self):
+        self._v2_ready()
+        (self.work / "script-audit.json").write_text("{broken", encoding="utf-8")
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        self.assertTrue(any(s == 5 and "无法解析" in m for s, m in problems), problems)
+
+    def test_corrupt_novel_ref_fails_the_gate_at_step_1(self):
+        self._v2_ready()
+        (self.work / "novel_ref.json").write_text("{broken", encoding="utf-8")
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        self.assertTrue(any(s == 1 and "novel_ref.json" in m and "无法解析" in m
+                            for s, m in problems), problems)
+
+    def test_corrupt_script_fails_the_gate(self):
+        self._v2_ready()
+        (self.work / "script.json").write_text("{broken", encoding="utf-8")
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        self.assertTrue(any("script.json" in m and "无法解析" in m for _s, m in problems),
+                        problems)
+
+
 class TestSchemaFile(unittest.TestCase):
     """`docs/schemas/script-audit.schema.json` 与代码常量必须一致。
 
@@ -692,6 +850,14 @@ class TestSchemaFile(unittest.TestCase):
     def test_review_status_enum_matches(self):
         self.assertEqual(set(self.schema["properties"]["review_status"]["enum"]),
                          REVIEW_STATUSES)
+
+    def test_severity_enum_matches(self):
+        """Schema 写了 severity enum，Linter 就必须执行——否则是纸面约束。"""
+        self.assertEqual(set(self.seg["properties"]["severity"]["enum"]), SEVERITIES)
+
+    def test_script_schema_enum_matches(self):
+        self.assertEqual(set(self.schema["properties"]["script_schema"]["enum"]),
+                         SCRIPT_SCHEMAS)
 
     def test_mixed_note_is_declared(self):
         """`mixed` 必须要求单独说明新增部分，否则它就是个逃生门。"""

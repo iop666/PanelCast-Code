@@ -31,6 +31,7 @@ v1 结构里根本没有 `source_refs` 字段，无从判断来源，不能放�
 import hashlib
 import json
 import pathlib
+import re
 
 NOVEL_REF_SCHEMA = "novel-ref/v1"
 AUDIT_SCHEMA = "script-audit/v2"
@@ -76,6 +77,17 @@ DISPOSITIONS = {"keep", "fix_pages", "rewrite", "remove"}
 #: 人工签核状态。`approved` 才允许出片；`pending_human` 表示机器出了结论但没人签。
 REVIEW_STATUSES = {"pending_human", "approved", "rejected"}
 
+#: 逐段 `severity` 的合法取值。Schema 里有这个 enum，Linter 以前没查——
+#: `severity="catastrophic"` 能一路通过（P0-REVIEW-07）。枚举必须两边都锁。
+SEVERITIES = {"high", "medium", "low", "none"}
+
+#: 讲稿 schema 版本（Schema `script_schema` 的 enum）。
+SCRIPT_SCHEMAS = {"script/v1", "script/v2"}
+
+SEG_ID_RE = re.compile(r"^seg_[0-9]{4}$")
+PAGE_RE = re.compile(r"^page_[0-9]{4}$")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
 #: 全书中出现次数不超过这个值的二元组才算"稀有锚点"。
 #: 调高会放进"的一""了。"这类到处都有的组合，候选立刻变成随机数。
 RARE_DF = 3
@@ -109,6 +121,21 @@ def sha256_file(path):
 
 def _read_json(path):
     return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+
+
+def _read_json_checked(path, label=None):
+    """读 JSON；文件损坏抛 `GateError`（而不是裸 `ValueError`）。
+
+    门禁的职责是把"某一步失败"讲清楚，而不是让 CLI 崩在 traceback 里。
+    **损坏 ≠ 不存在**：不存在由调用方按阶段规则处理，损坏必须报错。
+    """
+    p = pathlib.Path(path)
+    try:
+        return _read_json(p)
+    except (OSError, ValueError) as exc:
+        raise GateError(
+            f"error: {label or p.name} 存在但无法解析（{exc}）；"
+            f"损坏的文件不能当成不存在") from exc
 
 
 def load_novel(novel_dir):
@@ -231,7 +258,7 @@ def chapter_pages(work):
     p = pathlib.Path(work) / "chapter.json"
     if not p.exists():
         raise GateError(f"error: {p} not found")
-    doc = _read_json(p)
+    doc = _read_json_checked(p, "chapter.json")
     pages = doc.get("pages") or []
     if not pages:
         raise GateError(f"error: {p} has no pages")
@@ -246,7 +273,7 @@ def script_segments(work):
     p = pathlib.Path(work) / "script.json"
     if not p.exists():
         raise GateError(f"error: {p} not found")
-    doc = _read_json(p)
+    doc = _read_json_checked(p, "script.json")
     schema = doc.get("schema") or "script/v1"
     segs = [(s.get("id"), s.get("text") or s.get("narration", {}).get("text") or "")
             for s in doc.get("segments") or []]
@@ -399,13 +426,59 @@ def lint_audit(audit, segs=None, page_set=None):
             out.append((None, f"审核报告里出现 novel_ref 专有字段 {foreign!r}："
                               f"两层判定（漫画 vs 小说 / 旁白 vs 来源）不许混在一份文件里"))
 
-    audited = {a.get("segment_id"): a for a in audit.get("audited_segments") or []}
-    for sid, rec in audited.items():
-        out.extend((sid, m) for m in _lint_segment(sid, rec, page_set))
+    # ---- 顶层必填字段（与 Schema 的 required 对齐）----
+    # 只锁枚举不锁必填，等于"字段可以缺、校验器当没看见"。
+    for req in ("schema", "audit_spec_version", "judgement_scope", "chapter_uid",
+                "script_schema", "script_sha256", "novel_ref_sha256",
+                "audited_segments", "review_status"):
+        if req not in audit or audit.get(req) in (None, ""):
+            out.append((None, f"缺必填字段 {req!r}"))
+    if "reviewed_by" not in audit:
+        out.append((None, "缺必填字段 'reviewed_by'（未签核时必须显式写 null）"))
+    ss = audit.get("script_schema")
+    if ss is not None and ss not in SCRIPT_SCHEMAS:
+        out.append((None, f"script_schema 非法：{ss!r}；"
+                          f"只能是 {'/'.join(sorted(SCRIPT_SCHEMAS))}"))
+    for field in ("script_sha256", "novel_ref_sha256"):
+        v = audit.get(field)
+        if v is not None and not SHA256_RE.match(str(v)):
+            out.append((None, f"{field} 必须是 64 位小写十六进制，"
+                              f"实为 {str(v)[:20]!r}…"))
+
+    records = audit.get("audited_segments") or []
+    if not records:
+        out.append((None, "audited_segments 为空：没有任何逐段审核记录"))
+
+    # ---- 段落唯一性：重复 id 会让后一条覆盖前一条，把无效判定藏起来 ----
+    # 这不是格式问题，是审计记录完整性问题：一条自相矛盾的记录排在前面、
+    # 一条合法记录排在后面，dict 一覆盖就"看起来全对"（P0-REVIEW-07）。
+    audited, order, dups = {}, [], []
+    for rec in records:
+        sid = rec.get("segment_id")
+        if sid in audited:
+            dups.append(sid)
+        else:
+            order.append(sid)
+        audited[sid] = rec          # 保留最后一条供字段校验；重复本身已记错
+    if dups:
+        out.append((None, f"audited_segments 里 segment_id 重复："
+                          f"{_preview(sorted(set(dups)))}；重复记录会让后一条覆盖"
+                          f"前一条，把无效判定藏起来。每段必须恰好一条，"
+                          f"不接受 first-wins / last-wins"))
+
+    for sid in order:
+        if not SEG_ID_RE.match(str(sid or "")):
+            out.append((sid, f"segment_id 格式非法：{sid!r}；应为 seg_XXXX（四位数字）"))
+        out.extend((sid, m) for m in _lint_segment(sid, audited[sid], page_set))
+
     if segs is not None:
+        known = {sid for sid, _text in segs}
         for sid, _text in segs:
             if sid not in audited:
                 out.append((sid, "审核报告未覆盖该段"))
+        for sid in order:
+            if sid not in known:
+                out.append((sid, "审核报告里有讲稿中不存在的段落（多余记录）"))
 
     # `unknown` 是"还没查清"，不是一种结论——有它就整份不许签核。
     unresolved = [sid for sid, rec in audited.items()
@@ -423,7 +496,30 @@ def _lint_segment(sid, rec, page_set):
     origin = rec.get("alteration_origin")
     disp = rec.get("disposition")
     status = rec.get("status")
-    pages = rec.get("pages_declared") or []
+    raw_pages = rec.get("pages_declared")
+    pages = raw_pages if isinstance(raw_pages, list) else []
+    if raw_pages is not None and not isinstance(raw_pages, list):
+        out.append("pages_declared 必须是数组")
+
+    # ---- 与 Schema 对齐：必填、枚举、格式 ----
+    # 以前只查了 fidelity/status/disposition 三个枚举，`severity` 的 enum 写在
+    # Schema 里却没人执行，`severity="catastrophic"` 能一路通过（P0-REVIEW-07）。
+    for req in ("segment_id", "text_sha256", "status", "fidelity",
+                "disposition", "evidence"):
+        if rec.get(req) in (None, ""):
+            out.append(f"缺必填字段 {req!r}")
+    sev = rec.get("severity")
+    if sev is not None and sev not in SEVERITIES:
+        out.append(f"severity 非法：{sev!r}；只能是 {'/'.join(sorted(SEVERITIES))}")
+    sha = rec.get("text_sha256")
+    if sha not in (None, "") and not SHA256_RE.match(str(sha)):
+        out.append(f"text_sha256 必须是 64 位小写十六进制，实为 {str(sha)[:20]!r}…")
+    para = rec.get("novel_para")
+    if para is not None and not isinstance(para, list):
+        out.append("novel_para 必须是数组")
+    for p in pages:
+        if not PAGE_RE.match(str(p)):
+            out.append(f"pages_declared 里 {p!r} 不符合 page_XXXX 格式")
 
     if fid not in FIDELITIES:
         out.append(f"fidelity 非法：{fid!r}；只能是 {'/'.join(sorted(FIDELITIES))}")
@@ -511,7 +607,11 @@ def check(work, novel_dir):
     if not ref_path.exists():
         problems.append((1, f"novel_ref.json 不存在（{ref_path}）；先跑 --align"))
         return False, problems
-    ref = _read_json(ref_path)
+    try:
+        ref = _read_json_checked(ref_path, "novel_ref.json")
+    except GateError as exc:
+        problems.append((1, str(exc)))
+        return False, problems
 
     # ---- 第 2 步：纯文本哈希一致 ----
     try:
@@ -538,17 +638,16 @@ def check(work, novel_dir):
 
     # ---- 第 3 步：每段来源非空且 beat 存在 ----
     try:
-        _doc, segs, schema = script_segments(work)
+        script_doc, segs, schema = script_segments(work)
     except GateError as exc:
         problems.append((3, str(exc)))
-        segs, schema = [], "script/v1"
+        script_doc, segs, schema = {}, [], "script/v1"
     beat_ids = {b.get("id") for b in ref.get("beats") or []}
     if schema != "script/v2":
         problems.append(
             (3, f"讲稿是 {schema}，没有 source_refs 字段，无法校验来源；"
                 f"需先迁到 script/v2（P0-11）"))
     else:
-        script_doc = _read_json(work / "script.json")
         for seg in script_doc.get("segments") or []:
             sid = seg.get("id")
             refs = _segment_source_refs(seg)
@@ -622,7 +721,10 @@ def _check_audit(work, ref_path, ref, segs, schema):
     audit_path = pathlib.Path(work) / "script-audit.json"
     if not audit_path.exists():
         return [(5, "script-audit.json 不存在：内容未经审核，禁止正式出片")]
-    audit = _read_json(audit_path)
+    try:
+        audit = _read_json_checked(audit_path, "script-audit.json")
+    except GateError as exc:
+        return [(5, str(exc))]
 
     try:
         _cdoc, pages = chapter_pages(work)

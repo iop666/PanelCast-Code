@@ -97,6 +97,24 @@
 不存在的章号，自洽也照样拒绝。唯一 warning 例外是 v1 `script.json` 没有
 章节声明（P0-11 迁移后消失）。
 
+### 校验必须 fail-closed（P0-REVIEW-07）
+
+「找不到权威表就跳过」等于把 P0-08 的立论作废。现在：
+
+| 情形 | 结果 |
+| --- | --- |
+| 找不到 `chapter_index.json` | 退出码 3；只有代码里显式传 `authority=False` 才可跳过 |
+| 权威表损坏 / 为空 | 退出码 3 |
+| 权威索引自身不合格（uid/id/number 重复、编号跳号） | 退出码 3，**章级也拒绝** |
+| 身份文件存在但 JSON 损坏 | 退出码 3（损坏 ≠ 不存在） |
+| 审计段落 `segment_id` 重复 | 退出码 3，不做 first-wins / last-wins |
+| `severity` 越界（如 `catastrophic`） | 退出码 3（Schema 与 Linter 同步） |
+
+顺带查出一个比"临时目录缺表"更严重的问题：真实布局的索引在
+`m1/v1/work/chapter_index.json`，旧搜索路径只找 `work.parent` 与
+`work.parent.parent`，**从未加载过权威表**——此前十次"正常路径通过"实际是
+"根本没校验就通过"。已修正搜索路径并补测试。
+
 ### LF 证据链的三条边界
 
 **不许单独拿 `i/lf` 推导"所有平台工作区都是 LF"**：
@@ -125,7 +143,7 @@
 | **审核报告 Schema 校验** | `m1 novel lint`（只校格式、不要求签核） |
 | **章节身份强校验** | `m1 chapter --verify`（不一致就报错，不猜"最接近"） |
 | **第一章逐段来源审计** | 25 段 100% 审完，**未签核** |
-| 测试 | **361 tests OK (skipped=2)**（`test_novel.py` 64 例 / `test_identity.py` 41 例 / `test_lf.py` 6 例） |
+| 测试 | **384 tests OK (skipped=2)**（`test_novel.py` 78 例 / `test_identity.py` 50 例 / `test_lf.py` 6 例） |
 
 ### P0 任务状态
 
@@ -145,6 +163,7 @@
 | P0-REVIEW-04 | 审核口径进规范 + Schema + lint | ✅ **已完成**（样张升 v2，仍未签核） |
 | P0-REVIEW-05 | 四条风险落地（mixed / rewritten / scope / LF） | ✅ **已完成**（Schema 11 条条件规则 + 6 例换行复验） |
 | P0-REVIEW-06 | 身份测试矩阵 + 权威表校验 | ✅ **已完成**（七类局部错配 + CLI 端到端拒绝） |
+| P0-REVIEW-07 | fail-closed 身份 + 审计完整性 | ✅ **已完成**（权威表缺失/损坏/不合格一律拒绝；重复段落拒绝；`severity` 补齐） |
 
 ### 放行条件
 
@@ -160,7 +179,7 @@
 ## 复核命令（新克隆即可复现）
 
 ```bash
-python -m unittest discover -s tests     # 期望 Ran 361 tests / OK (skipped=2)
+python -m unittest discover -s tests     # 期望 Ran 384 tests / OK (skipped=2)
 python -m panelcast m1 novel lint --work m1/v1/ch01/work   # 格式校验，应通过
 python -m panelcast m1 novel check --work m1/v1/ch01/work --novel-dir <小说文本目录>
                                           # 门禁，样张应卡在第 3/4/5 步（退出码 3）

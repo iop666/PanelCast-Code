@@ -220,10 +220,42 @@ def find_chapter(index, key):
 
 
 def _read_json(path):
+    """读取 JSON，并**区分「不存在」与「损坏」**。
+
+    返回 `(data, status)`，`status` ∈ `{"ok", "missing", "corrupt"}`。
+
+    旧实现用同一个 `None` 表示两种情况，调用方一律 `continue`——结果
+    **一份损坏的 `novel_ref.json` 会被当成不存在而静默跳过**，所谓"五处交叉
+    验证"实际只验了剩下几处（P0-REVIEW-07）。缺失可能是阶段允许的，
+    损坏永远不是。
+    """
+    p = pathlib.Path(path)
+    if not p.exists():
+        return None, "missing"
     try:
-        return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+        return json.loads(p.read_text(encoding="utf-8")), "ok"
     except (OSError, ValueError):
-        return None
+        return None, "corrupt"
+
+
+def _authority_candidates(work):
+    """按真实布局列出可能存在的卷级索引路径（去重、保序）。
+
+    真实布局 `m1/v1/ch01/work` 的索引在 `m1/v1/work/chapter_index.json`。
+    旧实现只找 `work.parent` / `work.parent.parent`（= `m1/v1/ch01` / `m1/v1`），
+    **两个都不对**——所以真实仓库的章级校验从来没有加载过权威表，
+    "正常路径通过"其实是"根本没校验权威表就通过了"。
+    这里把 `<base>/work/chapter_index.json` 也列进去。
+    """
+    out, seen = [], set()
+    for base in (work, work.parent, work.parent.parent):
+        for rel in ("chapter_index.json", "work/chapter_index.json"):
+            p = base / rel
+            if p in seen:
+                continue
+            seen.add(p)
+            out.append(p)
+    return out
 
 
 def _authority_chapters(authority):
@@ -249,15 +281,19 @@ def check_work_identity(work, authority=None):
 
     `authority`：
 
-    - `None`（默认）：自动从工作区的卷目录找 `chapter_index.json`
-    - `False`：显式关闭，只用于没有卷级索引的临时实验目录
-    - 显式 dict / list / set：直接作为权威表
+    - `None`（默认）：自动从工作区向上找 `chapter_index.json`。**找不到即报错**
+      （fail-closed）；文件损坏、为空、或索引自身不合格同样报错。
+    - `False`：**显式**关闭权威表校验，只用于确实没有卷级索引的临时实验目录。
+      这是唯一的关闭方式——不能靠"恰好没找到"来静默跳过。
+    - 显式 dict / list / set：直接作为权威表。
 
-    返回 `(errors, warnings)`。errors 分三类：
+    返回 `(errors, warnings)`。errors 分四类：
 
-    1. 两份文件声明了不同的 `chapter_uid`，或目录名与全书号不符；
-    2. 所有来源两两之间的冲突（**即使 `chapter.json` 缺 uid 也照样抓**）；
-    3. uid 不在权威表里、在权威表里重复、或与权威表的编号不符。
+    1. 权威表缺失、损坏、为空，或权威索引自身不合格；
+    2. 身份文件存在但 JSON 损坏（损坏不等于不存在）；
+    3. 两份文件声明了不同的 `chapter_uid`，或目录名与全书号不符；
+    4. 所有来源两两之间的冲突（**即使 `chapter.json` 缺 uid 也照样抓**），
+       以及 uid 不在权威表里 / 在权威表里重复 / 与权威表编号不符。
 
     **五份文件自己一致也不作数**——它们可能一起抄错了一个不存在的章号。
     权威表是唯一能发现这种"集体一致地错"的东西。
@@ -268,20 +304,44 @@ def check_work_identity(work, authority=None):
     work = pathlib.Path(work)
     errors, warnings = [], []
 
-    if authority is None:
-        # 真实布局 `m1/v1/ch01/work` → 卷目录是 `work.parent.parent`；
-        # 也容忍直接传章目录 `m1/v1/ch01` → 卷目录是 `work.parent`。
-        for parent in (work.parent.parent, work.parent):
-            candidate = parent / "chapter_index.json"
-            if candidate.exists():
-                loaded = _read_json(candidate)
-                if loaded is not None:
-                    authority = loaded
-                break
+    def load(name, required=False):
+        """读一个身份文件。存在但损坏 → 记 error；缺失且 required → 记 error。"""
+        data, status = _read_json(work / name)
+        if status == "corrupt":
+            errors.append(f"{name} 存在但不是合法 JSON：损坏的文件不能当成不存在"
+                          f"而跳过校验，否则交叉验证会悄悄少验一处")
+            return None
+        if status == "missing" and required:
+            errors.append(f"{name} 不存在；缺了它无法核对章节身份")
+            return None
+        return data
 
-    chapter = _read_json(work / "chapter.json")
+    # ---- 权威表：先解析，fail-closed ----
+    # 五份文件自己一致，证明不了它们没有一起抄错一个不存在的章号；
+    # 权威表是唯一能发现"集体一致地错"的东西，所以它不能"找不到就算了"。
+    auth_doc = None
+    if authority is None:
+        found = next((p for p in _authority_candidates(work) if p.exists()), None)
+        if found is None:
+            errors.append(
+                "找不到权威章节映射表 chapter_index.json（卷级）；"
+                "五份文件自己一致也不能证明它们没有一起抄错。"
+                "确实没有权威表的临时目录必须显式传 authority=False")
+            authority = False
+        else:
+            auth_doc, status = _read_json(found)
+            if status != "ok":
+                errors.append(f"权威表 {found} 无法解析（{status}）；"
+                              f"损坏的权威表不能当成没有权威表")
+                authority = False
+            else:
+                authority = auth_doc
+    elif authority is not False:
+        auth_doc = authority
+
+    chapter = load("chapter.json", required=True)
     if chapter is None:
-        return [f"{work}: 缺 chapter.json，无法核对章节身份"], []
+        return errors, warnings
 
     uid = chapter.get("chapter_uid")
     if not uid:
@@ -323,8 +383,10 @@ def check_work_identity(work, authority=None):
         "script.json": lambda d: d.get("chapter_uid") or d.get("chapter"),
         "script-audit.json": lambda d: d.get("chapter_uid"),
     }
+    docs = {}
     for name, getter in sources.items():
-        doc = _read_json(work / name)
+        doc = load(name)          # 损坏已在 load 里记成 error
+        docs[name] = doc
         if doc is None:
             continue
         val = getter(doc)
@@ -356,7 +418,7 @@ def check_work_identity(work, authority=None):
             f"程序不替你挑")
 
     # novel_ref 还带 chapter_id，顺手核对（它是兼容字段，但不能自相矛盾）
-    ref = _read_json(work / "novel_ref.json")
+    ref = docs.get("novel_ref.json")
     if ref and ref.get("chapter_id") and chapter.get("id"):
         if ref["chapter_id"] != chapter["id"]:
             errors.append(
@@ -365,8 +427,18 @@ def check_work_identity(work, authority=None):
 
     # 权威表：五份文件一致也可能一起抄错了一个不存在的章。
     if authority is not False:
-        auth = _authority_chapters(authority)
-        if auth and uid:
+        # 章级校验必须验证**整份**权威索引，不能只查"当前 uid 能否匹配到"。
+        # 否则同一索引里别的章节重复 id、卷内编号跳号，章级 --verify 仍会通过，
+        # 与卷级 --verify 的强度不一致（P0-REVIEW-07）。
+        if isinstance(auth_doc, dict):
+            for msg in index_problems(auth_doc):
+                errors.append(f"权威索引自身不合格：{msg}")
+        auth = _authority_chapters(auth_doc)
+        if not auth:
+            errors.append(
+                "权威章节映射表为空或解析不出章节列表；按 fail-closed 拒绝，"
+                "不许在无权威表的情况下放行身份校验")
+        elif uid:
             matches = [c for c in auth if c.get("chapter_uid") == uid]
             if not matches:
                 known = ", ".join(sorted({str(c.get("chapter_uid")) for c in auth}))
@@ -385,6 +457,4 @@ def check_work_identity(work, authority=None):
                         errors.append(
                             f"chapter.json 的 {field}={got!r} "
                             f"与权威表中 {uid!r} 的 {want!r} 不符")
-        elif authority is not None and not auth:
-            warnings.append("权威章节映射表为空，无法核对 uid 是否真实存在")
     return errors, warnings

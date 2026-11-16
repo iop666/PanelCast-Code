@@ -137,6 +137,11 @@ class TestRealRepoClonesByteIdentical(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        # 代码审查镜像只含源码，不含 m1 产物——这条用例在那里没有比对对象。
+        # 该跳过而不是抛 FileNotFoundError：测试用例要能在两种仓库里都跑。
+        missing = [rel for rel in HASH_BOUND if not (ROOT / rel).exists()]
+        if missing:
+            self.skipTest("仓库不含哈希绑定文件（代码审查镜像）：" + ", ".join(missing))
         # 工作区有未提交改动时比不了——那不是换行问题，是内容本来就不同
         r = subprocess.run(["git", "status", "--porcelain"] + HASH_BOUND,
                            cwd=str(ROOT), capture_output=True, text=True)

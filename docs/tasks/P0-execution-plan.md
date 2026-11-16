@@ -200,7 +200,7 @@
 | 门禁 | `m1 novel check` 第 1 步先验身份 |
 | 数据迁移 | 2 份索引 + 10 份 `chapter.json` + 2 份 labels 全部补齐 |
 | 实测 | 两卷索引 + 十个章级 work `--verify` 全过 |
-| 测试 | `tests/test_identity.py` 50 例 + `tests/test_novel.py` 78 例 + `tests/test_lf.py` 6 例；全量 **384 tests OK (skipped=2)** |
+| 测试 | `tests/test_identity.py` 56 例 + `tests/test_novel.py` 89 例 + `tests/test_lf.py` 6 例；全量 **401 tests OK (skipped=2)**（P0-REVIEW-08 后） |
 
 **审核意见里的反例已写成测试**（`test_counter_example_from_review`）：
 目录 `ch06` + `chapter.json` 说 A + `novel_ref` 说 B + `script-audit` 说 C
@@ -397,6 +397,49 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 
 **未变**：第一章 `review_status` 仍是 `pending_human`、`reviewed_by` 为 `null`；
 第二章、九章批量、P0-06、P0-10、横版继续冻结。
+
+---
+
+### P0-REVIEW-08 JSON 结构 fail-closed 与 Schema/Linter 完整对齐【本轮已落地】
+
+**来源**：项目负责人独立复审（2026-11-16）。P0-REVIEW-07 的修复成立，
+但 `_read_json()` 对合法 JSON `null` 返回 `(None, "ok")`，`load()` 只看
+`corrupt`，所以 `chapter.json = null` 仍可能静默通过；Linter 也有
+`severity: null`、`narration + fix_pages`、`reviewed_by: []`、
+`pages_actual` 未校验等缺口。
+
+**三块处理**：
+
+| 块 | 处理 |
+| --- | --- |
+| A 身份 JSON 结构 | 缺失 / 语法损坏 / 顶层类型错误三分；`chapter.json`、`novel_ref.json`、`script.json`、`script-audit.json` 存在时必须为对象；权威表必须是对象且 `chapters` 为章节对象数组；多份权威表直接拒绝；索引系列/卷号必须与本章一致 |
+| B 审计 JSON 结构 | `lint_audit()` 先验顶层对象、`audited_segments` 数组、每条记录对象；任何结构错误返回 `(sid, msg)`，不抛 traceback |
+| C Schema/Linter 对齐 | `severity=null`、`pages_actual=null` / `["p45"]`、`narration + fix_pages`、`reviewed_by=[]` 等全部拒绝；补齐 `source_type` / `review_note` / `mixed_note` / `novel_para` / `pages_declared` 类型 |
+
+**验收（逐条实跑，均为退出码 3）**：
+
+| 场景 | 命令 |
+| --- | --- |
+| `chapter.json = null` | `m1 chapter --verify` |
+| `novel_ref.json = null` | `m1 chapter --verify` |
+| `script.json = []` | `m1 chapter --verify` |
+| `script-audit.json = null` | `m1 chapter --verify` / `m1 novel lint` |
+| `audited_segments = [null]` | `m1 novel lint` |
+| `severity = null` | `m1 novel lint` |
+| `pages_actual = null` | `m1 novel lint` |
+| `pages_actual = ["p45"]` | `m1 novel lint` |
+| `narration + fix_pages` | `m1 novel lint` |
+| `reviewed_by = []` | `m1 novel lint` |
+
+**正向回归**：第一章样张 `m1 novel lint` exit 0；`m1 novel check` exit 3
+（`script/v1` 无 `source_refs`、34 beat 未确认、未签核）；10 个章级 work 与
+两卷 `chapter_index.json` 的 `--verify` 全部 exit 0。
+
+**测试**：`test_identity.py` 50 → 56 例、`test_novel.py` 78 → 89 例；
+全量 **401 tests OK (skipped=2)**（缺真实 EPUB / MOBI 各 1）。
+第一章 `review_status` 仍为 `pending_human`、`reviewed_by` 为 `null`。
+
+**边界**：P0-08 最终签核仍由项目负责人完成；本轮不替代人工签核。
 
 ---
 

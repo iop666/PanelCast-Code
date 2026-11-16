@@ -104,6 +104,8 @@ def chapter_problems(ch, series_slug=None, volume_number=None):
     `series_slug` / `volume_number` 给了就一并核对——它们是卷级常量，
     单章不该自己另写一个值。
     """
+    if not isinstance(ch, dict):
+        return [f"章节身份必须是 JSON 对象，实为 {_json_kind(ch)}"]
     out = []
     label = ch.get("chapter_uid") or ch.get("id") or "?"
     missing = [f for f in IDENTITY_FIELDS if ch.get(f) in (None, "")]
@@ -147,10 +149,23 @@ def chapter_problems(ch, series_slug=None, volume_number=None):
 
 
 def index_problems(index):
-    """整卷身份自检：逐章 + 唯一性 + 卷内编号连续。"""
-    chapters = index.get("chapters") or []
+    """整卷身份自检：逐章 + 唯一性 + 卷内编号连续。
+
+    索引是 fail-closed 的输入：顶层必须是对象，`chapters` 必须是数组，
+    每个元素必须是章节对象。结构都不对时不能调用一轮 `.get()` 然后
+    靠 traceback 告诉调用方——那既不是"通过"，也不是可读的校验错误。
+    """
+    if not isinstance(index, dict):
+        return [f"索引顶层必须是 JSON 对象，实为 {_json_kind(index)}"]
+    chapters = index.get("chapters")
+    if not isinstance(chapters, list):
+        return [f"索引的 chapters 必须是数组，实为 {_json_kind(chapters)}"]
     if not chapters:
         return ["索引里没有 chapters"]
+    bad = [(i, ch) for i, ch in enumerate(chapters) if not isinstance(ch, dict)]
+    if bad:
+        return [f"chapters[{i}] 必须是章节对象，实为 {_json_kind(ch)}"
+                for i, ch in bad]
 
     out = []
     slug = index.get("series_slug")
@@ -219,23 +234,44 @@ def find_chapter(index, key):
            ", ".join(c.get("chapter_uid") or c.get("id") for c in hits), known))
 
 
-def _read_json(path):
-    """读取 JSON，并**区分「不存在」与「损坏」**。
+def _json_kind(value):
+    """给错误信息用的 JSON 类型名。"""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "布尔值"
+    if isinstance(value, dict):
+        return "对象"
+    if isinstance(value, list):
+        return "数组"
+    if isinstance(value, str):
+        return "字符串"
+    if isinstance(value, (int, float)):
+        return "数字"
+    return type(value).__name__
 
-    返回 `(data, status)`，`status` ∈ `{"ok", "missing", "corrupt"}`。
 
-    旧实现用同一个 `None` 表示两种情况，调用方一律 `continue`——结果
+def _read_json(path, expect=None):
+    """读取 JSON，并**区分「不存在」「损坏」「顶层类型错误」**。
+
+    返回 `(data, status)`，`status` ∈ `{"ok", "missing", "corrupt",
+    "wrong_type"}`。`expect` 是期望的顶层 Python 类型（例如 `dict`）。
+
+    旧实现用同一个 `None` 表示两种失败，调用方一律 `continue`——结果
     **一份损坏的 `novel_ref.json` 会被当成不存在而静默跳过**，所谓"五处交叉
     验证"实际只验了剩下几处（P0-REVIEW-07）。缺失可能是阶段允许的，
-    损坏永远不是。
+    损坏永远不是；合法 JSON 但顶层结构不对（`null` / `[]` / `123`）同样不是。
     """
     p = pathlib.Path(path)
     if not p.exists():
         return None, "missing"
     try:
-        return json.loads(p.read_text(encoding="utf-8")), "ok"
+        data = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None, "corrupt"
+    if expect is not None and not isinstance(data, expect):
+        return data, "wrong_type"
+    return data, "ok"
 
 
 def _authority_candidates(work):
@@ -265,11 +301,20 @@ def _authority_chapters(authority):
     返回空列表表示"没有可用的权威表"。
     """
     if isinstance(authority, dict):
-        return list(authority.get("chapters") or [])
+        chapters = authority.get("chapters")
+        if not isinstance(chapters, list):
+            return []
+        return [ch for ch in chapters if isinstance(ch, dict)]
     if isinstance(authority, (set, frozenset)):
-        return [{"chapter_uid": u} for u in authority]
+        return [{"chapter_uid": u} for u in authority if isinstance(u, str)]
     if isinstance(authority, (list, tuple)):
-        return [{"chapter_uid": x} if isinstance(x, str) else x for x in authority]
+        out = []
+        for item in authority:
+            if isinstance(item, str):
+                out.append({"chapter_uid": item})
+            elif isinstance(item, dict):
+                out.append(item)
+        return out
     return []
 
 
@@ -287,12 +332,13 @@ def check_work_identity(work, authority=None):
       这是唯一的关闭方式——不能靠"恰好没找到"来静默跳过。
     - 显式 dict / list / set：直接作为权威表。
 
-    返回 `(errors, warnings)`。errors 分四类：
+    返回 `(errors, warnings)`。errors 分五类：
 
-    1. 权威表缺失、损坏、为空，或权威索引自身不合格；
-    2. 身份文件存在但 JSON 损坏（损坏不等于不存在）；
-    3. 两份文件声明了不同的 `chapter_uid`，或目录名与全书号不符；
-    4. 所有来源两两之间的冲突（**即使 `chapter.json` 缺 uid 也照样抓**），
+    1. 权威表缺失、损坏、顶层类型错误、为空，或权威索引自身不合格；
+    2. 身份文件存在但 JSON 损坏，或合法 JSON 的顶层不是对象；
+    3. 找到多份权威表（程序不替你挑哪一份才是"正确卷"）；
+    4. 两份文件声明了不同的 `chapter_uid`，或目录名与全书号不符；
+    5. 所有来源两两之间的冲突（**即使 `chapter.json` 缺 uid 也照样抓**），
        以及 uid 不在权威表里 / 在权威表里重复 / 与权威表编号不符。
 
     **五份文件自己一致也不作数**——它们可能一起抄错了一个不存在的章号。
@@ -305,11 +351,16 @@ def check_work_identity(work, authority=None):
     errors, warnings = [], []
 
     def load(name, required=False):
-        """读一个身份文件。存在但损坏 → 记 error；缺失且 required → 记 error。"""
-        data, status = _read_json(work / name)
+        """读一个身份文件。损坏 / 顶层类型错误 / 缺失且必填 → 记 error。"""
+        data, status = _read_json(work / name, expect=dict)
         if status == "corrupt":
             errors.append(f"{name} 存在但不是合法 JSON：损坏的文件不能当成不存在"
                           f"而跳过校验，否则交叉验证会悄悄少验一处")
+            return None
+        if status == "wrong_type":
+            errors.append(
+                f"{name} 存在且是合法 JSON，但顶层必须是对象，实为 "
+                f"{_json_kind(data)}；结构不合法不能当成缺失跳过")
             return None
         if status == "missing" and required:
             errors.append(f"{name} 不存在；缺了它无法核对章节身份")
@@ -321,18 +372,32 @@ def check_work_identity(work, authority=None):
     # 权威表是唯一能发现"集体一致地错"的东西，所以它不能"找不到就算了"。
     auth_doc = None
     if authority is None:
-        found = next((p for p in _authority_candidates(work) if p.exists()), None)
-        if found is None:
+        found = [p for p in _authority_candidates(work) if p.exists()]
+        if not found:
             errors.append(
                 "找不到权威章节映射表 chapter_index.json（卷级）；"
                 "五份文件自己一致也不能证明它们没有一起抄错。"
                 "确实没有权威表的临时目录必须显式传 authority=False")
             authority = False
+        elif len(found) > 1:
+            errors.append(
+                f"找到 {len(found)} 份权威章节映射表："
+                f"{'、'.join(str(p) for p in found)}；"
+                f"程序不替你挑哪一份是当前卷，请只保留一份")
+            authority = False
         else:
-            auth_doc, status = _read_json(found)
-            if status != "ok":
-                errors.append(f"权威表 {found} 无法解析（{status}）；"
+            auth_doc, status = _read_json(found[0], expect=dict)
+            if status == "wrong_type":
+                errors.append(
+                    f"权威表 {found[0]} 存在且是合法 JSON，但顶层必须是对象，"
+                    f"实为 {_json_kind(auth_doc)}；"
+                    f"结构不合法不能当成没有权威表")
+                auth_doc = None
+                authority = False
+            elif status != "ok":
+                errors.append(f"权威表 {found[0]} 无法解析（{status}）；"
                               f"损坏的权威表不能当成没有权威表")
+                auth_doc = None
                 authority = False
             else:
                 authority = auth_doc
@@ -355,6 +420,17 @@ def check_work_identity(work, authority=None):
             {**chapter, "chapter_uid": uid},
             series_slug=chapter.get("series_slug"),
             volume_number=chapter.get("volume_number")))
+
+    # 找到一份索引 ≠ 找到当前卷的索引。索引顶层声明的卷必须与本章一致，
+    # 否则一份结构完全合法、内部也自洽的**别卷**索引会被拿来当权威表。
+    if isinstance(auth_doc, dict):
+        for field, label in (("series_slug", "系列"), ("volume_number", "卷号")):
+            want = auth_doc.get(field)
+            got = chapter.get(field)
+            if want is not None and got is not None and want != got:
+                errors.append(
+                    f"权威表的 {field}={want!r} 与 chapter.json 的 {got!r} 不符："
+                    f"找到的索引不是本章所属{label}的权威表")
 
     # 目录名（ch06）指的是**全书号**，不是卷内号。
     # 章级 work 通常长这样：`m1/v2/ch06/work`——目录名在**上一层**，
@@ -439,7 +515,8 @@ def check_work_identity(work, authority=None):
                 "权威章节映射表为空或解析不出章节列表；按 fail-closed 拒绝，"
                 "不许在无权威表的情况下放行身份校验")
         elif uid:
-            matches = [c for c in auth if c.get("chapter_uid") == uid]
+            matches = [c for c in auth
+                       if isinstance(c, dict) and c.get("chapter_uid") == uid]
             if not matches:
                 known = ", ".join(sorted({str(c.get("chapter_uid")) for c in auth}))
                 errors.append(

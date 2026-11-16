@@ -28,7 +28,7 @@
 | --- | --- | --- |
 | [`WORKFLOW-v1-vertical-manga-narration.md`](WORKFLOW-v1-vertical-manga-narration.md) | **主规范**，约 2,390 行。阶段定义、JSON schema、门禁、坑 | 改任何东西之前 |
 | [`ROADMAP.md`](ROADMAP.md) | **路线图**，P0–P5。优先级唯一依据 | 决定先做什么 |
-| [`P0-execution-plan.md`](tasks/P0-execution-plan.md) | **P0 任务书**，11 项 + P0-REVIEW-04/05 + 依赖图 + 验收命令 | 执行 P0 |
+| [`P0-execution-plan.md`](tasks/P0-execution-plan.md) | **P0 任务书**，11 项 + P0-REVIEW-04…08 + 依赖图 + 验收命令 | 执行 P0 |
 | [`PROJECT-MAP.md`](PROJECT-MAP.md) | **项目地图**，真实目录树 + 工作流全景 + 诚实状态 | 想知道"东西在哪" |
 | [`PROJECT-README.md`](../README.md) | 项目根目录 README 的副本 | — |
 | [`schemas/script-audit.schema.json`](schemas/script-audit.schema.json) | **审核报告 Schema**（draft-07），§4.3.10 的机器可读形式 | 校验/写审核报告时 |
@@ -115,6 +115,26 @@
 `work.parent.parent`，**从未加载过权威表**——此前十次"正常路径通过"实际是
 "根本没校验就通过"。已修正搜索路径并补测试。
 
+### 合法 JSON ≠ 结构合法（P0-REVIEW-08）
+
+`json.loads("null")` 会成功返回 `None`。如果只区分"文件在不在"和"JSON 坏没坏"，
+那么 `chapter.json` 写成 `null` 就会被当成"还没读到章节"，身份校验静默放行。
+现在身份文件与审计报告都要先验顶层结构：
+
+| 输入 | 结果 |
+| --- | --- |
+| `chapter.json = null` / `[]` / `"wrong type"` / `123` | 章级 `--verify` 退出码 3 |
+| `novel_ref.json = null` / `script.json = []` / `script-audit.json = null` | 章级 `--verify` 退出码 3 |
+| 权威表顶层不是对象，或 `chapters` 不是章节对象数组 | 退出码 3 |
+| 同时存在多份 `chapter_index.json` | 退出码 3（不替你挑哪份是当前卷） |
+| `audited_segments = [null]` | `m1 novel lint` 退出码 3，不抛 traceback |
+| `severity = null` / `pages_actual = null` / `pages_actual = ["p45"]` | `m1 novel lint` 退出码 3 |
+| `alteration_origin=narration` + `disposition=fix_pages` | `m1 novel lint` 退出码 3 |
+| `reviewed_by = []` | `m1 novel lint` 退出码 3 |
+
+注意：`severity` 是可选字段，但"没写"合法、"写了 `null`"非法；
+Schema 里 `severity` 只有四个字符串枚举，没有 `null`。
+
 ### LF 证据链的三条边界
 
 **不许单独拿 `i/lf` 推导"所有平台工作区都是 LF"**：
@@ -143,7 +163,7 @@
 | **审核报告 Schema 校验** | `m1 novel lint`（只校格式、不要求签核） |
 | **章节身份强校验** | `m1 chapter --verify`（不一致就报错，不猜"最接近"） |
 | **第一章逐段来源审计** | 25 段 100% 审完，**未签核** |
-| 测试 | **384 tests OK (skipped=2)**（`test_novel.py` 78 例 / `test_identity.py` 50 例 / `test_lf.py` 6 例） |
+| 测试 | **401 tests OK (skipped=2)**（`test_novel.py` 89 例 / `test_identity.py` 56 例 / `test_lf.py` 6 例） |
 
 ### P0 任务状态
 
@@ -156,7 +176,7 @@
 | P0-05 | `m1 novel --align/--check` | ✅ **已完成**（含验收第 5 条补修 + lint 拆分） |
 | P0-06 | 正式出片门禁（`--draft` + 审核报告） | ⬜ 未开始 |
 | P0-07 | 文档与实现统一 | 🔄 进行中 |
-| P0-08 | 章节身份统一 | ✅ **已完成**（`chapter_uid` 为唯一权威身份，五处引用强校验） |
+| P0-08 | 章节身份统一 | 🔄 **主体完成，待最终签核**（P0-REVIEW-08 已关闭结构绕过，仍待独立复审） |
 | P0-09 | 规则冲突核查 | 🔄 部分完成（1/2/3 页映射密度未验） |
 | P0-10 | `m1 verify --visual` 三层视觉验收 | ⬜ 未开始 |
 | P0-11 | `script.json` v1→v2 迁移（含三态） | ⬜ 未开始 |
@@ -164,6 +184,7 @@
 | P0-REVIEW-05 | 四条风险落地（mixed / rewritten / scope / LF） | ✅ **已完成**（Schema 11 条条件规则 + 6 例换行复验） |
 | P0-REVIEW-06 | 身份测试矩阵 + 权威表校验 | ✅ **已完成**（七类局部错配 + CLI 端到端拒绝） |
 | P0-REVIEW-07 | fail-closed 身份 + 审计完整性 | ✅ **已完成**（权威表缺失/损坏/不合格一律拒绝；重复段落拒绝；`severity` 补齐） |
+| P0-REVIEW-08 | JSON 结构 fail-closed + Schema/Linter 对齐 | ✅ **本轮已落地**（顶层类型三分、多权威表拒绝、Linter 结构先验；10 类负例 CLI 均 exit 3） |
 
 ### 放行条件
 
@@ -179,7 +200,7 @@
 ## 复核命令（新克隆即可复现）
 
 ```bash
-python -m unittest discover -s tests     # 期望 Ran 384 tests / OK (skipped=2)
+python -m unittest discover -s tests     # 期望 Ran 401 tests / OK (skipped=2)
 python -m panelcast m1 novel lint --work m1/v1/ch01/work   # 格式校验，应通过
 python -m panelcast m1 novel check --work m1/v1/ch01/work --novel-dir <小说文本目录>
                                           # 门禁，样张应卡在第 3/4/5 步（退出码 3）

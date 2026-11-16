@@ -155,7 +155,7 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   - `chapter_index.json` schema 的状态标注（schema 已定，字段是否全部落地待核）
   - `m1 verify --visual` 在文档中尚无对应条目 → 见 P0-10
 
-- [x] **P0-08 统一章节身份**【已完成】
+- [~] **P0-08 统一章节身份**【主体已完成，待 P0-REVIEW-08 后的最终签核】
   引入全书唯一 ID，把"卷内编号 / 全书编号 / 展示标签"分开：
   ```json
   {"chapter_uid": "konosuba-manga-v02-ch06",
@@ -217,6 +217,26 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
     拒绝多余记录与未覆盖段；补齐 `severity` 枚举、必填字段与 `page_XXXX` / 哈希格式。
   - 测试：`test_identity.py` 50 例、`test_novel.py` 78 例；全量 **384 tests OK (skipped=2)**。
   - 第一章样张仍 `pending_human`，未签核。
+
+- [x] **P0-REVIEW-08 JSON 结构 fail-closed 与 Schema/Linter 完整对齐**【本轮已落地】
+  **来源**：项目负责人独立复审（2026-11-16）。结论：P0-REVIEW-07 的修复成立，
+  但发现合法 JSON 的 `null` 仍可静默绕过身份校验，且 Linter 与 Schema 仍有
+  可复现的不一致；**P0-08 暂不签最终验收**。
+  - **身份文件**：缺失 / 语法损坏 / 顶层类型错误三分。`chapter.json`、
+    `novel_ref.json`、`script.json`、`script-audit.json` 存在时顶层必须是对象；
+    `null` / `[]` / `"wrong type"` / `123` 一律报错，不再等同于"没读到"。
+  - **权威表**：`chapter_index.json` 必须是对象且 `chapters` 是章节对象数组；
+    找到多份索引直接拒绝（程序不替你挑）；索引声明的系列/卷号必须与本章一致，
+    防止"找到一份索引"被当成"找到正确卷"。
+  - **Linter**：先验顶层对象、`audited_segments` 数组、每条记录对象，再查字段；
+    `severity=null`、`pages_actual=null` / 格式错误、`narration + fix_pages`、
+    `reviewed_by=[]` 等负例一律失败，结构错误不再抛 traceback。
+  - **验收**：审核意见列出的 10 类负例全部经真实 CLI 执行，退出码均为 3；
+    第一章样张 `lint` 仍通过，`check` 在内容未审核完成时仍拦截（exit 3）。
+  - **测试**：`test_identity.py` 50 → 56 例、`test_novel.py` 78 → 89 例；
+    全量 **401 tests OK (skipped=2)**。
+  - **未变**：第一章 `review_status=pending_human`、`reviewed_by=null`；
+    第二章、九章批量、P0-06、P0-10、横版继续冻结。P0-08 最终签核仍待独立复审。
 
 - [~] **P0-09 规则冲突核查（以代码为准）**【部分完成，需补一轮】
   已核实并写进规范的冲突：

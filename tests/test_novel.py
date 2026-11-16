@@ -12,6 +12,7 @@
 
 import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -815,6 +816,149 @@ class TestAuditIntegrity(Base):
         self.assertFalse(ok)
         self.assertTrue(any("script.json" in m and "无法解析" in m for _s, m in problems),
                         problems)
+
+
+class TestStructuralFailClosed(Base):
+    """P0-REVIEW-08：合法 JSON 但结构不对，必须返回校验错误而不是 traceback。
+
+    覆盖审核意见列出的全部负例：报告顶层、`audited_segments`、逐段对象、
+    `severity=null`、`pages_actual`、`narration + fix_pages`、`reviewed_by=[]`。
+    """
+
+    PAGES = {"page_0045", "page_0046", "page_0047"}
+
+    def _base_audit(self):
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        return json.loads((self.work / "script-audit.json").read_text(encoding="utf-8"))
+
+    def _lint(self, audit):
+        return lint_audit(audit, page_set=self.PAGES)
+
+    def _text(self, problems):
+        return " ".join(m for _sid, m in problems)
+
+    def test_top_level_must_be_an_object(self):
+        for bad in (None, [], "wrong type", 123):
+            with self.subTest(value=bad):
+                self.assertIn("顶层必须是对象", self._text(lint_audit(bad)))
+
+    def test_audited_segments_must_be_an_array(self):
+        audit = self._base_audit()
+        audit["audited_segments"] = {}
+        self.assertIn("audited_segments 必须是数组", self._text(self._lint(audit)))
+
+    def test_audited_segments_entry_must_be_an_object(self):
+        audit = self._base_audit()
+        audit["audited_segments"] = [None]
+        problems = self._lint(audit)
+        self.assertIn("必须是对象", self._text(problems))
+        self.assertIn("不能把它当成一条审核记录", self._text(problems))
+
+    def test_severity_null_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"][0]["severity"] = None
+        self.assertIn("severity 非法", self._text(self._lint(audit)))
+
+    def test_pages_actual_null_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"][0]["pages_actual"] = None
+        self.assertIn("pages_actual 必须是数组", self._text(self._lint(audit)))
+
+    def test_pages_actual_bad_page_name_is_rejected(self):
+        audit = self._base_audit()
+        audit["audited_segments"][0]["pages_actual"] = ["p45"]
+        self.assertIn("page_XXXX", self._text(self._lint(audit)))
+
+    def test_narration_with_fix_pages_is_rejected(self):
+        """Schema：旁白自己编的只能 rewrite/remove，fix_pages 也不行。"""
+        audit = self._base_audit()
+        audit["audited_segments"][0].update({
+            "fidelity": "altered", "alteration_origin": "narration",
+            "disposition": "fix_pages", "status": "pending_rewrite"})
+        self.assertIn("只能改写或删除", self._text(self._lint(audit)))
+
+    def test_reviewed_by_wrong_type_is_rejected(self):
+        for bad in ([], 123, {}):
+            with self.subTest(value=bad):
+                audit = self._base_audit()
+                audit["reviewed_by"] = bad
+                self.assertIn("reviewed_by 必须是字符串或 null",
+                              self._text(self._lint(audit)))
+
+    def test_gate_returns_step5_for_structurally_invalid_audit(self):
+        """`check()` 不能在 audited_segments=[null] 上抛 AttributeError。"""
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        path = self.work / "script-audit.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["audited_segments"] = [None]
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        step5 = " ".join(m for s, m in problems if s == 5)
+        self.assertIn("必须是对象", step5)
+
+    def test_gate_returns_step5_for_null_audit(self):
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        (self.work / "script-audit.json").write_text("null\n", encoding="utf-8")
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        step5 = " ".join(m for s, m in problems if s == 5)
+        self.assertIn("顶层必须是 JSON 对象", step5)
+
+    def test_cli_returns_errors_for_every_structural_negative(self):
+        """审核意见要求的负例由真实 CLI 执行，且必须是非零退出码。"""
+        base = self._base_audit()
+        path = self.work / "script-audit.json"
+
+        def mutate(doc):
+            doc["audited_segments"][0]["severity"] = None
+
+        def mutate_entry(doc):
+            doc["audited_segments"] = [None]
+
+        def mutate_pages_actual(doc):
+            doc["audited_segments"][0]["pages_actual"] = None
+
+        def mutate_bad_page(doc):
+            doc["audited_segments"][0]["pages_actual"] = ["p45"]
+
+        def mutate_narration(doc):
+            doc["audited_segments"][0].update({
+                "fidelity": "altered", "alteration_origin": "narration",
+                "disposition": "fix_pages", "status": "pending_rewrite"})
+
+        def mutate_reviewer(doc):
+            doc["reviewed_by"] = []
+
+        cases = [
+            ("script-audit-null", None, "顶层必须是 JSON 对象"),
+            ("audited-segment-null", mutate_entry, "必须是对象"),
+            ("severity-null", mutate, "severity 非法"),
+            ("pages-actual-null", mutate_pages_actual, "pages_actual 必须是数组"),
+            ("pages-actual-bad-name", mutate_bad_page, "page_XXXX"),
+            ("narration-fix-pages", mutate_narration, "只能改写或删除"),
+            ("reviewed-by-array", mutate_reviewer, "reviewed_by 必须是字符串或 null"),
+        ]
+        for label, mutator, expected in cases:
+            with self.subTest(case=label):
+                if mutator is None:
+                    path.write_text("null\n", encoding="utf-8")
+                else:
+                    doc = json.loads(json.dumps(base))
+                    mutator(doc)
+                    path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                                    encoding="utf-8")
+                r = subprocess.run(
+                    [sys.executable, "-m", "panelcast", "m1", "novel", "lint",
+                     "--work", str(self.work)],
+                    cwd=str(ROOT), capture_output=True, text=True)
+                self.assertEqual(r.returncode, 3,
+                                 f"{label}: stderr={r.stderr}\nstdout={r.stdout}")
+                self.assertIn(expected, r.stderr)
 
 
 class TestSchemaFile(unittest.TestCase):

@@ -296,7 +296,7 @@ def _m1_novel(args):
 
     from .novel import (
         GateError,
-        _read_json,
+        _read_json_checked,
         build_novel_ref,
         chapter_pages,
         check,
@@ -323,10 +323,9 @@ def _m1_novel(args):
         except GateError:
             segs = None
         try:
-            audit = _read_json(audit_path)
-        except (OSError, ValueError) as exc:
-            print(f"error: {audit_path} 存在但无法解析（{exc}）；"
-                  f"损坏的文件不能当成不存在", file=sys.stderr)
+            audit = _read_json_checked(audit_path, "script-audit.json")
+        except GateError as exc:
+            print(str(exc), file=sys.stderr)
             return 3
         problems = lint_audit(audit, segs=segs, page_set=page_set)
         if not problems:

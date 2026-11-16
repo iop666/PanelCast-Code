@@ -586,5 +586,115 @@ class TestFailClosed(unittest.TestCase):
         self.assertIn("找不到权威章节映射表", r.stderr)
 
 
+class TestWrongTopLevelTypes(unittest.TestCase):
+    """P0-REVIEW-08：合法 JSON 的 `null` / `[]` / `123` 不能静默绕过身份校验。
+
+    损坏（语法错误）与不存在是两种失败；顶层类型错误是第三种。
+    这三种都必须报错，且错误信息要能区分。
+    """
+
+    UID = "konosuba-manga-v02-ch06"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write(self, folder, name, doc):
+        folder = Path(folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_text(
+            json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _work(self, authority=True):
+        work = self.root / "ch06" / "work"
+        work.mkdir(parents=True)
+        self._write(work, "chapter.json", chapter())
+        if authority:
+            self._write(self.root, "chapter_index.json", index_of(chapter()))
+        return work
+
+    def _errors(self, work):
+        errors, _warnings = check_work_identity(work)
+        return errors
+
+    def test_chapter_json_wrong_top_level_types_are_rejected(self):
+        work = self._work()
+        for bad in (None, [], "wrong type", 123):
+            with self.subTest(value=bad):
+                self._write(work, "chapter.json", bad)
+                joined = " | ".join(self._errors(work))
+                self.assertIn("chapter.json", joined)
+                self.assertIn("顶层必须是对象", joined)
+                self.assertIn("合法 JSON", joined)
+
+    def test_other_identity_files_wrong_top_level_types_are_rejected(self):
+        work = self._work()
+        cases = [("novel_ref.json", None), ("script.json", []),
+                 ("script-audit.json", None), ("script-audit.json", 123)]
+        for name, bad in cases:
+            with self.subTest(file=name, value=bad):
+                self._write(work, name, bad)
+                joined = " | ".join(self._errors(work))
+                self.assertIn(name, joined)
+                self.assertIn("顶层必须是对象", joined)
+                (work / name).unlink()
+
+    def test_authority_table_wrong_top_level_types_are_rejected(self):
+        work = self._work(authority=False)
+        for bad in (None, [], "wrong type", 123):
+            with self.subTest(value=bad):
+                self._write(self.root, "chapter_index.json", bad)
+                joined = " | ".join(self._errors(work))
+                self.assertIn("权威表", joined)
+                self.assertIn("顶层必须是对象", joined)
+
+    def test_authority_chapters_must_be_an_array_of_objects(self):
+        work = self._work(authority=False)
+        cases = [
+            ("chapters-not-array",
+             {"series_slug": "konosuba-manga", "volume_number": 2,
+              "chapters": "ch06"}),
+            ("chapter-entry-null",
+             {"series_slug": "konosuba-manga", "volume_number": 2,
+              "chapters": [None]}),
+        ]
+        for label, doc in cases:
+            with self.subTest(case=label):
+                self._write(self.root, "chapter_index.json", doc)
+                joined = " | ".join(self._errors(work))
+                self.assertIn("权威索引自身不合格", joined)
+                self.assertTrue("chapters" in joined, joined)
+
+    def test_multiple_authority_tables_are_rejected(self):
+        """找到一份索引 ≠ 找到正确卷：多份并存时不许程序挑。"""
+        work = self._work()
+        self._write(work, "chapter_index.json", index_of(chapter()))
+        joined = " | ".join(self._errors(work))
+        self.assertIn("找到 2 份权威章节映射表", joined)
+
+    def test_cli_rejects_wrong_top_level_types(self):
+        """负例必须真实经过 CLI，而不是只在函数级测试里成立。"""
+        self._write(self.root, "chapter_index.json", index_of(chapter()))
+        cases = [("chapter.json", None), ("novel_ref.json", None),
+                 ("script.json", []), ("script-audit.json", None)]
+        for i, (name, bad) in enumerate(cases):
+            with self.subTest(file=name, value=bad):
+                work = self.root / f"case{i}" / "work"
+                work.mkdir(parents=True)
+                self._write(work, "chapter.json", chapter())
+                self._write(work, name, bad)
+                r = subprocess.run(
+                    [sys.executable, "-m", "panelcast", "m1", "chapter",
+                     "--verify", "--work", str(work)],
+                    cwd=str(ROOT), capture_output=True, text=True)
+                self.assertEqual(r.returncode, 3,
+                                 f"stderr={r.stderr}\nstdout={r.stdout}")
+                self.assertIn(name, r.stderr)
+                self.assertIn("顶层必须是对象", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

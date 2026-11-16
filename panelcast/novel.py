@@ -119,23 +119,47 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def _json_kind(value):
+    """给错误信息用的 JSON 类型名。"""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "布尔值"
+    if isinstance(value, dict):
+        return "对象"
+    if isinstance(value, list):
+        return "数组"
+    if isinstance(value, str):
+        return "字符串"
+    if isinstance(value, (int, float)):
+        return "数字"
+    return type(value).__name__
+
+
 def _read_json(path):
     return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
 
 
-def _read_json_checked(path, label=None):
-    """读 JSON；文件损坏抛 `GateError`（而不是裸 `ValueError`）。
+def _read_json_checked(path, label=None, expect=dict):
+    """读 JSON；文件损坏或顶层类型不对抛 `GateError`。
 
     门禁的职责是把"某一步失败"讲清楚，而不是让 CLI 崩在 traceback 里。
     **损坏 ≠ 不存在**：不存在由调用方按阶段规则处理，损坏必须报错。
+    **合法 JSON 也不等于结构合法**：`null` / `[]` / `123` 能解析，
+    但顶部不是对象，不能继续 `.get()`。
     """
     p = pathlib.Path(path)
     try:
-        return _read_json(p)
+        doc = _read_json(p)
     except (OSError, ValueError) as exc:
         raise GateError(
             f"error: {label or p.name} 存在但无法解析（{exc}）；"
             f"损坏的文件不能当成不存在") from exc
+    if expect is not None and not isinstance(doc, expect):
+        raise GateError(
+            f"error: {label or p.name} 顶层必须是 JSON 对象，实为 "
+            f"{_json_kind(doc)}；合法 JSON 不等于结构合法")
+    return doc
 
 
 def load_novel(novel_dir):
@@ -392,6 +416,9 @@ def lint_audit(audit, segs=None, page_set=None):
     返回 `[(segment_id 或 None, msg)]`，空列表表示格式合法。
     """
     out = []
+    if not isinstance(audit, dict):
+        return [(None, f"审核报告顶层必须是对象（JSON object），实为 "
+                       f"{_json_kind(audit)}；合法 JSON 不等于结构合法")]
     if audit.get("schema") != AUDIT_SCHEMA:
         out.append((None, f"schema 应为 {AUDIT_SCHEMA!r}，实为 {audit.get('schema')!r}"))
     scope = audit.get("judgement_scope")
@@ -406,17 +433,21 @@ def lint_audit(audit, segs=None, page_set=None):
         out.append((None, f"review_status 非法：{rs!r}；只能是 "
                           f"{'/'.join(sorted(REVIEW_STATUSES))}"))
     reviewer = audit.get("reviewed_by")
+    if ("reviewed_by" in audit and reviewer is not None
+            and not isinstance(reviewer, str)):
+        out.append((None, f"reviewed_by 必须是字符串或 null，实为 "
+                          f"{_json_kind(reviewer)}"))
     if rs == "approved":
-        if not str(reviewer or "").startswith("human:"):
+        if not isinstance(reviewer, str) or not reviewer.startswith("human:"):
             out.append((None, f"review_status=approved 时 reviewed_by 必须是 "
                               f"human:<name>，实为 {reviewer!r}"))
         # 机器出结论、机器签名 = 自己给自己发合格证。
         # `status=rewritten` 只是"改过了"，**不等于**"通过了"；
         # 从 rewritten 到 approved 只能由另一只手完成。
-        if reviewer and reviewer == audit.get("prepared_by"):
+        if isinstance(reviewer, str) and reviewer and reviewer == audit.get("prepared_by"):
             out.append((None, f"reviewed_by 与 prepared_by 相同（{reviewer!r}）："
                               f"改写完成不等于审核通过，签名必须是另一只手"))
-    elif reviewer:
+    elif reviewer is not None:
         out.append((None, f"review_status={rs!r} 却已填 reviewed_by={reviewer!r}；"
                           f"没签核就不许留签名"))
 
@@ -435,6 +466,22 @@ def lint_audit(audit, segs=None, page_set=None):
             out.append((None, f"缺必填字段 {req!r}"))
     if "reviewed_by" not in audit:
         out.append((None, "缺必填字段 'reviewed_by'（未签核时必须显式写 null）"))
+    for field in ("audit_spec_version", "chapter_uid"):
+        v = audit.get(field)
+        if v is not None and not isinstance(v, str):
+            out.append((None, f"{field} 必须是字符串，实为 {_json_kind(v)}"))
+    if "reviewed_at" in audit:
+        v = audit.get("reviewed_at")
+        if v is not None and not isinstance(v, str):
+            out.append((None, f"reviewed_at 必须是字符串或 null，实为 {_json_kind(v)}"))
+    for field in ("prepared_by", "prepared_at", "notes"):
+        if field in audit and not isinstance(audit.get(field), str):
+            out.append((None, f"{field} 必须是字符串，实为 "
+                              f"{_json_kind(audit.get(field))}"))
+    for field in ("coverage", "schema_migration"):
+        if field in audit and not isinstance(audit.get(field), dict):
+            out.append((None, f"{field} 必须是对象，实为 "
+                              f"{_json_kind(audit.get(field))}"))
     ss = audit.get("script_schema")
     if ss is not None and ss not in SCRIPT_SCHEMAS:
         out.append((None, f"script_schema 非法：{ss!r}；"
@@ -445,7 +492,15 @@ def lint_audit(audit, segs=None, page_set=None):
             out.append((None, f"{field} 必须是 64 位小写十六进制，"
                               f"实为 {str(v)[:20]!r}…"))
 
-    records = audit.get("audited_segments") or []
+    raw_records = audit.get("audited_segments")
+    if "audited_segments" not in audit:
+        records = []
+    elif not isinstance(raw_records, list):
+        out.append((None, f"audited_segments 必须是数组，实为 "
+                          f"{_json_kind(raw_records)}"))
+        records = []
+    else:
+        records = raw_records
     if not records:
         out.append((None, "audited_segments 为空：没有任何逐段审核记录"))
 
@@ -453,8 +508,17 @@ def lint_audit(audit, segs=None, page_set=None):
     # 这不是格式问题，是审计记录完整性问题：一条自相矛盾的记录排在前面、
     # 一条合法记录排在后面，dict 一覆盖就"看起来全对"（P0-REVIEW-07）。
     audited, order, dups = {}, [], []
-    for rec in records:
+    for idx, rec in enumerate(records):
+        if not isinstance(rec, dict):
+            out.append((f"第 {idx} 项", f"audited_segments[{idx}] 必须是对象，实为 "
+                                        f"{_json_kind(rec)}；不能把它当成一条审核记录"))
+            continue
         sid = rec.get("segment_id")
+        if not isinstance(sid, str):
+            out.append((f"第 {idx} 项", f"segment_id 必须是字符串，实为 "
+                                        f"{_json_kind(sid)}"))
+            out.extend((None, m) for m in _lint_segment(None, rec, page_set))
+            continue
         if sid in audited:
             dups.append(sid)
         else:
@@ -467,7 +531,7 @@ def lint_audit(audit, segs=None, page_set=None):
                           f"不接受 first-wins / last-wins"))
 
     for sid in order:
-        if not SEG_ID_RE.match(str(sid or "")):
+        if not SEG_ID_RE.match(sid):
             out.append((sid, f"segment_id 格式非法：{sid!r}；应为 seg_XXXX（四位数字）"))
         out.extend((sid, m) for m in _lint_segment(sid, audited[sid], page_set))
 
@@ -497,9 +561,13 @@ def _lint_segment(sid, rec, page_set):
     disp = rec.get("disposition")
     status = rec.get("status")
     raw_pages = rec.get("pages_declared")
-    pages = raw_pages if isinstance(raw_pages, list) else []
-    if raw_pages is not None and not isinstance(raw_pages, list):
-        out.append("pages_declared 必须是数组")
+    pages = []
+    if "pages_declared" in rec:
+        if isinstance(raw_pages, list):
+            pages = raw_pages
+        else:
+            out.append(f"pages_declared 必须是数组，实为 "
+                       f"{_json_kind(raw_pages)}")
 
     # ---- 与 Schema 对齐：必填、枚举、格式 ----
     # 以前只查了 fidelity/status/disposition 三个枚举，`severity` 的 enum 写在
@@ -508,18 +576,35 @@ def _lint_segment(sid, rec, page_set):
                 "disposition", "evidence"):
         if rec.get(req) in (None, ""):
             out.append(f"缺必填字段 {req!r}")
-    sev = rec.get("severity")
-    if sev is not None and sev not in SEVERITIES:
-        out.append(f"severity 非法：{sev!r}；只能是 {'/'.join(sorted(SEVERITIES))}")
+    # `severity` 是可选字段；但只要写了，就必须是 enum 成员。
+    # `null` 不是 enum 成员——"没写"和"写了 null"必须区分。
+    if "severity" in rec:
+        sev = rec.get("severity")
+        if sev not in SEVERITIES:
+            out.append(f"severity 非法：{sev!r}；只能是 "
+                       f"{'/'.join(sorted(SEVERITIES))}")
     sha = rec.get("text_sha256")
-    if sha not in (None, "") and not SHA256_RE.match(str(sha)):
+    if sha not in (None, "") and (not isinstance(sha, str)
+                                  or not SHA256_RE.match(sha)):
         out.append(f"text_sha256 必须是 64 位小写十六进制，实为 {str(sha)[:20]!r}…")
-    para = rec.get("novel_para")
-    if para is not None and not isinstance(para, list):
-        out.append("novel_para 必须是数组")
+    if "novel_para" in rec and not isinstance(rec.get("novel_para"), list):
+        out.append(f"novel_para 必须是数组，实为 "
+                   f"{_json_kind(rec.get('novel_para'))}")
     for p in pages:
-        if not PAGE_RE.match(str(p)):
+        if not isinstance(p, str) or not PAGE_RE.match(p):
             out.append(f"pages_declared 里 {p!r} 不符合 page_XXXX 格式")
+    if "pages_actual" in rec:
+        actual = rec.get("pages_actual")
+        if not isinstance(actual, list):
+            out.append(f"pages_actual 必须是数组，实为 {_json_kind(actual)}")
+        else:
+            for p in actual:
+                if not isinstance(p, str) or not PAGE_RE.match(p):
+                    out.append(f"pages_actual 里 {p!r} 不符合 page_XXXX 格式")
+    for field in ("source_type", "review_note"):
+        if field in rec and not isinstance(rec.get(field), str):
+            out.append(f"{field} 必须是字符串，实为 "
+                       f"{_json_kind(rec.get(field))}")
 
     if fid not in FIDELITIES:
         out.append(f"fidelity 非法：{fid!r}；只能是 {'/'.join(sorted(FIDELITIES))}")
@@ -532,6 +617,9 @@ def _lint_segment(sid, rec, page_set):
         out.append(f"disposition 非法：{disp!r}；只能是 {'/'.join(sorted(DISPOSITIONS))}")
 
     # ---- alteration_origin：只在"有差异"时才有值 ----
+    if origin is not None and not isinstance(origin, str):
+        out.append(f"alteration_origin 必须是字符串或 null，实为 "
+                   f"{_json_kind(origin)}")
     if fid == "altered":
         if origin not in ALTERATION_ORIGINS:
             out.append(f"fidelity=altered 但 alteration_origin={origin!r}；"
@@ -546,8 +634,10 @@ def _lint_segment(sid, rec, page_set):
                    f"实为 {origin!r}")
 
     # ---- 证据：alteration_origin 不能代替来源引用 ----
-    if not str(rec.get("evidence") or "").strip():
-        out.append("evidence 为空：判定必须给出可核对的人读证据")
+    evidence = rec.get("evidence")
+    if not isinstance(evidence, str) or not evidence.strip():
+        out.append(f"evidence 必须是字符串且非空，实为 {_json_kind(evidence)}；"
+                   f"判定必须给出可核对的人读证据")
     if fid in ("drawn", "altered") and not pages:
         out.append(f"fidelity={fid!r} 必须给出 pages_declared（旁白描述了画面，"
                    f"就得指得出是哪几页）")
@@ -556,6 +646,9 @@ def _lint_segment(sid, rec, page_set):
                    f"「漫画改的」本身就是一条关于画面的断言，必须附页码")
     # `mixed` 是最容易被当成逃生门的分类：一句"又像漫画又像原创"就绕过了举证。
     # 所以要求把新增部分**单独写出来**，不许混在 evidence 里含糊带过。
+    if "mixed_note" in rec and not isinstance(rec.get("mixed_note"), str):
+        out.append(f"mixed_note 必须是字符串，实为 "
+                   f"{_json_kind(rec.get('mixed_note'))}")
     if origin == "mixed" and not str(rec.get("mixed_note") or "").strip():
         out.append("alteration_origin=mixed 必须填 mixed_note，"
                    "写明哪部分是漫画给的、哪部分是旁白新增的；"
@@ -568,18 +661,19 @@ def _lint_segment(sid, rec, page_set):
             out.append(f"pages_declared 里有本章不存在的页：{_preview(bad)}")
 
     # ---- 状态与决定不许互相矛盾 ----
-    if status == "approved" and disp not in (None, "keep"):
+    if status == "approved" and disp != "keep":
         out.append(f"status=approved 却 disposition={disp!r}：通过了就不该还挂着要改")
-    if status == "removed" and disp not in (None, "remove"):
+    if status == "removed" and disp != "remove":
         out.append(f"status=removed 却 disposition={disp!r}")
-    # 旁白自己编的东西只能改或删，不许"保留"——保留就等于承认这段无来源。
-    if origin == "narration" and disp == "keep":
-        out.append("alteration_origin=narration 却 disposition=keep："
-                   "旁白自己编的内容不能保留，只能改写或删除")
-    # `unknown` 不是结论，不能据它放行某一段。
-    if origin == "unknown" and status == "approved":
-        out.append("alteration_origin=unknown 却 status=approved："
-                   "来源没查清不能判通过")
+    # Schema：origin=narration 时 disposition 只能是 rewrite/remove。
+    # 只拒绝 keep 会放过 fix_pages——旁白自己编的内容改页码并不能让它有来源。
+    if origin == "narration" and disp not in ("rewrite", "remove"):
+        out.append(f"alteration_origin=narration 却 disposition={disp!r}："
+                   f"旁白自己编的内容不能保留，只能改写或删除（rewrite/remove）")
+    # `unknown` 不是结论，不能据它放行某一段（Schema 只允许待改写或删除）。
+    if origin == "unknown" and status not in ("pending_rewrite", "removed"):
+        out.append(f"alteration_origin=unknown 却 status={status!r}："
+                   f"来源没查清，不许签核通过，只能是 pending_rewrite 或 removed")
     return out
 
 
@@ -725,6 +819,9 @@ def _check_audit(work, ref_path, ref, segs, schema):
         audit = _read_json_checked(audit_path, "script-audit.json")
     except GateError as exc:
         return [(5, str(exc))]
+    if not isinstance(audit, dict):
+        return [(5, f"{sid}: {msg}" if sid else msg)
+                for sid, msg in lint_audit(audit, segs=segs)]
 
     try:
         _cdoc, pages = chapter_pages(work)
@@ -754,7 +851,10 @@ def _check_audit(work, ref_path, ref, segs, schema):
     if audit.get("review_status") != "approved":
         out.append((5, f"review_status={audit.get('review_status')!r}，只有 approved 允许出片"))
 
-    audited = {a.get("segment_id"): a for a in audit.get("audited_segments") or []}
+    raw_segments = audit.get("audited_segments")
+    audited = ({a.get("segment_id"): a for a in raw_segments
+                if isinstance(a, dict)}
+               if isinstance(raw_segments, list) else {})
     for sid, text in segs:
         rec = audited.get(sid)
         if not rec:

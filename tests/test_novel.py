@@ -94,6 +94,13 @@ def write_chapter_work(dirpath, pages=("page_0045", "page_0046", "page_0047"),
         "volume": "漫画 第1卷", "id": "ch02", "number": "第二章",
         "title": "替华美的高阶职业带来愉悦！",
         "label": "第二章 替华美的高阶职业带来愉悦！",
+        # 身份字段（P0-08）：chapter_uid 是唯一权威身份，
+        # id / number 只作兼容与展示，必须与它自洽。
+        "chapter_uid": "konosuba-manga-v01-ch02",
+        "series_slug": "konosuba-manga",
+        "volume_number": 1,
+        "global_chapter_number": 2,
+        "volume_chapter_number": 2,
         "start_page": 45, "end_page": 47, "page_count": len(pages),
         "pages": list(pages), "source_work": "m1/v1/work",
     }
@@ -569,12 +576,38 @@ class TestAuditSchema(Base):
             "pages_declared": []}})
         self.assertIn("pages_declared 为空", self._text(problems))
 
-    def test_mixed_and_unknown_are_accepted(self):
-        for origin in ("mixed", "unknown"):
-            with self.subTest(origin=origin):
-                problems = self._lint(seg_extra={"seg_0001": {
-                    "fidelity": "altered", "alteration_origin": origin}})
-                self.assertEqual(problems, [], self._text(problems))
+    def test_mixed_without_note_is_rejected(self):
+        """`mixed` 最容易变成逃生门：一句"又像漫画又像原创"就绕过举证。"""
+        problems = self._lint(seg_extra={"seg_0001": {
+            "fidelity": "altered", "alteration_origin": "mixed"}})
+        self.assertIn("mixed_note", self._text(problems))
+
+    def test_mixed_with_note_is_accepted(self):
+        problems = self._lint(seg_extra={"seg_0001": {
+            "fidelity": "altered", "alteration_origin": "mixed",
+            "mixed_note": "漫画 p45 给了摔进店里的动作，旁白自己加了「撞翻一排货架」"}})
+        self.assertEqual(problems, [], self._text(problems))
+
+    def test_unknown_cannot_be_approved(self):
+        """`unknown` 是"还没查清"，不是结论——有它就整份不许签核。"""
+        problems = self._lint(seg_extra={"seg_0001": {
+            "fidelity": "altered", "alteration_origin": "unknown"}})
+        self.assertIn("不许签核通过", self._text(problems))
+
+    def test_unknown_is_allowed_as_an_open_question(self):
+        """但允许先记下来等查：pending_rewrite + 未签核时它是合法的。"""
+        problems = self._lint(
+            review_status="pending_human", reviewed_by=None,
+            seg_extra={"seg_0001": {
+                "fidelity": "altered", "alteration_origin": "unknown",
+                "status": "pending_rewrite", "disposition": "rewrite"}})
+        self.assertEqual(problems, [], self._text(problems))
+
+    def test_narration_origin_cannot_be_kept(self):
+        """旁白自己编的却判保留，等于承认这段没有来源。"""
+        problems = self._lint(seg_extra={"seg_0001": {
+            "fidelity": "altered", "alteration_origin": "narration"}})
+        self.assertIn("只能改写或删除", self._text(problems))
 
     def test_missing_judgement_scope_is_rejected(self):
         problems = self._lint(drop=("judgement_scope",))
@@ -602,6 +635,24 @@ class TestAuditSchema(Base):
         problems = self._lint(seg_extra={"seg_0001": {
             "pages_declared": ["page_0099"]}})
         self.assertIn("page_0099", self._text(problems))
+
+    def test_machine_cannot_sign_its_own_work(self):
+        """机器出结论、机器签名 = 自己给自己发合格证。"""
+        ref = self._v2_ready()
+        audit = write_audit(self.work, ref, schema="script/v2",
+                            reviewed_by="human:executor")
+        audit["prepared_by"] = "human:executor"
+        path = self.work / "script-audit.json"
+        path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
+        problems = lint_audit(audit, page_set=self.PAGES)
+        self.assertIn("另一只手", self._text(problems))
+
+    def test_rewritten_does_not_imply_approved(self):
+        """改完了仍可停在 pending_human——这是合法组合，不许被当成"未完成"报错。"""
+        problems = self._lint(
+            review_status="pending_human", reviewed_by=None,
+            seg_extra={"seg_0001": {"status": "rewritten"}})
+        self.assertEqual(problems, [], self._text(problems))
 
     def test_approved_with_rewrite_disposition_is_contradictory(self):
         problems = self._lint(seg_extra={"seg_0001": {"disposition": "rewrite"}})
@@ -641,6 +692,17 @@ class TestSchemaFile(unittest.TestCase):
     def test_review_status_enum_matches(self):
         self.assertEqual(set(self.schema["properties"]["review_status"]["enum"]),
                          REVIEW_STATUSES)
+
+    def test_mixed_note_is_declared(self):
+        """`mixed` 必须要求单独说明新增部分，否则它就是个逃生门。"""
+        self.assertIn("mixed_note", self.seg["properties"])
+
+    def test_conditional_rules_cover_the_three_risky_origins(self):
+        """条件规则不能只是摆设：mixed / narration / unknown 各自都要有一条。"""
+        text = json.dumps(self.seg["allOf"], ensure_ascii=False)
+        for origin in ("mixed", "narration", "unknown"):
+            self.assertIn(f'"{origin}"', text, f"缺 {origin} 的条件规则")
+        self.assertIn("mixed_note", text)
 
     def test_judgement_scope_matches(self):
         self.assertEqual(self.schema["properties"]["judgement_scope"]["const"],

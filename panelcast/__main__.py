@@ -178,25 +178,59 @@ def cmd_m1(args):
 
 
 def _m1_chapter(args):
-    """S2：测量每页 → 分隔页检测 + labels → chapter_index.json。"""
+    """S2：测量每页 → 分隔页检测 + labels → chapter_index.json。
+
+    `--verify` 只做身份核对，不重新测量（P0-08）。
+    """
     from .chapters import (
         build_index,
+        load_index,
         load_labels,
         measure_pages,
         require_confirmed,
         write_index,
     )
+    from .identity import IdentityError, check_work_identity, require_index_identity
 
     work = Path(args.work)
+
+    if getattr(args, "verify", False):
+        # 两种入口：卷级 work（有 chapter_index.json）或章级 work（有 chapter.json）
+        if (work / "chapter_index.json").exists():
+            try:
+                index = require_index_identity(load_index(work))
+            except IdentityError as exc:
+                print(str(exc), file=sys.stderr)
+                return 3
+            print(f"chapter --verify: {len(index['chapters'])} 章身份合格 -> "
+                  f"{work / 'chapter_index.json'}")
+            for ch in index["chapters"]:
+                print(f"  {ch['chapter_uid']}  id={ch['id']}  "
+                      f"{ch['number']}  p{ch['start_page']}-{ch['end_page']}")
+            return 0
+        errors, warnings = check_work_identity(work)
+        for w in warnings:
+            print(f"  warn: {w}", file=sys.stderr)
+        if errors:
+            print(f"error: 章节身份不一致（{len(errors)} 项）：", file=sys.stderr)
+            for e in errors:
+                print(f"  - {e}", file=sys.stderr)
+            return 3
+        print(f"chapter --verify: 身份一致 -> {work}")
+        return 0
+
     rows = measure_pages(work)
     labels = load_labels(args.labels) if args.labels else None
     index = build_index(rows, labels=labels,
                         series=getattr(args, "series", "") or "",
-                        volume=getattr(args, "volume", "") or "")
+                        volume=getattr(args, "volume", "") or "",
+                        series_slug=getattr(args, "series_slug", None),
+                        volume_number=getattr(args, "volume_number", None))
     path = write_index(work, index)
     for ch in index["chapters"]:
         mark = "" if ch["confirmed"] else "  (未确认)"
-        print(f"{ch['id']} {ch['label_zh'] or '?'} "
+        uid = ch.get("chapter_uid") or "（无 uid）"
+        print(f"{uid} {ch['id']} {ch['label_zh'] or '?'} "
               f"p{ch['start_page']}-{ch['end_page']} "
               f"({ch['page_count']}p){mark}")
     print(f"detected divider starts: {index['detected_starts']}")
@@ -547,8 +581,14 @@ def main(argv=None):
                            help="章节标签 JSON（人工确认过的边界与标题）")
     m1chapter.add_argument("--series", default="", help="系列名，写进 index")
     m1chapter.add_argument("--volume", default="", help="卷名，写进 index")
+    m1chapter.add_argument("--series-slug", default=None,
+                           help="系列 ASCII slug（进 chapter_uid），如 konosuba-manga")
+    m1chapter.add_argument("--volume-number", type=int, default=None,
+                           help="卷号（整数，进 chapter_uid）；不给则从 --volume 解析")
     m1chapter.add_argument("--require-confirmed", action="store_true",
                            help="有未确认章时退出码 3")
+    m1chapter.add_argument("--verify", action="store_true",
+                           help="只核对章节身份，不重新测量（P0-08）")
 
     m1slice = m1sub.add_parser(
         "slice", help="按章组装章级 work 目录（pages/ + chapter.json）",

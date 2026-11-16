@@ -191,6 +191,26 @@
 3. 新增测试：两卷各一章用 `chapter_uid` 查找成功；传 `ch01` 给第二卷能正确解析为「第六章」；
 4. `m1 slice` 用 `--chapter 第六章` 与 `--chapter konosuba-manga-v02-ch06` 结果一致。
 
+**执行结果【已完成】**
+
+| 项 | 结果 |
+| --- | --- |
+| 身份模块 | `panelcast/identity.py`（uid 生成/解析、单章自洽、整卷自洽、跨文件核对） |
+| 命令行 | `m1 chapter --verify`（卷级验索引、章级验跨文件） |
+| 门禁 | `m1 novel check` 第 1 步先验身份 |
+| 数据迁移 | 2 份索引 + 10 份 `chapter.json` + 2 份 labels 全部补齐 |
+| 实测 | 两卷索引 + 十个章级 work `--verify` 全过 |
+| 测试 | `tests/test_identity.py` 31 例 + `tests/test_lf.py` 6 例；全量 **351 tests OK (skipped=2)** |
+
+**审核意见里的反例已写成测试**（`test_counter_example_from_review`）：
+目录 `ch06` + `chapter.json` 说 A + `novel_ref` 说 B + `script-audit` 说 C
+→ 报错，且报错信息里 A/B/C 与基准值全部出现。**不选"最接近的"。**
+
+**一个刻意的取舍**：`id` 仍保留 `ch01–ch05`（卷内），**目录名不改**。
+理由是改名要动十处路径与所有引用，而身份统一并不需要改目录——
+需要的是"目录名的含义固定为全书号"并且**被校验**。
+`m1/v2/ch09` 里放第六章的 `chapter.json` 会立刻报错，这就够了。
+
 ---
 
 ### P0-05 `m1 novel --align` / `--check`
@@ -285,6 +305,32 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 8. `docs/schemas/script-audit.schema.json` 的枚举与代码常量一致（防两边分叉）。
 
 **不做**：不改任何一段旁白（改写属 P0-03）；不签核（只能由人做）；不碰 `m1 run`。
+
+---
+
+### P0-REVIEW-05 审核口径补强【已完成】
+
+**来源**：项目负责人对 `77735c0` 的复审，点出四个"应该锁住"的风险。
+这四个都不是"本轮一定错了"，而是"以后会错"。
+
+| # | 风险 | 处理 |
+| --- | --- | --- |
+| 1 | `mixed` 变成逃避举证的逃生门 | 新增必填字段 `mixed_note`，要求分开写"漫画给的"与"旁白新增的"；`mixed` 也必须给 `pages_declared` |
+| 2 | `rewritten` 被当成 `approved` | 规则：`rewritten` + `pending_human` 是**合法**组合；`reviewed_by` 不得等于 `prepared_by`（机器不许给自己发合格证） |
+| 3 | `judgement_scope` 只是字符串 | Schema 里是 `const`；`lint` 拒绝错值；`check` 第 4 步验 novel_ref 的另一个值；**审核报告里出现 `beats` 等 novel_ref 专有字段直接报错**（两层混在一份文件里） |
+| 4 | `.gitattributes` 没做过新克隆复验 | 新增 `tests/test_lf.py`：造临时仓库，用 `autocrlf=true/input/false` 三种设置分别克隆，逐字节比对；**另加反证**——去掉 `.gitattributes` 后 `autocrlf=true` 确实会把 LF 变成 CRLF，证明前一条不是空跑 |
+
+**额外收紧的两条**（顺着同一逻辑推出来的）：
+
+- `narration` + `disposition=keep` → 报错。旁白自己编的内容保留，等于承认这段没有来源。
+- `unknown` + `status=approved` → 报错；有 `unknown` 时整份不许 `review_status=approved`。
+  `unknown` 是待办，不是结论。
+
+**边界说明（诚实版）**：本机只有 Windows，Linux 侧无法实跑。
+但 Linux 的默认 `core.autocrlf` 是 `false`（或 `input`），两者都在覆盖范围内；
+真正决定检出结果的是 `.gitattributes` 而不是操作系统。
+真仓库那条用例用 `--depth 1 --no-local` 克隆当前仓库、比 `novel_ref` 与 `script-audit`
+的字节哈希，跑在 `autocrlf=true` 下——这是最接近"新克隆"的验证。
 
 ---
 

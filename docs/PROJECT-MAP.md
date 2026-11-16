@@ -38,13 +38,15 @@
 ```
 PanelCast\
 │
-├── panelcast/                      【跑通】代码，3,784 行，仅标准库
-│   ├── __main__.py          510   CLI 入口（ingest / m1 slice|panels|edit|run|verify）
+├── panelcast/                      【跑通】代码，5,384 行，仅标准库
+│   ├── novel.py             674   S5a 底稿对齐 + script-audit 校验（m1 novel）
+│   ├── __main__.py          657   CLI 入口（ingest / m1 slice|panels|edit|run|verify|novel|chapter）
 │   ├── timeline.py          514   时间轴：段时长、页窗口、切页同步
 │   ├── panels.py            435   分格检测（行/列投影 + Otsu）+ ffmpeg 定位
+│   ├── chapters.py          386   章节定界 + 按章切 work（m1 slice）
 │   ├── verify.py            385   成片 15 条验收，出 run_report.json
-│   ├── chapters.py          327   章节定界 + 按章切 work（m1 slice）
 │   ├── render.py            321   逐页画布 → concat → 烧字幕
+│   ├── identity.py          303   章节身份：uid 生成/解析 + 跨文件强校验（P0-08）
 │   ├── profile.py           303   介绍页 schema 校验（§6.6 八条门禁）
 │   ├── tts.py               295   edge-tts，stream() 收句锚点
 │   ├── profile_auto.py      279   介绍页**骨架**生成（内容留空，见 §5）
@@ -57,7 +59,7 @@ PanelCast\
 │       ├── server.py              HTTP + 分格/介绍页读写
 │       └── static/index.html      浏览器界面（两个页签）
 │
-├── tests/                          【跑通】15 个文件 / 306 用例 / OK(skipped=2)
+├── tests/                          【跑通】18 个文件 / 351 用例 / OK(skipped=2)
 │
 ├── tools/                          三个不进 CLI 的辅助脚本
 │   ├── novel_extract.py     114   【跑通】epub → novel.txt + novel_index.json
@@ -71,6 +73,7 @@ PanelCast\
 │   ├── ADR-001-source-ingestion.md               摄取层决策记录
 │   ├── ADR-002-m1-render-stack.md                渲染栈决策记录
 │   ├── schemas/page-profile.schema.json          介绍页 schema
+│   ├── schemas/script-audit.schema.json          逐段审计 schema（v2，含 11 条条件规则）
 │   └── tasks/
 │       ├── P0-execution-plan.md                  P0 九项任务书
 │       ├── M0-content-validation.md
@@ -85,13 +88,13 @@ PanelCast\
 │   ├── capability_report.md        S0 环境探测实测结果
 │   ├── audit/                      【新增】内容审计区（P0-01/02/03 的产物）
 │   │   ├── chapter-map.md          章节对应表（第一章已核，其余九章标「未核」）
-│   │   ├── script-audit-ch01.md    第一章逐段审计（723 行，人读版）
+│   │   ├── script-audit-ch01.md    第一章逐段审计（801 行，人读版）
 │   │   └── P0-01-SAMPLE-CH01-report.md  第一章样张执行报告
 │   ├── v1/work/                    整卷工作区（第 1 卷，169 页）
 │   │   ├── pages/                  169 张页图（git 忽略）
 │   │   ├── profiles/               145 份介绍页【占位】
 │   │   └── chapter_index.json      【跑通】5 章，p5/45/75/105/137
-│   ├── v1/ch01..ch05/              章级工作区 + 成片
+│   ├── v1/ch01..ch05/              章级工作区 + 成片（ch01/work 是第一章样张，5 份产物未签核）
 │   ├── v2/work/                    整卷工作区（第 2 卷，167 页）
 │   │   ├── pages/ 167 张
 │   │   ├── profiles/ 146 份【占位】
@@ -188,7 +191,7 @@ epub ─S1─► chapters/*.xhtml ─S1'─► novel.txt + novel_index.json     
 | S2 | 章节定界：读横幅确认章首 | 机器 + 人 | `chapter_index.json` | 【半自动】边界靠人读横幅 |
 | S3 | 页面解读：逐页读图填结构化介绍页 | 视觉模型 + 人 | `page_XXXX.profile.json` | 【占位】只有骨架 |
 | S4 | 分格：投影给候选框，人在浏览器修 | 机器 + 人 | `*.panels.json` | 【跑通】 |
-| **S5a** | 底稿对齐：小说段 ↔ 漫画页 | 人 + 模型 | `novel_ref.json` | 【待建】流程已定 |
+| **S5a** | 底稿对齐：小说段 ↔ 漫画页 | 人 + 模型 | `novel_ref.json` | 【部分】骨架已实现，逐 beat 判定靠人 |
 | S5 | 讲稿：按拍点写 1–3 页一段旁白 | 人（模型辅助） | `script.json` | 【半自动】纯人工 |
 | S6 | 配音：edge-tts，收句锚点 | 机器 | `audio/*.wav` + 索引 | 【跑通】 |
 | S7 | 时间轴：累加真实时长，段内切页 | 机器 | `timeline.json` | 【跑通】 |
@@ -271,7 +274,8 @@ python -m panelcast m1 verify --work m1/v1/ch02/work --out m1/v1/ch02/out --name
 | `timeline.json` | S7 | `segments[].{start,end,duration,sentences}` / `total_duration` | 【跑通】 |
 | `run_report.json` | `m1 verify` | `checks[15]` / `passed` / `total_duration` | 【跑通】 |
 | `page_XXXX.profile.json` | S3 | 十组字段，见 schema | 【占位】 |
-| `novel_ref.json` | S5a | `beats[].{para,pages,fidelity}` / `coverage` | 【待建】 |
+| `novel_ref.json` | S5a | `beats[].{para,pages,fidelity}` / `coverage` / `judgement_scope` | 【已实现】P0-08 |
+| `script-audit.json` | S5a 后置 | `segments[].{fidelity,alteration_origin,disposition,status}` / `review_status` | 【已实现】Schema v2 + `m1 novel lint` |
 
 **页窗口的规则**（S7 最容易出错的地方）：一段覆盖 k 页，就在**这一段内部**找 k−1 个切点，
 优先吸附真实句边界，硬约束是切点绝不越出本段。所以"一页停多久"等于"这段文字多长"，
@@ -312,7 +316,7 @@ y=1821  └──────────────────────┘
 | 验收 | 15 条，`run_report.json` 逐条留痕 |
 | 分格编辑器 | 分格页签 + 介绍页页签（schema 驱动表单） |
 | 小说抽取 | 2,627 段 / 83,599 字；`sha256`（内容）与 `file_sha256`（落盘字节）双哈希稳定 |
-| 测试 | 306 用例通过 |
+| 测试 | 351 用例通过 |
 
 ### 5.2 半自动的
 
@@ -366,10 +370,10 @@ P0 十一项，按依赖顺序：
 | P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10（**ch01 已建，34 beats 全 needs_review**） |
 | P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**ch01 已审，13 段待改写 / 1 段待修页映射**） |
 | P0-04 | 改稿后重出受影响成片 | 十章 mp4 + 更新的 `delivery.md` |
-| P0-05 | `m1 novel --align/--check`（五步链）+ `lint`（Schema 校验） | CLI + 测试（`test_novel.py` 56 例） |
+| P0-05 | `m1 novel --align/--check`（五步链）+ `lint`（Schema 校验） | CLI + 测试（`test_novel.py` 64 例） |
 | P0-06 | 正式出片门禁（`--draft` 分离 + 审核报告校验） | `m1 run` 改动 + 测试 |
 | P0-07 | 文档与实现统一 | 主规范 / 本文件 / README / CLI 帮助 |
-| P0-08 | 章节身份统一 | `chapter_uid` + 三种编号 |
+| P0-08 | 章节身份统一 | ✅ `panelcast/identity.py` + `m1 chapter --verify`（`test_identity.py` 31 例） |
 | P0-09 | 规则冲突核查 | 已核三处（时间轴、字数、哈希口径），结论已写进主规范 |
 | P0-10 | `m1 verify --visual` 视觉验收 | 抽帧判据 + 测试 |
 | P0-11 | `script.json` v1→v2 迁移 | 十章 v2 脚本 + 迁移脚本 |

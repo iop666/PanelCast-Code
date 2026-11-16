@@ -100,6 +100,9 @@ class TestBuildIndexFromLabels(unittest.TestCase):
         self.labels = {
             "series": "为美好的世界献上祝福！",
             "volume": "漫画 第1卷",
+            # P0-08：有 slug + 卷号才会生成 chapter_uid
+            "series_slug": "konosuba-manga",
+            "volume_number": 1,
             "chapters": [
                 {"number": "第一章", "title": "转生", "start_page": 3},
                 {"number": "第二章", "title": "公会", "start_page": 11},
@@ -203,7 +206,8 @@ class TestFindChapter(unittest.TestCase):
     def test_unknown_lists_known(self):
         with self.assertRaises(RuntimeError) as ctx:
             find_chapter(self.index, "第三章")
-        self.assertIn("ch01=第一章", str(ctx.exception))
+        self.assertIn("ch01", str(ctx.exception))
+        self.assertIn("第一章", str(ctx.exception))
 
     def test_label_without_title_is_number_only(self):
         self.assertEqual(chapter_label(find_chapter(self.index, "ch02")), "第十章")
@@ -262,6 +266,8 @@ class TestBuildChapterWork(unittest.TestCase):
         self.index = build_index(rows_of([0.2] * 7), labels={
             "series": "为美好的世界献上祝福！",
             "volume": "漫画 第1卷",
+            "series_slug": "konosuba-manga",
+            "volume_number": 1,
             "chapters": [{"number": "第二章", "title": "公会", "start_page": 2},
                          {"number": "第三章", "start_page": 5}]})
         write_index(self.work, self.index)

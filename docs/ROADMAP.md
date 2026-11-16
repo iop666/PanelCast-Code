@@ -155,7 +155,7 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   - `chapter_index.json` schema 的状态标注（schema 已定，字段是否全部落地待核）
   - `m1 verify --visual` 在文档中尚无对应条目 → 见 P0-10
 
-- [ ] **P0-08 统一章节身份**
+- [x] **P0-08 统一章节身份**【已完成】
   引入全书唯一 ID，把"卷内编号 / 全书编号 / 展示标签"分开：
   ```json
   {"chapter_uid": "konosuba-manga-v02-ch06",
@@ -184,6 +184,26 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   危险不在命名难看，在于**门禁抓不到**：哈希绑的是文件内容，不是章节身份。
   底稿/审计/讲稿一旦写进错误工作区，整章内容张冠李戴，五步门禁照样全过。
   验收要求五条（含"四者不一致必须报错，不许程序猜"）见规范 §4.3.1。
+
+  **实现（`panelcast/identity.py`）**：
+  - `chapter_uid` 成为唯一权威身份；`make_uid` / `parse_uid` 强制两位补零，
+    `v2-ch6` 这类写法直接拒绝（否则同一身份会有两种字符串）。
+  - `chapter_problems` 单章自洽（uid 卷号/全书号 == 字段、`number` 第六章 == 全书号 6、
+    `id` == `ch{volume_chapter_number:02d}`）；`index_problems` 整卷自洽
+    （uid/id/number 三者各自不许重复、卷内编号 1..N 连续）。
+  - `find_chapter` **多命中就报错并列候选**，不再挑"最像的"。
+  - `check_work_identity` 交叉比对目录名 / `chapter.json` / `novel_ref` /
+    `script` / `script-audit`，不一致时报错并列出全部值。
+  - 新增 `m1 chapter --verify`（卷级验索引、章级验跨文件）。
+  - `m1 novel check` **第 1 步先验身份**：身份错了，后面的内容校验没有意义。
+
+  **迁移**：两卷索引 + 十个章级 `chapter.json` 全部补齐身份字段，
+  十个目录 `--verify` 全过；`m1/v2/ch06–ch10` 的 `id` 仍为 `ch01–ch05`（卷内），
+  `chapter_uid` / `global_chapter_number` 为 6–10。**目录名未改**。
+  **测试**：`tests/test_identity.py` 31 例（含审核意见里的反例：
+  目录 ch06 / novel_ref 说 A / script-audit 说 B → 必须报错）；
+  `tests/test_lf.py` 6 例（含"索引侧零 CRLF blob"与"去掉 .gitattributes 后确实泄漏"的反证）。
+  全量 351 tests OK。
 
 - [~] **P0-09 规则冲突核查（以代码为准）**【部分完成，需补一轮】
   已核实并写进规范的冲突：

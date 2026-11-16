@@ -46,7 +46,7 @@
 | 审核报告 Schema 校验 | 【已实现】 | `m1 novel lint`（P0-REVIEW-04） |
 | 逐段内容审计 | 【部分】 | 第一章样张 25 段已出结论，**未签核**；其余九章未做 |
 | 真实帧视觉验收 | 【待建】 | §9.5 |
-| 章节全书唯一 ID | 【待建】 | §4.3.1、ROADMAP P0-08 |
+| 章节全书唯一 ID + 身份强校验 | 【已实现】 | §4.3.1、`m1 chapter --verify`、ROADMAP P0-08 |
 | 无漫画素材复用（V2 page 模式） | 【待建】 | §14.2 |
 | **横版切格模式（V2 panel 模式）** | 【待建】 | §15、ROADMAP P1–P2 |
 
@@ -297,9 +297,9 @@ panelcast/
 
 | 字段 | 含义 | 现状 |
 | --- | --- | --- |
-| `chapter_uid` | 全书唯一，`<系列>-v<卷两位>-ch<全书两位>` | 【待建】 |
-| `global_chapter_number` | 全书连续编号（第六章 = 6） | 【待建】 |
-| `volume_chapter_number` | 卷内编号（第二卷第一话 = 1） | 【待建】 |
+| `chapter_uid` | 全书唯一，`<系列slug>-v<卷两位>-ch<全书两位>` | 【已实现】P0-08 |
+| `global_chapter_number` | 全书连续编号（第六章 = 6） | 【已实现】P0-08 |
+| `volume_chapter_number` | 卷内编号（第二卷第一话 = 1） | 【已实现】P0-08 |
 | `id` | 卷内短 id，**仅供程序引用** | 现有，两卷都从 `ch01` 起 |
 | `number` | 展示用章节号「第六章」 | 现有 |
 | `label_zh` | 完整展示标签 | 现有 |
@@ -308,11 +308,12 @@ panelcast/
 `find_chapter` 按 `id` 或 `number` 匹配才没炸。**人工对数必须看 `label_zh`，不要看 `id`。**
 P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 
-##### P0-08 已登记的明确问题：三套编号在同一个目录里对不上
+##### P0-08 章节身份【已实现】
 
-这不是"命名不统一"，是**三个不同身份维度被混在一起**。实测证据（`m1/v2/ch06`）：
+**问题**：三套编号在同一个目录里对不上。这不是"命名不统一"，
+是**三个不同身份维度被混在一起**。实测证据（`m1/v2/ch06`）：
 
-| 维度 | 实际值 | 谁在用 |
+| 维度 | 迁移前的值 | 谁在用 |
 | --- | --- | --- |
 | 目录名 | `ch06` | 文件系统、脚本按路径找章 |
 | `chapter.json` 的 `id` | `ch01` | 程序引用（`find_chapter`） |
@@ -324,19 +325,48 @@ P0-08 会把三者分开，此后 `id` 不再承担两种含义。
 
 **危险在哪**：`P0-01` 的章节对应关系即使人工做对了，只要写进错误的工作区，
 底稿、审计、讲稿会一起挂到另一章上，而且**门禁照样通过**——因为哈希绑的是文件内容，
-不是章节身份。这类错配不会自己暴露，只会让整章内容张冠李戴。
+不是章节身份。**哈希只能证明"没被改过"，证明不了"属于这一章"。**
 
-**P0-08 的验收要求（未实现，不许跳过）**：
+**实现（`panelcast/identity.py`）**：
 
-1. `chapter_uid` 成为机器内部**唯一**身份，跨文件引用只用它；
-2. `id` / `number` 降级为展示或兼容字段，**不得**用于任何跨章定位；
-3. 卷号、全书章节号、卷内章节号三个数字**分开存**，不许互相推导；
-4. 目录名、`id`、`number`、`chapter_uid` 四者不一致时**明确报错**，
-   报错信息要同时列出四个值——**不许程序猜一个"最像的"继续跑**；
-5. 迁移脚本必须能列出全部不一致的章（当前已知至少 `m1/v2/ch06–ch10`）。
+| 机制 | 行为 |
+| --- | --- |
+| `chapter_uid` | 唯一权威身份，`<系列slug>-v<卷两位>-ch<全书两位>`，如 `konosuba-manga-v02-ch06` |
+| `make_uid` / `parse_uid` | 必须两位补零；`v2-ch6` 这类写法直接拒绝，避免"同一个身份两种字符串" |
+| `chapter_problems` | 单章自洽：uid 解析出的卷号/全书号必须等于 `volume_number` / `global_chapter_number`；`number`（第六章）必须与全书号一致；`id` 必须等于 `ch{volume_chapter_number:02d}` |
+| `index_problems` | 整卷自洽：`chapter_uid` / `id` / `number` 三者各自不许重复；`volume_chapter_number` 必须 1..N 连续 |
+| `find_chapter` | 唯一命中才返回；**多命中报错并列出全部候选**，并提示改用 `chapter_uid` |
+| `check_work_identity` | 交叉比对目录名、`chapter.json`、`novel_ref.json`、`script.json`、`script-audit.json`，**不一致就报错并列出全部值** |
 
-第 4 条是重点。当前代码的默认行为是"猜"（`find_chapter` 按 `id` 或 `number` 都能命中），
-猜对是运气，猜错是静默错配。**P0-08 之后，猜必须变成报错。**
+**四条硬规则**：
+
+1. `chapter_uid` 是机器内部**唯一**身份，跨文件引用只用它；
+2. `id` / `number` 降级为展示或兼容字段，**不得**用于跨章定位；
+3. 卷号、全书章节号、卷内章节号**分开存**，不许互相推导；
+4. 四者不一致**明确报错**，报错信息同时列出全部值——**不许程序猜"最像的"**。
+
+第 4 条是重点。迁移前 `find_chapter` 按 `id` 或 `number` 都能命中，
+猜对是运气，猜错是静默错配。现在**多命中就是错误**。
+
+**目录名的含义固定为全书号**：`m1/v2/ch06` 的 `ch06` 指全书第 6 章，
+不是卷内第 1 章。所以 `id=ch01` 与目录名 `ch06` 并存是**合法的**（前者卷内、后者全书），
+但 `global_chapter_number` 必须等于 6，否则报错：
+
+```
+$ m1 chapter --work m1/v2/ch09/work --verify
+error: 章节身份不一致（1 项）：
+  - 目录名 'ch09' 表示全书第 9 章，但 chapter.json 的
+    global_chapter_number=6（chapter_uid=konosuba-manga-v02-ch06）
+```
+
+**门禁接入**：`m1 novel check` 第 1 步先验身份，再验底稿存在。
+身份不过时后面的内容校验没有意义——一份格式完全合法、哈希全部正确的审计，
+也可能属于另一章。
+
+**迁移结果**：两卷索引 + 十个章级 `chapter.json` 全部补齐身份字段；
+`m1/v2/ch06–ch10` 的 `id` 仍是 `ch01–ch05`（卷内），但 `chapter_uid` 与
+`global_chapter_number` 已是 6–10，`--verify` 十个目录全部通过。
+**目录名没改**——改名会动十处路径，而身份统一不需要改目录。
 
 `page_kinds` 取值：`cover | colophon | frontispiece | title_page | story | blank | divider | watermark | extra`。
 **非 `story`/`title_page` 的页不进正文出片**，但介绍页照样要写（复用时会用到）。
@@ -702,16 +732,33 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
 | `unknown` | 查不清是谁改的 | 保留疑问，**不许硬塞进前两个** |
 | `null` | 没有差异（`drawn` / `omitted`） | 留空 |
 
-三条硬规则：
+**六条硬规则**（全部由 `m1 novel lint` 机器校验，不是靠自觉）：
 
-1. **`alteration_origin` 不能代替来源引用。** 标了 `manga` 仍然必须给出
-   `pages_declared`——"这是漫画改的"本身就是一句关于画面的断言，指不出页码就等于没证据。
-   `m1 novel lint` 会直接拒绝 `alteration_origin=manga` 且 `pages_declared` 为空的记录。
-2. **没有差异时留空，不许用 `"none"` 之类的伪值。** 伪值会让"枚举校验"形同虚设：
-   它看起来是个合法成员，实际上没有任何语义。
-3. **`mixed` 与 `unknown` 是留给出题人的，不是给选择题凑数的。** 遇到"漫画改一半、
-   旁白编一半"，正确做法是拆成两条记录或用 `mixed` 并在 `evidence` 里写清各占哪部分，
-   **不是**为了满足枚举硬挑一个。
+| # | 规则 | 拦什么 |
+| --- | --- | --- |
+| 1 | `manga` 必须给 `pages_declared` | "这是漫画改的"是关于画面的断言，指不出页码等于没证据 |
+| 2 | 无差异必须留空，不许写 `"none"` | 伪值看着像枚举成员，实际无语义，会让枚举校验形同虚设 |
+| 3 | `mixed` 必须填 `mixed_note` | 见下：`mixed` 是最容易被当成逃生门的分类 |
+| 4 | `narration` 不许 `disposition=keep` | 旁白自己编的内容保留，等于承认这段没有来源 |
+| 5 | `unknown` 不许 `status=approved` | 来源没查清不是一种结论，不能据它放行某一段 |
+| 6 | 有 `unknown` 时整份不许 `review_status=approved` | 没查清就不许签核通过 |
+
+**第 3 条为什么单独设字段**：`mixed` 的诱惑太大——一句"又像漫画又像原创"就能绕开举证，
+把真正无来源的部分藏在"混合"里。所以要求把两部分**分开写**：
+
+```json
+{"fidelity": "altered", "alteration_origin": "mixed",
+ "pages_declared": ["page_0045"],
+ "mixed_note": "漫画 p45 给了摔进店里的动作；旁白自己加了「撞翻一排货架」"}
+```
+
+`mixed_note` 里必须能看出**哪部分是漫画给的、哪部分是旁白新增的**。
+混在一句话里含糊带过，`lint` 一样会拒——它只检查字段非空，判断"说清了没有"仍然是人的事。
+**字段能拦住的是"根本没写"，拦不住"写了但含糊"。**
+
+**第 5、6 条为什么把 `unknown` 单独拎出来**：`unknown` 的语义是"查不清是谁改的"，
+它是**待办**，不是**结论**。允许它存在于报告里（总比硬塞进 `manga` 或 `narration` 诚实），
+但不允许它跟着整份报告一起被签核通过。
 
 ##### `status` 与 `review_status`：处理状态 ≠ 签核状态
 
@@ -735,8 +782,19 @@ JSON 转换成功 ≠ 内容审过。**不许把"转换无报错"当成"可以�
   发明 `pending` 并在文件里写声明）。**`pending` 已废弃**，`lint` 会报错并提示改用
   `pending_rewrite`。
 - `status=approved` 与 `disposition` 不许矛盾：通过了就不该还挂着 `rewrite`。
+- **`rewritten` 绝不等于 `approved`。** 一段内容改写之后仍然可能有新的事实错误。
+  合法组合是：
+
+  ```json
+  {"status": "rewritten", "review_status": "pending_human", "reviewed_by": null}
+  ```
+
+  读作"改完了，等重审"。**不许在改写完成时自动签核**——从 `rewritten` 到 `approved`
+  只能由另一只手完成。
 - 只有整份 `review_status=approved` 且 `reviewed_by=human:<name>` 才允许出片；
   `pending_human` 时 `reviewed_by` 必须为空——**没签核就不许留签名**。
+- `reviewed_by` **不得等于** `prepared_by`。机器出结论、机器签名，
+  等于自己给自己发合格证；`lint` 直接拒绝。
 
 ##### 逐段字段
 
@@ -1682,7 +1740,10 @@ fps=30 , scale=in_range=full:out_range=tv , ass=<章节名>.ass
 ```
 script.json
    │
-   ├─1. novel_ref.json 存在？                  否 → 禁止正式出片（只允许 --draft 预览）
+   ├─1. 章节身份一致 + novel_ref.json 存在？
+   │     · chapter_uid 在 chapter.json / novel_ref / script / script-audit 中一致
+   │     · 目录名的全书号 == global_chapter_number
+   │     · id / number 与 chapter_uid 自洽         否 → 禁止出片（身份错了，后面全无意义）
    ├─2. novel_ref.source.text_sha256
    │     == novel_index.json 的 file_sha256？   否 → 底稿失效，回 S5a 重对齐
    ├─3. 每段 source_refs 非空且 beat 存在？      否 → 禁止出片

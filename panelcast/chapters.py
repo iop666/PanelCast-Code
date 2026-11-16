@@ -18,9 +18,19 @@
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
+from .identity import (
+    IdentityError,
+    chapter_problems,
+    cn_to_int,
+    find_chapter as _find_chapter,
+    make_uid,
+    parse_uid,
+    require_index_identity,
+)
 from .panels import decode_gray, find_ffmpeg, find_ffprobe, probe_size
 
 #: 近全黑页阈值（墨量 = 灰度 ≤ 127 的像素占比）
@@ -115,11 +125,22 @@ def _end_before_divider(rows, start_page, fallback):
 
 
 def build_index(rows, labels=None, series="", volume="",
-                front_matter_end=None, back_matter_start=None):
+                front_matter_end=None, back_matter_start=None,
+                series_slug=None, volume_number=None, first_global_chapter=None):
     """测量结果 (+ labels) → chapter_index 字典。
 
     有 labels 时以 labels 为准（labels 的 start_page 覆盖检测结果）；
     无 labels 时用分隔页检测，且全部标 `confirmed: false`。
+
+    ## 章节身份（P0-08）
+
+    给了 `series_slug` 与 `volume_number` 才会写 `chapter_uid` 等身份字段。
+    不给就是旧行为（只有 `id` / `number`），**P0-08 之后的生产路径必须给**——
+    没有 uid 的索引过不了 `require_index_identity`。
+
+    `global_chapter_number` 优先从 `number`（第六章 → 6）解析，解析不了才用
+    `first_global_chapter + 序号`。两种来源不一致时由 `index_problems` 报错，
+    不在这里悄悄挑一个。
     """
     page_count = len(rows)
     if labels:
@@ -128,6 +149,10 @@ def build_index(rows, labels=None, series="", volume="",
         volume = labels.get("volume") or volume
         front_matter_end = labels.get("front_matter_end", front_matter_end)
         back_matter_start = labels.get("back_matter_start", back_matter_start)
+        series_slug = labels.get("series_slug") or series_slug
+        volume_number = labels.get("volume_number", volume_number)
+        if first_global_chapter is None:
+            first_global_chapter = labels.get("first_global_chapter")
         detected = detect_divider_starts(rows)
         source = "labels"
     else:
@@ -148,6 +173,10 @@ def build_index(rows, labels=None, series="", volume="",
     elif front_matter_end is None:
         front_matter_end = starts[0] - 1
 
+    if volume_number is None:
+        m = re.search(r"第\s*(\d+)\s*卷", str(volume or ""))
+        volume_number = int(m.group(1)) if m else None
+
     out = []
     for i, ch in enumerate(chapters):
         start = ch["start_page"]
@@ -162,7 +191,7 @@ def build_index(rows, labels=None, series="", volume="",
             raise RuntimeError(
                 f"error: chapter at page {start} ends before it starts ({end})"
             )
-        out.append({
+        item = {
             "id": f"ch{i + 1:02d}",
             "number": ch["number"],
             "title": ch["title"],
@@ -171,9 +200,19 @@ def build_index(rows, labels=None, series="", volume="",
             "end_page": end,
             "page_count": end - start + 1,
             "confirmed": bool(ch["label_zh"]),
-        })
+        }
+        if series_slug and volume_number:
+            glob = cn_to_int(ch["number"])
+            if glob is None and first_global_chapter is not None:
+                glob = first_global_chapter + i
+            if glob is not None:
+                item["chapter_uid"] = make_uid(series_slug, volume_number, glob)
+                item["volume_chapter_number"] = i + 1
+                item["global_chapter_number"] = glob
+                item["volume_number"] = volume_number
+        out.append(item)
 
-    return {
+    index = {
         "schema": SCHEMA,
         "series": series,
         "volume": volume,
@@ -187,6 +226,11 @@ def build_index(rows, labels=None, series="", volume="",
                        if back_matter_start else None,
         "chapters": out,
     }
+    if series_slug:
+        index["series_slug"] = series_slug
+    if volume_number:
+        index["volume_number"] = volume_number
+    return index
 
 
 def _warnings(starts, detected):
@@ -218,12 +262,10 @@ def require_confirmed(index):
 
 
 def pages_of(index, chapter_id):
-    """某章的页码字符串列表（page_0005 形式）。"""
-    for ch in index["chapters"]:
-        if ch["id"] == chapter_id:
-            return [f"page_{i:04d}"
-                    for i in range(ch["start_page"], ch["end_page"] + 1)]
-    raise RuntimeError(f"error: unknown chapter {chapter_id!r}")
+    """某章的页码字符串列表（page_0005 形式）。键可以是 uid / id / number。"""
+    ch = find_chapter(index, chapter_id)
+    return [f"page_{i:04d}"
+            for i in range(ch["start_page"], ch["end_page"] + 1)]
 
 
 def write_index(work_dir, index):
@@ -246,12 +288,13 @@ def load_labels(path):
 
 
 def find_chapter(index, key):
-    """按 id（ch02）或章节号（第二章）找一章，找不到抛错。"""
-    for ch in index["chapters"]:
-        if key in (ch["id"], ch["number"]):
-            return ch
-    known = ", ".join(f"{c['id']}={c['number']}" for c in index["chapters"])
-    raise RuntimeError(f"error: unknown chapter {key!r}; known: {known}")
+    """按 `chapter_uid` / `id` / `number` / `label_zh` 找一章，找不到或**有歧义**都抛错。
+
+    实现见 `panelcast.identity.find_chapter`。P0-08 之后：
+    `chapter_uid` 是唯一权威身份，`id` / `number` 只作兼容与展示；
+    多命中时**报错列候选**，不许挑一个"最像的"。
+    """
+    return _find_chapter(index, key)
 
 
 def chapter_label(ch):
@@ -320,6 +363,22 @@ def build_chapter_work(src_work, index, key, out_work):
         "pages": names,
         "source_work": str(src_work),
     }
+    # 身份字段原样带下来。**缺了就不写**，不在这里编一个——
+    # 编出来的 uid 会让人以为身份已经统一了，比缺字段更危险。
+    for field in ("chapter_uid", "series_slug", "volume_number",
+                  "global_chapter_number", "volume_chapter_number"):
+        val = ch.get(field)
+        if val is None and field == "series_slug":
+            val = index.get("series_slug")
+        if val is not None:
+            doc[field] = val
+    problems = chapter_problems(doc, series_slug=index.get("series_slug"),
+                                volume_number=index.get("volume_number")) \
+        if doc.get("chapter_uid") else [f"{ch.get('id')}: 索引里没有 chapter_uid"]
+    if problems:
+        raise IdentityError(
+            "error: 章级 chapter.json 身份不合格（%d 项）：\n  - %s"
+            % (len(problems), "\n  - ".join(problems)))
     path = Path(out_work) / "chapter.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",

@@ -1,0 +1,326 @@
+"""P0-08 章节身份测试。
+
+锁住三件事：
+
+1. `chapter_uid` 是唯一权威身份，格式与三套编号必须自洽；
+2. `find_chapter` **有歧义就报错**，绝不挑一个"最像的"；
+3. 章级 work 里五份文件声明不同章节时，`check_work_identity` 必须报错并列出全部值。
+"""
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from panelcast.chapters import build_chapter_work, build_index, find_chapter, pages_of  # noqa: E402
+from panelcast.identity import (  # noqa: E402
+    IdentityError,
+    chapter_problems,
+    check_work_identity,
+    cn_to_int,
+    index_problems,
+    make_uid,
+    parse_uid,
+    require_index_identity,
+)
+
+
+def chapter(uid="konosuba-manga-v02-ch06", **over):
+    """一份自洽的第六章身份块，测试里逐项破坏。"""
+    base = {
+        "chapter_uid": uid,
+        "series_slug": "konosuba-manga",
+        "volume_number": 2,
+        "global_chapter_number": 6,
+        "volume_chapter_number": 1,
+        "id": "ch01",
+        "number": "第六章",
+        "label_zh": "第六章 为这片湖献上自称女神的圣水！",
+        "start_page": 3, "end_page": 30, "page_count": 28,
+        "confirmed": True,
+    }
+    base.update(over)
+    return base
+
+
+def index_of(*chapters, slug="konosuba-manga", volume=2):
+    return {"schema": "chapter-index/v1", "series": "为美好的世界献上祝福！",
+            "volume": f"漫画 第{volume}卷", "series_slug": slug,
+            "volume_number": volume, "chapters": list(chapters)}
+
+
+class TestCnNum(unittest.TestCase):
+    def test_parses_chapter_numbers(self):
+        cases = {"第一章": 1, "第六章": 6, "第十章": 10, "第十一章": 11,
+                 "第十二章": 12, "第二章 替华美的高阶职业带来愉悦！": 2}
+        for text, want in cases.items():
+            self.assertEqual(cn_to_int(text), want, text)
+
+    def test_returns_none_instead_of_guessing(self):
+        for text in ("", None, "Chapter 6", "第？章", "序章"):
+            self.assertIsNone(cn_to_int(text), repr(text))
+
+
+class TestUid(unittest.TestCase):
+    def test_make_uid_pads_to_two_digits(self):
+        self.assertEqual(make_uid("konosuba-manga", 2, 6), "konosuba-manga-v02-ch06")
+        self.assertEqual(make_uid("konosuba-manga", 1, 1), "konosuba-manga-v01-ch01")
+
+    def test_non_ascii_slug_is_rejected(self):
+        with self.assertRaises(IdentityError):
+            make_uid("为美好的世界献上祝福", 1, 1)
+
+    def test_parse_roundtrip(self):
+        self.assertEqual(parse_uid("konosuba-manga-v02-ch06"),
+                         ("konosuba-manga", 2, 6))
+
+    def test_unpadded_uid_is_rejected(self):
+        """`v1` 与 `v01` 并存会让"唯一身份"变成两套字符串。"""
+        for bad in ("konosuba-manga-v2-ch6", "konosuba-manga-v02-ch6", "x"):
+            with self.assertRaises(IdentityError):
+                parse_uid(bad)
+
+
+class TestChapterProblems(unittest.TestCase):
+    def test_consistent_chapter_is_clean(self):
+        self.assertEqual(chapter_problems(chapter(), "konosuba-manga", 2), [])
+
+    def test_missing_fields_are_reported_as_a_block(self):
+        problems = chapter_problems({"id": "ch01", "number": "第六章"})
+        self.assertTrue(any("缺身份字段" in p for p in problems), problems)
+
+    def test_uid_volume_disagrees_with_field(self):
+        problems = chapter_problems(chapter(volume_number=3), "konosuba-manga", 2)
+        self.assertTrue(any("两个字段各说一套" in p or "卷号" in p for p in problems),
+                        problems)
+
+    def test_number_disagrees_with_global_number(self):
+        """`number` 写「第七章」但全书号是 6 —— 人工对数会数错章。"""
+        problems = chapter_problems(chapter(number="第七章"), "konosuba-manga", 2)
+        self.assertTrue(any("第七章" in p for p in problems), problems)
+
+    def test_id_must_derive_from_volume_chapter_number(self):
+        """`id` 只作兼容字段，不许承载第二种含义。"""
+        problems = chapter_problems(chapter(volume_chapter_number=2), "konosuba-manga", 2)
+        self.assertTrue(any("id=" in p and "volume_chapter_number" in p
+                            for p in problems), problems)
+
+    def test_series_slug_mismatch(self):
+        problems = chapter_problems(chapter(), "other-series", 2)
+        self.assertTrue(any("系列" in p for p in problems), problems)
+
+
+class TestIndexProblems(unittest.TestCase):
+    def test_two_volumes_numbered_independently_are_each_valid(self):
+        v1 = index_of(chapter("konosuba-manga-v01-ch01", volume_number=1,
+                              global_chapter_number=1, volume_chapter_number=1,
+                              id="ch01", number="第一章"),
+                      slug="konosuba-manga", volume=1)
+        self.assertEqual(index_problems(v1), [])
+
+    def test_duplicate_id_is_reported(self):
+        a = chapter()
+        b = chapter("konosuba-manga-v02-ch07", global_chapter_number=7,
+                    volume_chapter_number=2, id="ch02", number="第七章")
+        self.assertEqual(index_problems(index_of(a, b)), [])
+
+        dup = chapter("konosuba-manga-v02-ch07", global_chapter_number=7,
+                      volume_chapter_number=1, number="第七章")  # id 撞了
+        problems = index_problems(index_of(a, dup))
+        self.assertTrue(any("重复" in p for p in problems), problems)
+
+    def test_volume_chapter_numbers_must_be_contiguous(self):
+        a = chapter()
+        b = chapter("konosuba-manga-v02-ch07", global_chapter_number=7,
+                    volume_chapter_number=3, id="ch03", number="第七章")
+        problems = index_problems(index_of(a, b))
+        self.assertTrue(any("1..2" in p for p in problems), problems)
+
+    def test_require_index_identity_raises(self):
+        with self.assertRaises(IdentityError):
+            require_index_identity({"chapters": []})
+
+
+class TestFindChapter(unittest.TestCase):
+    def setUp(self):
+        self.index = index_of(
+            chapter(),
+            chapter("konosuba-manga-v02-ch07", global_chapter_number=7,
+                    volume_chapter_number=2, id="ch02", number="第七章"),
+        )
+
+    def test_find_by_uid(self):
+        ch = find_chapter(self.index, "konosuba-manga-v02-ch06")
+        self.assertEqual(ch["global_chapter_number"], 6)
+
+    def test_find_by_id_and_number(self):
+        self.assertEqual(find_chapter(self.index, "ch02")["number"], "第七章")
+        self.assertEqual(find_chapter(self.index, "第六章")["global_chapter_number"], 6)
+
+    def test_unknown_key_lists_known_chapters(self):
+        with self.assertRaises(IdentityError) as ctx:
+            find_chapter(self.index, "ch09")
+        self.assertIn("找不到", str(ctx.exception))
+        self.assertIn("konosuba-manga-v02-ch06", str(ctx.exception))
+
+    def test_ambiguous_key_raises_instead_of_picking_one(self):
+        """同一个 key 命中两章时必须报错——这是 P0-08 的核心纪律。"""
+        idx = index_of(
+            chapter(),
+            chapter("konosuba-manga-v02-ch07", global_chapter_number=7,
+                    volume_chapter_number=2, id="ch02", number="第六章"),  # number 撞了
+        )
+        with self.assertRaises(IdentityError) as ctx:
+            find_chapter(idx, "第六章")
+        msg = str(ctx.exception)
+        self.assertIn("有歧义", msg)
+        self.assertIn("konosuba-manga-v02-ch06", msg)
+        self.assertIn("konosuba-manga-v02-ch07", msg)
+        self.assertIn("chapter_uid", msg)
+
+    def test_pages_of_accepts_uid(self):
+        pages = pages_of(self.index, "konosuba-manga-v02-ch06")
+        self.assertEqual(len(pages), 28)
+        self.assertEqual(pages[0], "page_0003")
+
+
+class TestWorkIdentity(unittest.TestCase):
+    """章级 work 的跨文件核对。这里复现审核意见里的反例。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _work(self, name="ch06"):
+        work = self.root / name
+        work.mkdir(parents=True)
+        return work
+
+    def _write(self, work, name, doc):
+        (work / name).write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                                 encoding="utf-8")
+
+    def test_consistent_work_is_clean(self):
+        work = self._work()
+        self._write(work, "chapter.json", chapter())
+        self._write(work, "novel_ref.json", {
+            "schema": "novel-ref/v1",
+            "chapter_uid": "konosuba-manga-v02-ch06", "chapter_id": "ch01"})
+        self._write(work, "script-audit.json", {
+            "schema": "script-audit/v2",
+            "chapter_uid": "konosuba-manga-v02-ch06"})
+        errors, warnings = check_work_identity(work)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("script.json" in w for w in warnings) or not warnings)
+
+    def test_counter_example_from_review(self):
+        """目录 ch06 / chapter.json ch01 / novel_ref 说 A / script-audit 说 B → 必须报错。"""
+        work = self._work("ch06")
+        self._write(work, "chapter.json", chapter())          # uid A: ...-v02-ch06
+        self._write(work, "novel_ref.json", {
+            "schema": "novel-ref/v1",
+            "chapter_uid": "konosuba-manga-v02-ch07",          # uid B
+            "chapter_id": "ch02"})
+        self._write(work, "script-audit.json", {
+            "schema": "script-audit/v2",
+            "chapter_uid": "konosuba-manga-v02-ch08"})         # uid C
+        errors, _ = check_work_identity(work)
+        joined = " | ".join(errors)
+        self.assertIn("novel_ref.json", joined)
+        self.assertIn("script-audit.json", joined)
+        self.assertIn("konosuba-manga-v02-ch07", joined)
+        self.assertIn("konosuba-manga-v02-ch08", joined)
+        self.assertIn("konosuba-manga-v02-ch06", joined)       # 基准值也要列出来
+
+    def test_directory_name_means_global_number(self):
+        """目录 `ch06` 指全书第 6 章，不是卷内第 1 章。"""
+        work = self._work("ch06")
+        self._write(work, "chapter.json", chapter(global_chapter_number=7,
+                                                  chapter_uid="konosuba-manga-v02-ch07"))
+        errors, _ = check_work_identity(work)
+        self.assertTrue(any("目录名" in e for e in errors), errors)
+
+    def test_parent_directory_is_checked_for_work_layout(self):
+        """真实布局是 `m1/v2/ch06/work`——章号在上一层，`work` 自己不算。"""
+        work = self._work("ch09") / "work"
+        work.mkdir()
+        self._write(work, "chapter.json", chapter())   # 全书第 6 章
+        errors, _ = check_work_identity(work)
+        self.assertTrue(any("ch09" in e and "global_chapter_number=6" in e
+                            for e in errors), errors)
+
+    def test_missing_uid_is_an_error_not_a_warning(self):
+        work = self._work()
+        doc = chapter()
+        doc.pop("chapter_uid")
+        self._write(work, "chapter.json", doc)
+        errors, _ = check_work_identity(work)
+        self.assertTrue(any("chapter_uid" in e for e in errors), errors)
+
+    def test_v1_script_without_chapter_is_only_a_warning(self):
+        """v1 讲稿没有章节声明——记下来，但不该因此判整章不可用。"""
+        work = self._work()
+        self._write(work, "chapter.json", chapter())
+        self._write(work, "script.json", {"segments": []})
+        errors, warnings = check_work_identity(work)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("script.json" in w for w in warnings), warnings)
+
+    def test_missing_chapter_json_is_an_error(self):
+        work = self._work()
+        errors, _ = check_work_identity(work)
+        self.assertTrue(any("chapter.json" in e for e in errors), errors)
+
+
+class TestBuildIndex(unittest.TestCase):
+    ROWS = [{"page": i, "ink": 0.5, "ink_dark": 0.1} for i in range(1, 21)]
+
+    def test_uid_is_emitted_when_slug_and_volume_given(self):
+        labels = {"series": "为美好的世界献上祝福！", "volume": "漫画 第2卷",
+                  "series_slug": "konosuba-manga", "volume_number": 2,
+                  "chapters": [{"number": "第六章", "title": "湖", "start_page": 3},
+                               {"number": "第七章", "title": "竹笋", "start_page": 10}]}
+        idx = build_index(self.ROWS, labels=labels)
+        self.assertEqual(idx["series_slug"], "konosuba-manga")
+        self.assertEqual(idx["volume_number"], 2)
+        self.assertEqual([c["chapter_uid"] for c in idx["chapters"]],
+                         ["konosuba-manga-v02-ch06", "konosuba-manga-v02-ch07"])
+        self.assertEqual([c["global_chapter_number"] for c in idx["chapters"]], [6, 7])
+        self.assertEqual([c["volume_chapter_number"] for c in idx["chapters"]], [1, 2])
+        self.assertEqual(index_problems(idx), [])
+
+    def test_without_slug_no_uid_is_invented(self):
+        """没有 slug 就不写 uid——编一个出来会让人误以为身份已统一。"""
+        labels = {"chapters": [{"number": "第一章", "start_page": 3}]}
+        idx = build_index(self.ROWS, labels=labels)
+        self.assertNotIn("chapter_uid", idx["chapters"][0])
+
+    def test_build_chapter_work_carries_identity(self):
+        labels = {"series": "为美好的世界献上祝福！", "volume": "漫画 第2卷",
+                  "series_slug": "konosuba-manga", "volume_number": 2,
+                  "chapters": [{"number": "第六章", "title": "湖", "start_page": 3}]}
+        idx = build_index(self.ROWS, labels=labels)
+        src = self._src_work()
+        out = Path(tempfile.mkdtemp()) / "ch06"
+        doc, _stats, _path = build_chapter_work(src, idx, "konosuba-manga-v02-ch06", out)
+        self.assertEqual(doc["chapter_uid"], "konosuba-manga-v02-ch06")
+        self.assertEqual(doc["global_chapter_number"], 6)
+        self.assertEqual(doc["series_slug"], "konosuba-manga")
+
+    def _src_work(self):
+        src = Path(tempfile.mkdtemp()) / "src"
+        (src / "pages").mkdir(parents=True)
+        for i in range(1, 21):
+            (src / "pages" / f"page_{i:04d}.jpg").write_bytes(b"x")
+        return src
+
+
+if __name__ == "__main__":
+    unittest.main()

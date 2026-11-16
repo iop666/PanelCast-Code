@@ -383,9 +383,21 @@ def lint_audit(audit, segs=None, page_set=None):
         if not str(reviewer or "").startswith("human:"):
             out.append((None, f"review_status=approved 时 reviewed_by 必须是 "
                               f"human:<name>，实为 {reviewer!r}"))
+        # 机器出结论、机器签名 = 自己给自己发合格证。
+        # `status=rewritten` 只是"改过了"，**不等于**"通过了"；
+        # 从 rewritten 到 approved 只能由另一只手完成。
+        if reviewer and reviewer == audit.get("prepared_by"):
+            out.append((None, f"reviewed_by 与 prepared_by 相同（{reviewer!r}）："
+                              f"改写完成不等于审核通过，签名必须是另一只手"))
     elif reviewer:
         out.append((None, f"review_status={rs!r} 却已填 reviewed_by={reviewer!r}；"
                           f"没签核就不许留签名"))
+
+    # 两层语义混进一份文件：`beats` 是 novel_ref 的结构，不该出现在审核报告里
+    for foreign in ("beats", "novel_chapters", "align_meta"):
+        if foreign in audit:
+            out.append((None, f"审核报告里出现 novel_ref 专有字段 {foreign!r}："
+                              f"两层判定（漫画 vs 小说 / 旁白 vs 来源）不许混在一份文件里"))
 
     audited = {a.get("segment_id"): a for a in audit.get("audited_segments") or []}
     for sid, rec in audited.items():
@@ -394,6 +406,13 @@ def lint_audit(audit, segs=None, page_set=None):
         for sid, _text in segs:
             if sid not in audited:
                 out.append((sid, "审核报告未覆盖该段"))
+
+    # `unknown` 是"还没查清"，不是一种结论——有它就整份不许签核。
+    unresolved = [sid for sid, rec in audited.items()
+                  if rec.get("alteration_origin") == "unknown"]
+    if unresolved and rs == "approved":
+        out.append((None, f"{len(unresolved)} 段的 alteration_origin 仍是 unknown"
+                          f"（{_preview(unresolved)}）：来源没查清就不许签核通过"))
     return out
 
 
@@ -436,9 +455,15 @@ def _lint_segment(sid, rec, page_set):
     if fid in ("drawn", "altered") and not pages:
         out.append(f"fidelity={fid!r} 必须给出 pages_declared（旁白描述了画面，"
                    f"就得指得出是哪几页）")
-    if origin == "manga" and not pages:
-        out.append("alteration_origin=manga 但 pages_declared 为空："
-                   "「漫画改的」本身就是一条关于画面的断言，必须附页码")
+    if origin in ("manga", "mixed") and not pages:
+        out.append(f"alteration_origin={origin} 但 pages_declared 为空："
+                   f"「漫画改的」本身就是一条关于画面的断言，必须附页码")
+    # `mixed` 是最容易被当成逃生门的分类：一句"又像漫画又像原创"就绕过了举证。
+    # 所以要求把新增部分**单独写出来**，不许混在 evidence 里含糊带过。
+    if origin == "mixed" and not str(rec.get("mixed_note") or "").strip():
+        out.append("alteration_origin=mixed 必须填 mixed_note，"
+                   "写明哪部分是漫画给的、哪部分是旁白新增的；"
+                   "混在一起写等于没有举证")
     if fid != "original" and not rec.get("novel_para"):
         out.append(f"fidelity={fid!r} 必须给出 novel_para（没有段落区间就是没有来源）")
     if page_set is not None:
@@ -451,6 +476,14 @@ def _lint_segment(sid, rec, page_set):
         out.append(f"status=approved 却 disposition={disp!r}：通过了就不该还挂着要改")
     if status == "removed" and disp not in (None, "remove"):
         out.append(f"status=removed 却 disposition={disp!r}")
+    # 旁白自己编的东西只能改或删，不许"保留"——保留就等于承认这段无来源。
+    if origin == "narration" and disp == "keep":
+        out.append("alteration_origin=narration 却 disposition=keep："
+                   "旁白自己编的内容不能保留，只能改写或删除")
+    # `unknown` 不是结论，不能据它放行某一段。
+    if origin == "unknown" and status == "approved":
+        out.append("alteration_origin=unknown 却 status=approved："
+                   "来源没查清不能判通过")
     return out
 
 
@@ -463,10 +496,21 @@ def check(work, novel_dir):
     novel_dir = pathlib.Path(novel_dir)
     problems = []
 
-    # ---- 第 1 步：底稿存在 ----
+    # ---- 第 1 步：章节身份 + 底稿存在 ----
+    # 身份先于内容：一份格式完全合法、哈希全部正确的审计，也可能属于另一章。
+    # 哈希只能证明"没被改过"，证明不了"属于这一章"（P0-08）。
+    try:
+        from .identity import check_work_identity
+        id_errors, _id_warnings = check_work_identity(work)
+        for msg in id_errors:
+            problems.append((1, f"章节身份：{msg}"))
+    except Exception as exc:  # noqa: BLE001 — 身份模块自身出错也不能静默放行
+        problems.append((1, f"章节身份校验失败：{exc}"))
+
     ref_path = work / "novel_ref.json"
     if not ref_path.exists():
-        return False, [(1, f"novel_ref.json 不存在（{ref_path}）；先跑 --align")]
+        problems.append((1, f"novel_ref.json 不存在（{ref_path}）；先跑 --align"))
+        return False, problems
     ref = _read_json(ref_path)
 
     # ---- 第 2 步：纯文本哈希一致 ----

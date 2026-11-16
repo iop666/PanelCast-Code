@@ -19,6 +19,7 @@ Python 3.13，**仅标准库**；外部依赖只有 `ffmpeg` 与 `edge-tts`。
 | **底稿对齐骨架（S5a）** | 半自动（`--align` 产骨架，人判 beat） | `m1 novel align` |
 | **底稿五步门禁** | ✅ | `m1 novel check` |
 | **审核报告 Schema 校验** | ✅ | `m1 novel lint`（只校格式，不要求签核） |
+| **章节身份强校验** | ✅ | `m1 chapter --verify`（不一致就报错，不猜） |
 | **逐段来源审计** | 半自动（第一章样张已出，`script-audit/v2`，**待人签核**） | `m1/audit/script-audit-ch01.md` |
 | **讲稿 v2 迁移（含三态）** | ⬜ 待建 | 见 ROADMAP P0-11 |
 | **正式出片内容门禁** | ⬜ 待建 | 见 ROADMAP P0-06 |
@@ -98,8 +99,8 @@ y=1821  └──────────────────────┘
 ## 目录
 
 ```
-panelcast/   代码（15 模块 + editor/ 浏览器校对）
-tests/       306 用例
+panelcast/   代码（16 模块 + editor/ 浏览器校对）
+tests/       351 用例
 tools/       novel_extract / contact_sheet / strip_sheet
 docs/        WORKFLOW（怎么做）/ ROADMAP（先做什么）/ PROJECT-MAP（目录与状态）
 m1/          出片产物区

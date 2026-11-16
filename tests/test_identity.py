@@ -8,6 +8,7 @@
 """
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -320,6 +321,167 @@ class TestBuildIndex(unittest.TestCase):
         for i in range(1, 21):
             (src / "pages" / f"page_{i:04d}.jpg").write_bytes(b"x")
         return src
+
+
+class TestIdentityMatrix(unittest.TestCase):
+    """七类局部错配，逐类拒绝。
+
+    只有 `test_counter_example_from_review` 那一个"五处全冲突"的反例不够：
+    真实迁移里更常见的是**只错一处**，而其余四处看起来完全合理。
+    这里每一类都只破坏一对关系，验证校验器不会因为"其他地方都对"就放过。
+
+    基线布局：`tmp/ch06/work/`，权威表 `tmp/chapter_index.json`，
+    五份文件全部自称 `konosuba-manga-v02-ch06`。
+    """
+
+    UID = "konosuba-manga-v02-ch06"
+    OTHER = "konosuba-manga-v02-ch07"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.work = self.root / "ch06" / "work"
+        self.work.mkdir(parents=True)
+        self._write(self.work, "chapter.json", chapter())
+        self._write(self.work, "novel_ref.json", {
+            "schema": "novel-ref/v1",
+            "chapter_uid": self.UID, "chapter_id": "ch01"})
+        self._write(self.work, "script.json", {
+            "schema": "script/v2", "chapter_uid": self.UID, "segments": []})
+        self._write(self.work, "script-audit.json", {
+            "schema": "script-audit/v2", "chapter_uid": self.UID})
+        self._write(self.root, "chapter_index.json", index_of(chapter()))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write(self, folder, name, doc):
+        (folder / name).write_text(
+            json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _set_uid(self, name, uid):
+        path = self.work / name
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["chapter_uid"] = uid
+        self._write(self.work, name, doc)
+
+    def _errors(self, work=None):
+        errors, warnings = check_work_identity(work or self.work)
+        return errors, warnings, " | ".join(errors)
+
+    def test_00_baseline_is_clean(self):
+        """先证明基线本身干净，否则后面每一条都可能是假阳性。"""
+        errors, warnings, joined = self._errors()
+        self.assertEqual(errors, [], joined)
+        self.assertEqual(warnings, [], warnings)
+
+    def test_01_workspace_disagrees_with_chapter_json(self):
+        """工作区目录名 ch07，chapter.json 说全书第 6 章。"""
+        (self.root / "ch06").rename(self.root / "ch07")
+        errors, _warnings, joined = self._errors(self.root / "ch07" / "work")
+        self.assertTrue(errors, "目录名错配必须拒绝")
+        self.assertIn("目录名", joined)
+        self.assertIn("ch07", joined)
+
+    def test_02_chapter_json_disagrees_with_novel_ref(self):
+        self._set_uid("novel_ref.json", self.OTHER)
+        errors, _warnings, joined = self._errors()
+        self.assertTrue(errors)
+        self.assertIn("novel_ref.json", joined)
+        self.assertIn(self.OTHER, joined)
+
+    def test_03_novel_ref_disagrees_with_script(self):
+        """novel_ref 说 ch06、script 说 ch07，其余三处都对。"""
+        self._set_uid("script.json", self.OTHER)
+        errors, _warnings, joined = self._errors()
+        self.assertTrue(errors)
+        self.assertIn("script.json", joined)
+        self.assertIn("身份来源互相矛盾", joined)
+
+    def test_03b_pairwise_conflict_caught_even_without_baseline_uid(self):
+        """关键变体：chapter.json 缺 uid 时逐项比对整轮空转，两两比对仍须抓到。
+
+        这正是"只测一个完整反例"会漏掉的场景。
+        """
+        path = self.work / "chapter.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc.pop("chapter_uid")
+        self._write(self.work, "chapter.json", doc)
+        self._set_uid("script.json", self.OTHER)
+        _errors, _warnings, joined = self._errors()
+        self.assertIn("身份来源互相矛盾", joined,
+                      "基准 uid 缺失时，novel_ref 与 script 的冲突不能被忽略")
+        self.assertIn(self.UID, joined)
+        self.assertIn(self.OTHER, joined)
+
+    def test_04_script_disagrees_with_script_audit(self):
+        self._set_uid("script-audit.json", self.OTHER)
+        errors, _warnings, joined = self._errors()
+        self.assertTrue(errors)
+        self.assertIn("script-audit.json", joined)
+        self.assertIn("身份来源互相矛盾", joined)
+
+    def test_05_all_five_agree_but_uid_not_in_authority(self):
+        """五处一致地抄了同一个不存在的章号——自洽但不在权威表。"""
+        orphan_uid = "konosuba-manga-v02-ch08"
+        self._write(self.work, "chapter.json",
+                    chapter(orphan_uid, global_chapter_number=8, number="第八章"))
+        for name in ("novel_ref.json", "script.json", "script-audit.json"):
+            self._set_uid(name, orphan_uid)
+        (self.root / "ch06").rename(self.root / "ch08")
+        errors, _warnings, joined = self._errors(self.root / "ch08" / "work")
+        self.assertTrue(errors, "权威表里没有的 uid 必须拒绝")
+        self.assertIn("不在权威章节映射表", joined)
+        self.assertIn(orphan_uid, joined)
+
+    def test_06_missing_uid_is_rejected(self):
+        """身份绑定文件缺 uid 一律拒绝；v1 script.json 是唯一已知例外。"""
+        for name in ("chapter.json", "novel_ref.json", "script-audit.json"):
+            with self.subTest(file=name):
+                path = self.work / name
+                raw = path.read_text(encoding="utf-8")
+                doc = json.loads(raw)
+                doc.pop("chapter_uid", None)
+                self._write(self.work, name, doc)
+                errors, _warnings, joined = self._errors()
+                self.assertTrue(any(name in e and "chapter_uid" in e for e in errors),
+                                joined)
+                path.write_text(raw, encoding="utf-8")  # 还原，避免污染下一个子用例
+
+        path = self.work / "script.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc.pop("chapter_uid")
+        self._write(self.work, "script.json", doc)
+        errors, warnings, joined = self._errors()
+        self.assertEqual(errors, [], joined)
+        self.assertTrue(any("script.json" in w for w in warnings), warnings)
+
+    def test_07_duplicate_uid_in_authority_is_rejected(self):
+        """权威表里同一个 uid 出现两次：身份不唯一，查找必然歧义。"""
+        self._write(self.root, "chapter_index.json",
+                    index_of(chapter(), chapter(self.UID)))
+        errors, _warnings, joined = self._errors()
+        self.assertTrue(errors)
+        self.assertIn("重复", joined)
+        self.assertIn(self.UID, joined)
+
+    def test_08_cli_verify_rejects_orphan_uid(self):
+        """拒绝路径真的接入 CLI——不只是函数级测试。"""
+        orphan_uid = "konosuba-manga-v02-ch08"
+        self._write(self.work, "chapter.json",
+                    chapter(orphan_uid, global_chapter_number=8, number="第八章"))
+        for name in ("novel_ref.json", "script.json", "script-audit.json"):
+            self._set_uid(name, orphan_uid)
+        (self.root / "ch06").rename(self.root / "ch08")
+        work = self.root / "ch08" / "work"
+
+        r = subprocess.run(
+            [sys.executable, "-m", "panelcast", "m1", "chapter",
+             "--verify", "--work", str(work)],
+            cwd=str(ROOT), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 3, f"stderr={r.stderr}\nstdout={r.stdout}")
+        self.assertIn("权威章节映射表", r.stderr)
+        self.assertIn(orphan_uid, r.stderr)
 
 
 if __name__ == "__main__":

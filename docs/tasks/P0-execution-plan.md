@@ -200,11 +200,31 @@
 | 门禁 | `m1 novel check` 第 1 步先验身份 |
 | 数据迁移 | 2 份索引 + 10 份 `chapter.json` + 2 份 labels 全部补齐 |
 | 实测 | 两卷索引 + 十个章级 work `--verify` 全过 |
-| 测试 | `tests/test_identity.py` 31 例 + `tests/test_lf.py` 6 例；全量 **351 tests OK (skipped=2)** |
+| 测试 | `tests/test_identity.py` 41 例 + `tests/test_lf.py` 6 例；全量 **361 tests OK (skipped=2)** |
 
 **审核意见里的反例已写成测试**（`test_counter_example_from_review`）：
 目录 `ch06` + `chapter.json` 说 A + `novel_ref` 说 B + `script-audit` 说 C
 → 报错，且报错信息里 A/B/C 与基准值全部出现。**不选"最接近的"。**
+
+**身份测试矩阵（P0-REVIEW-06 追加，10 例）**。完整反例之外，逐类只破坏一对关系，
+验证校验器不会因为"其余四处都对"就放过：
+
+| # | 场景 | 必须拒绝 |
+| --- | --- | --- |
+| 1 | 工作区目录名 vs `chapter.json` | 目录名报全书号不符 |
+| 2 | `chapter.json` vs `novel_ref.json` | 列出两个 uid |
+| 3 | `novel_ref.json` vs `script.json` | 两两冲突汇总 |
+| 3b | 上面这对冲突 + `chapter.json` 缺 uid（逐项比对整轮空转） | **仍须两两冲突汇总** |
+| 4 | `script.json` vs `script-audit.json` | 两两冲突汇总 |
+| 5 | 五处一致但 uid 不在权威章节表 | 报"不在权威章节映射表" |
+| 6 | 缺 `chapter_uid`（三份绑定文件） | 一律 error；v1 `script.json` 是唯一 warning 例外 |
+| 7 | 权威表里 uid 重复 | 报"重复" |
+| 8 | CLI `m1 chapter --verify` 命中场景 5 | **退出码 3**，证明拒绝路径接入 CLI |
+
+其中 3b 是矩阵的关键：`check_work_identity` 原本只做"每份 vs `chapter.json`"，
+基准自身缺失时整轮空转。现在补了"每份 vs 每份"的两两交叉比对。
+权威表由 CLI 从卷级 `chapter_index.json` **自动加载**——五份文件一起抄错一个
+不存在的章号，自洽也照样拒绝。
 
 **一个刻意的取舍**：`id` 仍保留 `ch01–ch05`（卷内），**目录名不改**。
 理由是改名要动十处路径与所有引用，而身份统一并不需要改目录——

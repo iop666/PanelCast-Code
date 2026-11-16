@@ -200,10 +200,10 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   **迁移**：两卷索引 + 十个章级 `chapter.json` 全部补齐身份字段，
   十个目录 `--verify` 全过；`m1/v2/ch06–ch10` 的 `id` 仍为 `ch01–ch05`（卷内），
   `chapter_uid` / `global_chapter_number` 为 6–10。**目录名未改**。
-  **测试**：`tests/test_identity.py` 31 例（含审核意见里的反例：
+  **测试**：`tests/test_identity.py` 41 例（含审核意见里的反例：
   目录 ch06 / novel_ref 说 A / script-audit 说 B → 必须报错）；
   `tests/test_lf.py` 6 例（含"索引侧零 CRLF blob"与"去掉 .gitattributes 后确实泄漏"的反证）。
-  全量 351 tests OK。
+  全量 361 tests OK。
 
 - [~] **P0-09 规则冲突核查（以代码为准）**【部分完成，需补一轮】
   已核实并写进规范的冲突：

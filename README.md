@@ -100,7 +100,7 @@ y=1821  └──────────────────────┘
 
 ```
 panelcast/   代码（16 模块 + editor/ 浏览器校对）
-tests/       351 用例
+tests/       361 用例
 tools/       novel_extract / contact_sheet / strip_sheet
 docs/        WORKFLOW（怎么做）/ ROADMAP（先做什么）/ PROJECT-MAP（目录与状态）
 m1/          出片产物区

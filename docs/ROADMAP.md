@@ -94,13 +94,19 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   改稿后重跑 S6–S9，只重算受影响段落（TTS 内容寻址缓存会自动命中未改的段）。
   产物：十章 mp4 + `run_report.json`，且 `delivery.md` 标明"内容已审计"。
 
-- [ ] **P0-05 `m1 novel --align / --check` 代码化**
+- [x] **P0-05 `m1 novel --align / --check` 代码化**【已完成】
   `--align` 只生成候选与骨架，**不得把候选自动标成人工确认**；
   `--check` 校验：`novel_ref.json` 存在 → `novel_ref.source.text_sha256` 与当前
-  `novel_index.json` 的 `file_sha256` 一致 → 每段有有效 beat → beat 的页映射合法。
-  五步任一不过就退出码 3。
+  `novel_index.json` 的 `file_sha256` 一致 → 每段有有效 beat → beat 的页映射合法
+  → `script-audit.json` 有效。五步任一不过就退出码 3。
   > 注意哈希口径：比的是 `text_sha256`（`novel.txt` 落盘字节），**不是** `source.sha256`
   > （EPUB 原文件）。两者永远不相等，混用会让底稿永远判定失效。见规范 §4.3.9。
+
+  **实现**：`panelcast/novel.py` + `tests/test_novel.py`（32 个用例）。
+  **实测**：真实章节 ch02 骨架 29 beats 全部 `unconfirmed`，`--check` 正确拒绝并指出
+  「v1 无 source_refs，需先迁 P0-11」+「缺 script-audit.json」两项。
+  **副产物**：`render()` 收归 `panelcast/novel.py`，`tools/novel_extract.py` 改为 import，
+  消除"两份 render 实现会分叉"的隐患。
 
 - [ ] **P0-06 正式出片门禁**
   `m1 run` 正式路径检查：底稿 hash、beat 引用、**内容审核报告（`script-audit.json`）

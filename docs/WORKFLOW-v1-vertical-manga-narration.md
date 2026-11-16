@@ -796,7 +796,7 @@ python tools/strip_sheet.py --pages m1/v2/work/pages \
 写稿前必须先有底稿。跳过这一步直接看漫画写，就会写出"哥布林绑票、竹筏漂向湖心、
 大青蛙吞掉铁笼"这种画面里根本没有、小说里也根本没有的段落（实测事故，见 §13 第 15 条）。
 
-#### 5.6.1 S5a 底稿对齐【待建】
+#### 5.6.1 S5a 底稿对齐【半自动：`--align` 产骨架，`--check` 五步门禁】
 
 **第一步：小说纯文本化**（`tools/novel_extract.py`，已实现）
 
@@ -843,8 +843,16 @@ def extract(epub_path):
                   "chapters": chapters,
                   "total_paras": len(lines),
                   "total_chars": sum(c["chars"] for c in chapters),
-                  "sha256": hashlib.sha256(text.encode()).hexdigest()}
+                  # 内容哈希：不含文件尾部换行
+                  "sha256": hashlib.sha256(text.encode()).hexdigest(),
+                  # 落盘字节哈希：含一个尾部换行，novel_ref 的 text_sha256 用它
+                  "file_sha256": hashlib.sha256(render(text).encode()).hexdigest()}
 ```
+
+`render(text)` 定义在 `panelcast/novel.py`（`return text + "\n"`），
+**它是 `novel.txt` 的唯一写入口**，`tools/novel_extract.py` 直接 import 它。
+写盘时必须 `newline="\n"`，否则 Windows 会把 `\n` 翻成 `\r\n`，
+同一份 epub 在不同平台算出不同的 `file_sha256`。详见 §4.3.9 的四条复验。
 
 落盘 `.local/source/epub/text/novel.txt` + `novel_index.json`。
 **段号是全局连续的**，跨章引用才不会歧义。
@@ -891,6 +899,50 @@ def extract(epub_path):
 - **门禁**：每章 `beats` 覆盖全部漫画页；`by_fidelity` 四类计数之和 = `beats_total`；
   `original` 的 beat 必须有 `pages`（否则就是凭空写的）
 - **耗时**：一章 8–30 页，约 20–40 分钟（读小说 + 对页）
+
+##### 工具：`m1 novel --align` / `--check`（P0-05，已实现）
+
+```bash
+# 生成骨架：所有 beat 一律 unconfirmed + needs_review，para 留空
+python -m panelcast m1 novel align \
+  --work m1/v1/ch02/work \
+  --novel-dir .local/source/epub/text \
+  --chapter-uid konosuba-manga-v01-ch02 \
+  --epub "この素晴らしい世界に祝福を！/正文/1.epub" \
+  --novel-chapter ch01
+
+# 五步门禁
+python -m panelcast m1 novel check \
+  --work m1/v1/ch02/work --novel-dir .local/source/epub/text
+```
+
+**`--align` 的候选为什么只是"弱提示"（实测结论）**
+
+第一版实现用二元组 Jaccard 相似度打分，实测**不可靠**。原因很具体：
+旁白是**改写**的，不是原文摘抄。
+
+| | 文本 |
+| --- | --- |
+| 旁白 | 冒险者公会的**后院**有一口大**浴池**，**热水**是从**地底**引上来的 |
+| 小说原文 | 这里的入浴费比日本还贵……我将肩膀以下都浸泡在**热水浴池**里 |
+
+只有「浴池」「热水」两个词真正重合。任何相似度都会把它排到很后面，
+而排到前面的往往是「从地底」「高阶」这类**巧合命中的无关段落**——
+实测 ch01 范围内，Jaccard 版本的第 1 名是第 446 段（讲蟾蜍的），正确答案在第 324 段。
+
+所以现在退一步，只回答一个站得住的问题：
+**"这段旁白里有哪些全书中很罕见的词（df ≤ 3）？它们在候选范围内出现在哪几段？"**
+命中词写在候选的 `anchors` 里，人一眼能判断这个候选靠什么猜的、值不值得看。
+
+实测 ch02 第 1 段：`para 324, anchors=[热水, 浴池]` —— 正确，且可解释。
+同章第 2、3 段则给出 `anchors=[费也]`、`[的简]` 这类无意义命中，
+**这正是它该有的样子**：候选不可靠的时候要看得出来，而不是伪装成结论。
+
+> **纪律**：候选一律进 `para_candidates`，`para` 永远是 `null` 直到人填。
+> 把候选写进 `para` 等于伪造"已确认"。
+
+**`--check` 对 v1 讲稿会直接失败**，这是正确的：v1 结构里没有 `source_refs` 字段，
+无从判断来源。要过第 3 步必须先迁到 v2（P0-11）。
 
 #### 5.6.2 S5 讲稿
 

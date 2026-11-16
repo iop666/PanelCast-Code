@@ -162,6 +162,8 @@ def cmd_m1(args):
             return _m1_slice(args)
         if args.m1_command == "profile":
             return _m1_profile(args)
+        if args.m1_command == "novel":
+            return _m1_novel(args)
         if args.m1_command == "verify":
             return _m1_verify(args)
         if args.m1_command == "run":
@@ -248,6 +250,59 @@ def _m1_profile(args):
     if failed:
         return 4
     return 0
+
+
+def _m1_novel(args):
+    """S5a：底稿对齐。--align 生成骨架，--check 跑五步门禁链。
+
+    `--align` 只产骨架：所有 beat 是 `unconfirmed` / `needs_review`，
+    `para` 留空，候选区间放 `para_candidates`。**不把候选标成已确认。**
+    """
+    import json as _json
+
+    from .novel import (
+        GateError,
+        build_novel_ref,
+        check,
+        format_problems,
+        write_novel_ref,
+    )
+
+    work = Path(args.work)
+    novel_dir = Path(args.novel_dir)
+
+    if args.novel_command == "align":
+        try:
+            doc = build_novel_ref(
+                work, novel_dir,
+                chapter_uid=args.chapter_uid,
+                epub=args.epub,
+                novel_chapter=args.novel_chapter,
+                volume=args.volume,
+                order=args.order,
+            )
+        except GateError as exc:
+            print(str(exc), file=sys.stderr)
+            return 3
+        path = write_novel_ref(work, doc)
+        by = doc["coverage"]["by_fidelity"]
+        print(f"novel_ref 骨架 -> {path}")
+        print(f"  beats: {by['unconfirmed']} 个，全部 needs_review（未确认）")
+        print(f"  novel 段范围: {doc['align_meta']['novel_para_range']}")
+        print("  下一步：逐 beat 判 para 与 fidelity，"
+              "候选仅供参考，不得直接采纳")
+        return 0
+
+    if args.novel_command == "check":
+        ok, problems = check(work, novel_dir)
+        if ok:
+            print(f"novel --check: 五步全过 -> {work / 'novel_ref.json'}")
+            return 0
+        print(format_problems(problems), file=sys.stderr)
+        return 3
+
+    print(f"error: unknown novel command {args.novel_command!r}", file=sys.stderr)
+    return 2
 
 
 def _m1_verify(args):
@@ -490,6 +545,28 @@ def main(argv=None):
                            help="只做前 N 页（调试用）")
     m1profile.add_argument("--allow-unconfirmed", action="store_true",
                            help="章节未确认也继续（仅调试）")
+
+    m1novel = m1sub.add_parser(
+        "novel", help="S5a: 底稿对齐 --align 生成骨架 / --check 五步门禁",
+    )
+    novel_sub = m1novel.add_subparsers(dest="novel_command", required=True)
+    for name, hlp in (("align", "生成 novel_ref.json 骨架（全部未确认）"),
+                      ("check", "五步门禁链：底稿 / 来源 / 页映射 / 审核报告")):
+        p = novel_sub.add_parser(name, help=hlp)
+        p.add_argument("--work", default="m1/work",
+                       help="章级 work 目录（要有 chapter.json / script.json）")
+        p.add_argument("--novel-dir", required=True,
+                       help="novel.txt + novel_index.json 所在目录")
+        if name == "align":
+            p.add_argument("--chapter-uid", required=True,
+                           help="全书唯一身份，如 konosuba-manga-v01-ch02")
+            p.add_argument("--epub", default=None,
+                           help="小说 epub 路径（算 source.sha256）")
+            p.add_argument("--novel-chapter", default=None,
+                           help="小说章，如 ch02 / chapter02.xhtml；不给则全书")
+            p.add_argument("--volume", type=int, default=1)
+            p.add_argument("--order", default="in_order",
+                           choices=["in_order", "reordered", "partial"])
 
     m1verify = m1sub.add_parser(
         "verify", help="S9: run the 15 acceptance checks -> run_report.json",

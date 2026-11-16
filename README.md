@@ -16,8 +16,11 @@ Python 3.13，**仅标准库**；外部依赖只有 `ffmpeg` 与 `edge-tts`。
 | 分格候选 + 浏览器校对 | ✅ | `m1 panels` / `m1 edit` |
 | 配音 → 时间轴 → 渲染 → 烧字幕 | ✅ | `m1 run` |
 | 15 条技术验收 | ✅ | `m1 verify` |
-| **底稿对齐（S5a）** | ⬜ 待建 | 见 ROADMAP P0-05 |
-| **真实帧视觉验收** | ⬜ 待建 | 见 ROADMAP P0-06 |
+| **底稿对齐骨架（S5a）** | 半自动（`--align` 产骨架，人判 beat） | `m1 novel align` |
+| **底稿五步门禁** | ✅ | `m1 novel check` |
+| **讲稿 v2 迁移（含三态）** | ⬜ 待建 | 见 ROADMAP P0-11 |
+| **正式出片内容门禁** | ⬜ 待建 | 见 ROADMAP P0-06 |
+| **真实帧视觉验收** | ⬜ 待建 | 见 ROADMAP P0-10 |
 | **横版切图模式** | ⬜ 待建 | 见 ROADMAP P1–P2 |
 
 **状态口径**：✅ = 代码在、测试过、出过产物；半自动 = 有一半靠人；⬜ = 规范写了、代码没有。
@@ -37,6 +40,16 @@ python tools/novel_extract.py \
 
 # 3) 切出一章的工作区
 python -m panelcast m1 slice --work m1/v1/work --chapter 第二章 --out m1/v1/ch02/work
+
+# 3.5) 底稿对齐骨架 + 五步门禁（P0-05）
+#      --align 只产骨架：全部 beat 是 unconfirmed，para 留空，候选进 para_candidates
+python -m panelcast m1 novel align \
+  --work m1/v1/ch02/work --novel-dir .local/source/epub/text \
+  --chapter-uid konosuba-manga-v01-ch02 \
+  --epub "この素晴らしい世界に祝福を！/正文/1.epub" --novel-chapter ch01
+python -m panelcast m1 novel check \
+  --work m1/v1/ch02/work --novel-dir .local/source/epub/text
+#      注意：v1 讲稿会在此失败（无 source_refs），需先迁 v2（P0-11）——这是正确行为
 
 # 4) 出片（竖版整页模式，跳过分格门禁是合法默认）
 python -m panelcast m1 run \

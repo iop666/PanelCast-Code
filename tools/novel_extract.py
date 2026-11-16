@@ -29,6 +29,12 @@ import re
 import sys
 import zipfile
 
+# render() 是 novel.txt 的唯一写入口，定义在 panelcast.novel 里（规范 §4.3.9
+# 的"旁路写入禁令"）。这里必须复用同一份实现，不能另写一个——
+# 两份实现一旦分叉，file_sha256 就会和磁盘字节对不上。
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from panelcast.novel import render  # noqa: E402
+
 #: 只认正文文件。本卷的 chapter00..chapter05 恰好是 spine 顺序；
 #: 换出版社的 epub 若文件名排序 ≠ spine 顺序，要改成读 OPF 的 <spine><itemref>。
 BODY_RE = re.compile(r".*/chapter\d+\.xhtml")
@@ -88,11 +94,6 @@ def extract(epub_path):
         "file_sha256": hashlib.sha256(render(text).encode("utf-8")).hexdigest(),
     }
     return text, index
-
-
-def render(text):
-    """落盘内容：每段一行 + 一个尾部换行。哈希与写盘都走这里，避免两处不一致。"""
-    return text + "\n"
 
 
 def main(argv=None):

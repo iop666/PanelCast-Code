@@ -36,7 +36,7 @@
 ## 1. 真实目录树
 
 ```
-D:\ClaudeCode\PanelCast\
+PanelCast\
 │
 ├── panelcast/                      【跑通】代码，3,784 行，仅标准库
 │   ├── __main__.py          510   CLI 入口（ingest / m1 slice|panels|edit|run|verify）

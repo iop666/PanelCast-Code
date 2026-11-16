@@ -38,6 +38,10 @@ AUDIT_SCHEMA = "script-audit/v1"
 #: 一个 beat 最多映射几页。超过这个数说明这一段覆盖太宽，该拆。
 MAX_PAGES_PER_BEAT = 3
 
+#: `fidelity` 的合法取值（规范 §3.4）。骨架用的 `unconfirmed` **不在其中**——
+#: 它是"还没判"的占位，不是一种判定结果，门禁必须拒绝它。
+FIDELITIES = {"drawn", "omitted", "altered", "original"}
+
 #: 全书中出现次数不超过这个值的二元组才算"稀有锚点"。
 #: 调高会放进"的一""了。"这类到处都有的组合，候选立刻变成随机数。
 RARE_DF = 3
@@ -308,6 +312,13 @@ def write_novel_ref(work, doc):
     return path
 
 
+def _preview(items, n=5):
+    """把一长串 id 压成"前几个 … 共 N 个"，避免门禁输出刷屏。"""
+    items = list(items)
+    head = "、".join(str(x) for x in items[:n])
+    return head + (f" … 共 {len(items)} 个" if len(items) > n else "")
+
+
 def check(work, novel_dir):
     """五步门禁链。返回 `(ok, problems)`，problems 是 `[(step, msg)]`。
 
@@ -377,13 +388,37 @@ def check(work, novel_dir):
         problems.append((4, str(exc)))
         pages = []
     page_set = set(pages)
+    unconfirmed, bad_fidelity, missing_para = [], [], []
     for b in ref.get("beats") or []:
+        bid = b.get("id")
         bpages = b.get("pages") or []
-        if b.get("fidelity") == "original" and not bpages:
-            problems.append((4, f"{b.get('id')}: fidelity=original 但 pages 为空"))
+        fid = b.get("fidelity")
+        if fid not in FIDELITIES:
+            bad_fidelity.append(f"{bid}={fid!r}")
+        # 候选/骨架不等于结论：没人工确认过的 beat 一律不放行。
+        # 这条是 P0-05 验收第 5 条，漏掉它，`--align` 的骨架就能直接过门禁。
+        if b.get("review_status") != "confirmed":
+            unconfirmed.append(bid)
+        # 非 original 的 beat 必须指到具体段落，否则"来源"是空的。
+        if fid != "original" and not b.get("para"):
+            missing_para.append(bid)
+        if fid == "original" and not bpages:
+            problems.append((4, f"{bid}: fidelity=original 但 pages 为空"))
         for p in bpages:
             if p not in page_set:
-                problems.append((4, f"{b.get('id')}: 页 {p} 不在本章"))
+                problems.append((4, f"{bid}: 页 {p} 不在本章"))
+    if bad_fidelity:
+        problems.append(
+            (4, f"fidelity 非法：{_preview(bad_fidelity)}；只能是 "
+                f"{'/'.join(sorted(FIDELITIES))}。unconfirmed 是骨架占位，必须人工判定"))
+    if missing_para:
+        problems.append(
+            (4, f"{len(missing_para)} 个非 original 的 beat 没有 para："
+                f"{_preview(missing_para)}；没有段落区间就是没有来源"))
+    if unconfirmed:
+        problems.append(
+            (4, f"{len(unconfirmed)} 个 beat 仍是 needs_review：{_preview(unconfirmed)}；"
+                f"候选与骨架不等于结论，必须人工确认后才能过门禁"))
 
     # ---- 第 5 步：审核报告有效 ----
     problems.extend(_check_audit(work, ref_path, ref, segs, schema))

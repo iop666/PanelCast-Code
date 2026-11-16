@@ -57,7 +57,7 @@ PanelCast\
 │       ├── server.py              HTTP + 分格/介绍页读写
 │       └── static/index.html      浏览器界面（两个页签）
 │
-├── tests/                          【跑通】15 个文件 / 250 用例 / OK(skipped=2)
+├── tests/                          【跑通】15 个文件 / 286 用例 / OK(skipped=2)
 │
 ├── tools/                          三个不进 CLI 的辅助脚本
 │   ├── novel_extract.py     114   【跑通】epub → novel.txt + novel_index.json
@@ -83,6 +83,10 @@ PanelCast\
 │   ├── labels/v1.json  v2.json     【跑通】章节边界，人工读横幅确认
 │   ├── delivery.md                 十章成片清单（时长/大小/验收）
 │   ├── capability_report.md        S0 环境探测实测结果
+│   ├── audit/                      【新增】内容审计区（P0-01/02/03 的产物）
+│   │   ├── chapter-map.md          章节对应表（第一章已核，其余九章标「未核」）
+│   │   ├── script-audit-ch01.md    第一章逐段审计（723 行，人读版）
+│   │   └── P0-01-SAMPLE-CH01-report.md  第一章样张执行报告
 │   ├── v1/work/                    整卷工作区（第 1 卷，169 页）
 │   │   ├── pages/                  169 张页图（git 忽略）
 │   │   ├── profiles/               145 份介绍页【占位】
@@ -308,7 +312,7 @@ y=1821  └──────────────────────┘
 | 验收 | 15 条，`run_report.json` 逐条留痕 |
 | 分格编辑器 | 分格页签 + 介绍页页签（schema 驱动表单） |
 | 小说抽取 | 2,627 段 / 83,599 字；`sha256`（内容）与 `file_sha256`（落盘字节）双哈希稳定 |
-| 测试 | 250 用例通过 |
+| 测试 | 286 用例通过 |
 
 ### 5.2 半自动的
 
@@ -358,9 +362,9 @@ P0 十一项，按依赖顺序：
 
 | ID | 任务 | 产出 |
 | --- | --- | --- |
-| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿的真实对应 | `m1/audit/chapter-map.md` |
-| P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10 |
-| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit.md` |
+| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿的真实对应 | `m1/audit/chapter-map.md`（**第一章已核，九章未核**） |
+| P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10（**ch01 已建，34 beats 全 needs_review**） |
+| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**ch01 已审，14 段待改写**） |
 | P0-04 | 改稿后重出受影响成片 | 十章 mp4 + 更新的 `delivery.md` |
 | P0-05 | `m1 novel --align/--check`（五步链） | CLI + 测试 |
 | P0-06 | 正式出片门禁（`--draft` 分离 + 审核报告校验） | `m1 run` 改动 + 测试 |

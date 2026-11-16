@@ -74,10 +74,18 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
 
 ### 2.2 任务清单
 
-- [ ] **P0-01 核实对应关系**
+- [~] **P0-01 核实对应关系**
   核实十章旧成片、讲稿、小说源文件、章节映射的真实对应关系。
   产物：一张对照表（章 → 小说段区间 → 讲稿段数 → 成片 hash），写进 `m1/audit/chapter-map.md`。
   **不得凭记忆填，必须逐章读小说原文核对。**
+
+  **状态：第一章样张已完成（P0-01-SAMPLE-CH01），其余九章未核。**
+  - `m1/audit/chapter-map.md`：第一章 30 条段落锚点 + 十章总表（九章标「未核」，不推断）
+  - 第一章结论：漫画 ch01（p5–42）= 小说 **序章 0–148 + 第一章 149–711（部分）**，
+    `order: reordered`（漫画把序章后置成插叙）
+  - 小说有、漫画没画：ch01 309–387（两周土木工/浴场/马厩）、562–619、620–711
+  - 副产物：发现 `m1/v2/ch06–ch10` 目录名与 `chapter.json` 的 `id` 不一致
+    （目录 ch06–ch10 / id ch01–ch05 / number 第六–十章），是 P0-08 的直接证据
 
 - [ ] **P0-02 建立底稿 `novel_ref.json`**
   十章各一份，覆盖本章所有漫画页；每个 Beat 标 `drawn / omitted / altered / original`。
@@ -102,11 +110,17 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   > 注意哈希口径：比的是 `text_sha256`（`novel.txt` 落盘字节），**不是** `source.sha256`
   > （EPUB 原文件）。两者永远不相等，混用会让底稿永远判定失效。见规范 §4.3.9。
 
-  **实现**：`panelcast/novel.py` + `tests/test_novel.py`（32 个用例）。
+  **实现**：`panelcast/novel.py` + `tests/test_novel.py`（36 个用例）。
   **实测**：真实章节 ch02 骨架 29 beats 全部 `unconfirmed`，`--check` 正确拒绝并指出
   「v1 无 source_refs，需先迁 P0-11」+「缺 script-audit.json」两项。
   **副产物**：`render()` 收归 `panelcast/novel.py`，`tools/novel_extract.py` 改为 import，
   消除"两份 render 实现会分叉"的隐患。
+
+  **2026-11-16 补修（P0-01 样张期间发现）**：验收第 5 条「`--check` 对未确认的 beat
+  报错而不是放过」在首版实现里**漏了**——第 4 步只看页映射，`review_status` 与
+  `fidelity` 一律不看，导致 `--align` 骨架能直接过第 4 步。已在第 4 步补三项：
+  `fidelity` 必须是四值之一（`unconfirmed` 不算判定结果）、非 `original` 必须有 `para`、
+  `review_status` 必须为 `confirmed`；新增 4 个用例。全量 286 tests OK。
 
 - [ ] **P0-06 正式出片门禁**
   `m1 run` 正式路径检查：底稿 hash、beat 引用、**内容审核报告（`script-audit.json`）

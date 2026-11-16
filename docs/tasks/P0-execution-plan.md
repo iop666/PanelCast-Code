@@ -261,6 +261,18 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 3. `order` 字段只有 `in_order / reordered / partial`，`reordered` 必须写明挪动方向；
 4. 成片 hash 用 `sha256sum` 实测，不是抄 `delivery.md`。
 
+**进度（2026-11-16）：第一章样张已完成，其余九章未动。**
+
+- 产物：`m1/audit/chapter-map.md`（第一章 30 条段落锚点 + 十章总表）
+- 第一章结论：漫画 ch01 p5–42 = 小说 **序章 0–148 + 第一章 149–711（部分）**，
+  `order: reordered`（漫画把序章后置成插叙）
+- 小说有、漫画没画：ch01 309–387（两周土木工/浴场/马厩，约 3,400 字）、562–619、620–711
+- 新增副产物：`m1/v2/ch06–ch10` 的目录名（ch06–ch10）与 `chapter.json` 的 `id`
+  （ch01–ch05）、`number`（第六–十章）三者不一致 → P0-08 的直接证据
+- 未完成：另九章的段区间与成片 hash（211 页 / 143 段）
+- 方法修正：`contact_sheet.py` 拼图只用于初筛，**判读必须回单页**——
+  第一轮用 6 页拼图看错了格序，第二轮改逐页读才纠正
+
 ---
 
 ### P0-02 十章 `novel_ref.json`

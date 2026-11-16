@@ -141,6 +141,24 @@ def write_audit(work, ref_path, schema="script/v1", review_status="approved",
     return audit
 
 
+def confirm_beats(work, fidelity="drawn", para=(0, 0)):
+    """把骨架里的 beat 全部标成"人工已确认"，用于构造"结构完全合法"的基准。
+
+    真实流程里这一步只能由人做；测试里必须显式调用它，
+    否则任何用例都不该通过第 4 步——这正是 P0-05 验收第 5 条要锁住的行为。
+    """
+    work = Path(work)
+    path = work / "novel_ref.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    for b in doc.get("beats") or []:
+        b["fidelity"] = fidelity
+        b["para"] = list(para)
+        b["review_status"] = "confirmed"
+    path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8", newline="\n")
+    return doc
+
+
 def make_v2_script(work, beats_per_seg=1):
     """把 v1 讲稿改造成"结构合法"的 v2：每段挂一个存在的 beat。"""
     work = Path(work)
@@ -346,10 +364,53 @@ class TestCheckStep4(Base):
         joined = " ".join(m for s, m in problems if s == 4)
         self.assertIn("page_9999", joined)
 
+    def test_skeleton_beats_are_rejected_not_let_through(self):
+        """--align 的骨架必须过不了门禁。这是 P0-05 验收第 5 条。"""
+        self._align()
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        joined = " ".join(m for s, m in problems if s == 4)
+        self.assertIn("needs_review", joined)
+
+    def test_unconfirmed_fidelity_is_illegal(self):
+        doc = self._align()
+        for b in doc["beats"]:
+            b["review_status"] = "confirmed"   # 只改状态，不改 fidelity
+        write_novel_ref(self.work, doc)
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        joined = " ".join(m for s, m in problems if s == 4)
+        self.assertIn("unconfirmed", joined)
+
+    def test_confirmed_beat_without_para_is_step_4(self):
+        doc = self._align()
+        for b in doc["beats"]:
+            b["review_status"] = "confirmed"
+            b["fidelity"] = "drawn"
+            b["para"] = None
+        write_novel_ref(self.work, doc)
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        joined = " ".join(m for s, m in problems if s == 4)
+        self.assertIn("没有 para", joined)
+
+    def test_original_beat_may_have_null_para(self):
+        doc = self._align()
+        for b in doc["beats"]:
+            b["review_status"] = "confirmed"
+            b["fidelity"] = "original"
+            b["para"] = None
+            b["pages"] = ["page_0005"]
+        write_novel_ref(self.work, doc)
+        _ok, problems = check(self.work, self.novel_dir)
+        joined = " ".join(m for s, m in problems if s == 4)
+        self.assertNotIn("没有 para", joined)
+
 
 class TestCheckStep5(Base):
     def _v2_ready(self):
         self._align()
+        confirm_beats(self.work)
         make_v2_script(self.work)
         return self.work / "novel_ref.json"
 

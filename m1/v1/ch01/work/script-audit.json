@@ -1,0 +1,858 @@
+{
+  "schema": "script-audit/v1",
+  "audit_spec_version": "v1.0",
+  "chapter_uid": "konosuba-manga-v01-ch01",
+  "script_schema": "script/v1",
+  "script_sha256": "1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3",
+  "novel_ref_sha256": "c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a",
+  "status_enum_extended": {
+    "pending": "已审出结论但未改写、未签核（P0-03 改写前的状态）。规范 §4.3.10 的 status 只有 approved/rewritten/removed，缺少「审过但有缺陷、等待改写」这一态，本样张按此扩展并在此显式声明。"
+  },
+  "review_status": "pending_human",
+  "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。",
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "prepared_by": "agent:panelcast-executor",
+  "prepared_at": "2026-11-16T16:00:00+08:00",
+  "coverage": {
+    "segments_total": 25,
+    "segments_audited": 25,
+    "coverage_ratio": 1.0,
+    "by_fidelity": {
+      "drawn": 10,
+      "altered": 15
+    },
+    "by_severity": {
+      "low": 6,
+      "none": 8,
+      "high": 7,
+      "medium": 4
+    },
+    "by_source_type": {
+      "novel_beat": 25
+    },
+    "by_recommended_action": {
+      "keep": 10,
+      "fix_pages": 1,
+      "rewrite": 14
+    },
+    "pages_mismatch": [
+      "seg_0003"
+    ]
+  },
+  "audited_segments": [
+    {
+      "segment_id": "seg_0001",
+      "narration_text": "自称女神的少女，把家里蹲少年佐藤和真一起拽进了异世界。落地的地方，是一座被城墙环抱的城镇：红瓦屋顶连绵成片，街上走着尖耳朵的精灵、兽耳的亚人，还有披甲的骑士，货摊边人来人往。对家里蹲来说，这里的一切都新鲜得晃眼。",
+      "text_sha256": "f585bdb5c0d48495e620f4d656f745d40633a28c9319b7c9abe1912b1e79a8b8",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00",
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          118,
+          148
+        ],
+        [
+          152,
+          160
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "low",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0005",
+        "page_0006"
+      ],
+      "pages_actual": [
+        "page_0005",
+        "page_0006"
+      ],
+      "evidence": "序章 143–148（和真指定阿克娅为「要带去的东西」，光笼罩两人）；第一章 156–160（红砖屋、兽耳、精灵耳、「如果是这个世界，我愿意乖乖出外工作」）",
+      "review_note": "「被城墙环抱」「货摊」「披甲骑士」只见于 p6 全景，小说未写，属画面补充，不冲突。p5 是扉页、无剧情，旁白落在扉页上是版式决定。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0002",
+      "narration_text": "佐藤和真站上石板路，第一句话就是感叹：这真的是异世界！真的剑、真的铠甲、真的魔法师，连兽耳和精灵都有——他兴奋得高举双手，直呼在这个世界自己也能好好出门工作。可身旁的少女阿克娅，却趴在地上放声大哭，吵得他直喊搞什么啦。",
+      "text_sha256": "0b472fc76e6d6c98a3c42d0f3e0e97b0cffe613645a1ca3576c44a67ef77e77b",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          152,
+          165
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0007",
+        "page_0008"
+      ],
+      "pages_actual": [
+        "page_0007",
+        "page_0008"
+      ],
+      "evidence": "第一章 152「马车驶过石板路」、159「是兽耳！…还有精灵耳！」、160「我愿意乖乖出外工作啊」；p8 高举双手",
+      "review_note": "「趴在地上放声大哭」与 p8 阿克娅蹲地痛哭一致。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0003",
+      "narration_text": "阿克娅哭着控诉：为什么连自己也要被拽到这种地方！和真只好安抚说，不喜欢的话回去也可以，只换来一句质问：你以为是谁害的啊！话题绕回那个谁都不想提的字——死。女神微笑着确认：没错，真是短暂的人生，佐藤和真先生。",
+      "text_sha256": "4cee18ed56106b91e1ad206a7f90796b7c4fddc17c5ed219146e12f39f3a4846",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01",
+        "ch00"
+      ],
+      "novel_para": [
+        [
+          161,
+          170
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "low",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0009"
+      ],
+      "pages_actual": [
+        "page_0009",
+        "page_0010"
+      ],
+      "evidence": "第一章 168「就是因为回不去我才伤脑筋啊」；序章 2「虽然短暂，您的人生已经结束了」；p10 首格「沒錯！非常遺憾。真是短暫的人生。」",
+      "review_note": "**页映射不完整**：末句「没错，真是短暂的人生」实际在 p10 首格，本段只登记 p9。内容无误，页引用少一页，会让时间轴把旁白压在错误的页上。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "fix_pages"
+    },
+    {
+      "segment_id": "seg_0004",
+      "narration_text": "时间拨回事故那天。难得出门的和真，看见一辆大卡车朝一名女高中生猛冲过去，他想都没想就伸手把人推开，自己却被撞飞。再睁眼时，他还在自我感觉良好：原来如此，我死了啊——不过为了保护女孩子而死，感觉真是超帅的！那孩子应该平安无事吧？",
+      "text_sha256": "8c04f09b076ae47024476c1c173c4d247e46bba594e52f674579de0daf960f86",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00"
+      ],
+      "novel_para": [
+        [
+          13,
+          24
+        ],
+        [
+          25,
+          33
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "low",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0010",
+        "page_0011"
+      ],
+      "pages_actual": [
+        "page_0010",
+        "page_0011"
+      ],
+      "evidence": "序章 14–24 回忆事故；25–33「我可以问一件事吗？」「那个女生…她还活着吗？」；p10 末格起回忆、p11 推开动作",
+      "review_note": "「再睁眼时」把小说的「我回想起不久之前的记忆」（12）改写成「苏醒」，叙事框架变了；事件本身无误。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0005",
+      "narration_text": "结果阿克娅当场噗嗤笑出了声：那孩子还活着，精神得很！除了因为他多管闲事而受的伤之外，好得很！和真当场愣在原地。一个把女神一起拽下界的家里蹲，他的异世界冒险，就从这场鸡同鸭讲的相遇，就此开场了。",
+      "text_sha256": "c57ef278b72423bf6bf19b085c21e6728ce3a71b184ec4c1e57fbeaad0e92dad",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00"
+      ],
+      "novel_para": [
+        [
+          33,
+          35
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0012"
+      ],
+      "pages_actual": [
+        "page_0012"
+      ],
+      "evidence": "序章 33–35「还活着啊！不过伤势颇为严重，脚都骨折了」「所以我并没有白死」；p12 同",
+      "review_note": "**末两句无来源且时序倒错**：此时尚未发生「把女神拽下界」（那是 p17–p19），旁白却写成既成事实；「他的异世界冒险就此开场」是编导式收束语，小说与漫画都没有。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0006",
+      "narration_text": "真相很快揭晓：撞过来的不是卡车，是一台慢吞吞的农用曳引机。和真其实是被那玩意儿吓死的。阿克娅笑得直不起腰，说医生和护士都讲，从没见过被吓到心跳停止的人。和真瘫在地上只剩一句好痛，还嘴硬说妳多管闲事。笑够了的女神清清嗓子报上名号：我叫阿克娅，在日本负责引导英年早逝的人投胎。她说，有个好消息要告诉佐藤和真先生。",
+      "text_sha256": "26cfc46af1a55194448c185941fc411aee59448cb8c73334a2e48a33b301717f",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00",
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          36,
+          55
+        ],
+        [
+          56,
+          56
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0013",
+        "page_0014"
+      ],
+      "pages_actual": [
+        "page_0013",
+        "page_0014"
+      ],
+      "evidence": "序章 40–55 牵引机与被吓死；56「我的名字是阿克娅…有两个选择」；p13「好痛」为**被推开的女生**所说，和真是抱头蹲坐",
+      "review_note": "**两处张冠李戴**：①「和真瘫在地上只剩一句好痛」——小说与 p13 里说「好痛」的是被推开的女生，和真是抱头蹲坐（序章 56）；②「还嘴硬说妳多管闲事」——「多管閒事」是阿克娅形容和真的举动（p12、小说 41 同义），旁白把说话人写成了和真。这类错误不是编剧情，而是把角色对调，比完全虚构更难被发现。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0007",
+      "narration_text": "阿克娅解释：那个世界正被魔王军入侵，人类越死越少。被怪物杀死的人带着心理创伤，再也不肯投胎，所以只能把别的世界刚死的人送过去。目标就是像和真这样英年早逝、对世界还有留恋的家伙。她眨眨眼补了一句：就像打电玩一样。",
+      "text_sha256": "edbeb93973fa6eb53e9793e490b4691f26482349d08171db2d9bdd0d690d847e",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          72,
+          80
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0015"
+      ],
+      "pages_actual": [
+        "page_0015"
+      ],
+      "evidence": "第一章 74–80「有个魔王」「把其他世界的死者送到那里去」「找年纪轻轻便丧命、还充满依恋的人」；p15「就像打電玩一樣♡」",
+      "review_note": "「人类越死越少」是小说 78「再这样下去，那个世界就不会再有小宝宝诞生」的压缩，语义一致。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0008",
+      "narration_text": "和真一口回绝：我一点也不想去。阿克娅立刻改口推销：那里有剑有魔法，还有很棒的特别赠品，可以任选一样带过去。和真嘴上说太可疑，可当女神问他想要什么，他抬手一指：那我就选妳。",
+      "text_sha256": "e61a119b2074801648b9e9b62ccf450a580fc0daf4661c31d26e705db7415d22",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00"
+      ],
+      "novel_para": [
+        [
+          81,
+          94
+        ],
+        [
+          111,
+          113
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0016",
+        "page_0017"
+      ],
+      "pages_actual": [
+        "page_0016",
+        "page_0017"
+      ],
+      "evidence": "序章 81–94 可带一样东西过去；111–113「那，就你吧」；p16「我一點也不想去！」p17「那我就選妳！」",
+      "review_note": "",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0009",
+      "narration_text": "阿克娅当场愣住。她还没来得及开口，身后的天使已经接过工作：阿克娅大人，之后的事移交给我处理，请您加油，路上小心。和真只丢下一句遵命，抓住女神的手就往传送阵里带。",
+      "text_sha256": "e325d907963758a3a833857d8caa2bfbb115f1720049095b2609aea320514c4b",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00"
+      ],
+      "novel_para": [
+        [
+          114,
+          124
+        ],
+        [
+          129,
+          129
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "medium",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0018"
+      ],
+      "pages_actual": [
+        "page_0018"
+      ],
+      "evidence": "序章 114–124 魔法阵浮现、天使现身；129「一路顺风，阿克娅大人」；p18 魔法阵与「遵命！」",
+      "review_note": "「抓住女神的手就往传送阵里带」是捏造的动作：小说与 p18 都是**魔法阵自行启动**，和真没有碰她。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0010",
+      "narration_text": "女神的惨叫一路穿透天界：等一下！我是治愈之神，根本没有战斗能力啊！她挣扎着大喊，竟敢把女神也一起送过去，这样犯规啦——声音越来越远。",
+      "text_sha256": "900c8350ab055d58abc2c6ff3e4d340ec79c9ef5b7e6556cf9dca4431577cf19",
+      "status": "pending",
+      "novel_chapter": [
+        "ch00"
+      ],
+      "novel_para": [
+        [
+          126,
+          130
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0019"
+      ],
+      "pages_actual": [
+        "page_0019"
+      ],
+      "evidence": "序章 126「带女神去是犯规吧！」130「身为女神，我拥有治愈的力量，但是没有战斗的力量啊！」；p19 同",
+      "review_note": "p19 另有神「對勇者說這些帥氣的台詞…是我的工作啊」，旁白未提，属可接受省略。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0011",
+      "narration_text": "两人摔在草地上。和真拍拍灰站起来：总之先想想接下来怎么办。阿克娅哭着吼：你以为是谁害的啊！和真懒得接话，只问城镇的酒馆和冒险者公会在哪。女神答不上来，他当场给她定了性：死废人。",
+      "text_sha256": "465379cae8f2813b98a40c3cf140ad188c133b3d59fbb0a97e6d8f66d5a0f282",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          171,
+          180
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0020"
+      ],
+      "pages_actual": [
+        "page_0020"
+      ],
+      "evidence": "第一章 171–180「阿克娅，总之先告诉我冒险者公会的位置」「这种事情你问我，我也不知道啊」「这家伙真是没用」；p20「死廢人」",
+      "review_note": "**「两人摔在草地上」无来源且与画面矛盾**：小说 152 明写落地是「马车驶过石板路」，p20 画面是城镇街道，没有草地。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0012",
+      "narration_text": "问过路，两人找到冒险者公会，一楼就是酒馆，人声鼎沸。柜台小姐露娜笑着迎上来：欢迎来到新手冒险者的城镇阿克塞尔，请问今天要办什么？和真说想当冒险者，露娜答得干脆：登记费一人一千艾莉丝。和真愣住：这也要收钱？阿克娅比他还急：我是突然被你带过来的耶！",
+      "text_sha256": "e62df8c7447d23a365c34026fa12188c116a23c7c20db6e42b128ad818e7e156",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          181,
+          202
+        ],
+        [
+          229,
+          229
+        ],
+        [
+          234,
+          234
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0021",
+        "page_0022"
+      ],
+      "pages_actual": [
+        "page_0021",
+        "page_0022"
+      ],
+      "evidence": "第一章 181–202 问路与进公会；229「登录需要支付登录手续费」；234「在那种状况下突然被带到这里来，我怎么可能有带钱啊？」；p22「一人要收一千艾莉絲」",
+      "review_note": "**「柜台小姐露娜」的人名无来源**：全书检索「露娜」0 次，小说只称「柜台小姐」，p21–p23 也没有出现她的名字。凭空命名，且后两段继续沿用（seg_0014/0015），错误会扩散。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0013",
+      "narration_text": "阿克娅翻遍全身也掏不出钱。她清清嗓子，当众宣布自己是阿克西斯教团信仰的女神，接着朝大厅喊了一句给我钱。没想到真有人掏钱，还恭恭敬敬递上教典。和真看不下去，自己把登记费交了。",
+      "text_sha256": "112f69af6d28d9693333a47994d609dce25a4d8f467b103ac111eba76679266d",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          241,
+          257
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0023"
+      ],
+      "pages_actual": [
+        "page_0023"
+      ],
+      "evidence": "第一章 242「我是阿克娅…阿克西斯教团所祭拜的神体」「能不能请汝帮个忙，借我一点钱」；248 祭司给钱并告诫别冒用名号；253–256「我们拿登录费来了」「阿克娅从祭司那里要来的钱有三千艾莉丝」",
+      "review_note": "**两处事实错误**：①「恭恭敬敬递上教典」——祭司递的是**钱**，「教典」是他用来自证艾莉丝教徒身份的道具（p23「這是我們的教典」），不是礼物；②「和真看不下去，自己把登记费交了」——小说 253–256 与 p23 用的都是**阿克娅讨来的三千艾莉丝**，和真没有自己掏钱。资金因果被改写。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0014",
+      "narration_text": "露娜解释：冒险者是讨伐城外怪物的职业，也接各种杂活，等于万事屋。她把一张卡片推过来，让和真用手按住，等级和能力值就会显示在上面。露娜补充，打倒怪物能拿经验值，攒够就能升级、加技能点。和真闭上眼，等着看自己惊人的潜在能力。",
+      "text_sha256": "d6b7ffee167faef9cf10117dadedc454ff37c99bce14b3ff257e9d1b702d1573",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          259,
+          278
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "low",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0024",
+        "page_0025"
+      ],
+      "pages_actual": [
+        "page_0024",
+        "page_0025"
+      ],
+      "evidence": "第一章 259–278 冒险者是万事屋、卡片显示等级与能力值、经验值可升级；p24–p25 同",
+      "review_note": "内容忠于原文，唯一问题是「露娜」这个无来源人名（承 seg_0012）。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0015",
+      "narration_text": "结果力量、生命、魔力全是普通，只有幸运值高得离谱。露娜安慰他，幸运对冒险者没什么用。和真不服，转头说那我要当大贤者，被告知只能从基础职业里挑。轮到阿克娅，卡片上的魔力值高到异常，智力偏低，幸运最低。她得意地挺起胸：真不愧是我。",
+      "text_sha256": "d914e4fdcb6a37b2a5d062200ece10d2ae2838f4c728cff84467f60dee8764c3",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          278,
+          303
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0026",
+        "page_0027"
+      ],
+      "pages_actual": [
+        "page_0026",
+        "page_0027"
+      ],
+      "evidence": "第一章 278–303「每一项都很普通…幸运非常高」「幸运是不太需要的数值」「那、那个，我还是，当冒险者好了」；292–303 阿克娅数值与大祭司",
+      "review_note": "**「和真不服，转头说那我要当大贤者」是凭空捏造的台词**：小说 282–283 和真说的是「我还是，当冒险者好了」，p26 也没有「大贤者」。同段仍有「露娜」人名问题。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0016",
+      "narration_text": "职业栏里只有最基本的冒险者可选，和真咬牙认了。两人刚出城，草丛里窜出一只比人还高的青蛙。和真扭头就跑，一边喊我怎么可能打得赢这种东西。阿克娅在后面笑得直不起腰。",
+      "text_sha256": "13ba21babdf7e36d59b9317adf328baf448b3804ffe443d48fcce077d3618e13",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          387,
+          396
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "low",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0028"
+      ],
+      "pages_actual": [
+        "page_0028"
+      ],
+      "evidence": "第一章 392「巨大的蛙型怪物——巨型蟾蜍」、399「它们巨大的身体比牛还大」；p28 巨蛙远大于人",
+      "review_note": "「比人还高」与小说「比牛还大」不符，属尺寸低估；「草丛里窜出」与小说「城镇外面的宽广平原」略偏。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0017",
+      "narration_text": "笑够了，阿克娅才慢悠悠开口说要帮他，前提是今后得信仰她、叫她阿克娅大人。可她刚摆好架势，就被青蛙一口黏液浇透。和真握着小刀站在巨蛙面前，身后传来女神的哭腔：又腥又臭，都是你的错啦。",
+      "text_sha256": "9f14d3151b3b656a7826baf7deef353d95e395ed1f207078467fdc1862ed0ea1",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          407,
+          424
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "high",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0029",
+        "page_0030"
+      ],
+      "pages_actual": [
+        "page_0029",
+        "page_0030"
+      ],
+      "evidence": "第一章 412–421「蟾蜍已经跑向和逃窜的我不同的方向」「一条腿从蟾蜍的嘴角掉了出来」；p30 同",
+      "review_note": "**关键动作被改写**：「被青蛙一口黏液浇透」——小说与 p30 都是**被吞进嘴里**、被拖出来时全身黏液。把「被吃掉」降级成「被喷到」，抹掉了原作的核心笑点，也掩盖了「女神被蟾蜍吞下」这一事实。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0018",
+      "narration_text": "和真瘫在公会的长椅上不肯动，阿克娅叉着腰催他起来。他辩解说是队伍攻击力不够，女神立刻反问：不够的东西多了，比如钱。可这个任务赌上性命，报酬却少得可怜。两人对着账本发愁，最后阿克娅拍桌：来募集强大的伙伴吧！",
+      "text_sha256": "15cd05c5706e5d93b916a2413172ee57a003b4619f8e1ddb45b566831a25799c",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          444,
+          461
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "low",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0031"
+      ],
+      "pages_actual": [
+        "page_0031"
+      ],
+      "evidence": "第一章 444–461「还是招募同伴吧！」「有本小姐在，想找同伴只需要招募一下」；p31「這個任務要賭上性命，但是報酬卻很少…」",
+      "review_note": "「两人对着账本发愁」无来源：小说 446–461 是**吃着酥炸蟾蜍腿**开会，没有账本。「报酬少得可怜」来自 p31 漫画台词，小说 451 只说「和土木工程的打工费差不了多少」，属程度放大。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0019",
+      "narration_text": "和真泼冷水：这种刚成立的队伍，能招到人吗？阿克娅拍着胸脯说当然，毕竟自己是大祭司。结果坐到天黑，一个来问的都没有。和真只好让步：把仅限高阶职业这条去掉，门槛降一点。",
+      "text_sha256": "483e27001d93aeac58c36bdf3766fd3e8cf67f2cafa77ca4004d088bc744c1d0",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          463,
+          480
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0032"
+      ],
+      "pages_actual": [
+        "page_0032"
+      ],
+      "evidence": "第一章 463–480「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
+      "review_note": "「坐到天黑」对应小说 466「已经持续等超过半天」，可接受。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0020",
+      "narration_text": "话音刚落，一个戴尖帽的少女掀帘进来：我是看征人广告来的，就是这里吗？她自报家门，说是最高阶职业大魔法师，必杀魔法能崩山碎石，是红魔族首屈一指的魔法师，名叫惠惠。紧接着肚子咕噜一声，她红着脸改口：可以给我一点食物吗？我三天没吃东西了。",
+      "text_sha256": "eb402bf4ddc3bc8f061c7bf9ff8db5f482767c57458e6e71061e15201dcf7936",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          480,
+          497
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0033",
+        "page_0034"
+      ],
+      "pages_actual": [
+        "page_0033",
+        "page_0034"
+      ],
+      "evidence": "第一章 480「我看见在招募上级职业冒险者的告示」、488「吾乃惠惠！职业乃大法师…爆裂魔法」、494「红魔族首屈一指的魔法师」、495「我已经三天没吃任何东西了」；p33–p34 同",
+      "review_note": "「最高阶职业」与小说「大法师」（上级职业）一致；「红着脸」画面依据不足，但无害。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0021",
+      "narration_text": "惠惠抓起面包就啃。阿克娅凑到和真耳边小声说，红魔族名字虽然怪，可都是老练的魔法师，这女孩魔力很高。惠惠放下杯子，撩起眼罩：从我的角度来看，你们一族以外的名字才奇怪。要不要见识一下我的力量？",
+      "text_sha256": "32f9a6e92669201517efa672e786f950796e884ff746f9a4897ef636b4f142b0",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          498,
+          518
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "medium",
+      "alteration_origin": "narration",
+      "pages_declared": [
+        "page_0035"
+      ],
+      "pages_actual": [
+        "page_0035"
+      ],
+      "evidence": "第一章 497–501 眼罩由**和真**去拉；502–506 红魔族说明；507–512 父母名字；513 魔力值很高；515–517 递菜单；p35 惠惠在喝饮料",
+      "review_note": "**两处动作错位**：①「惠惠…撩起眼罩」——小说 500 与 p34 都是**和真**去拉扯她的眼罩，不是她自己撩；②「抓起面包就啃」无来源，小说 515–517 是递菜单，p35 她拿的是杯子。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0022",
+      "narration_text": "三人刚出城，草丛里又冒出几只青蛙。惠惠说魔法需要时间发动，请他们先帮忙绊住青蛙的行动。和真问这样真的没问题吗，阿克娅也只能说不知道。惠惠把法杖举过头顶：这就是人类最强的攻击手段，也是究极的攻击魔法——爆裂魔法！",
+      "text_sha256": "724e1e6b79497535db58a9375e0d02930ad61785abc1e0c94a88cce5dd3e7738",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          519,
+          543
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0036",
+        "page_0037"
+      ],
+      "pages_actual": [
+        "page_0036",
+        "page_0037"
+      ],
+      "evidence": "第一章 519「在我准备好之前，请你们绊住那只蟾蜍」、538「这就是人类所能实行的攻击手段当中威力最强的一种」；p36–p37 同",
+      "review_note": "「几只青蛙」小说为两只（一远一近），p36 画面多于两只，属画面差异。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0023",
+      "narration_text": "白光从法杖顶端的圆球里炸开，热浪把草叶全部压平。和真和阿克娅只能抬起手臂挡住眼睛，连喊都喊不出来。",
+      "text_sha256": "4d7c88f257c38de037016525ace253b4961b5c8ad1b192790b956e15fa6971ff",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          539,
+          547
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": "none",
+      "pages_declared": [
+        "page_0038",
+        "page_0039"
+      ],
+      "pages_actual": [
+        "page_0038",
+        "page_0039"
+      ],
+      "evidence": "第一章 539–547 法杖前端聚光、闪光、爆风；p39 球状法器与冲击波",
+      "review_note": "「草叶全部压平」是画面推断（p39 冲击波），小说只说「就快被那凌厉的爆风给吹走」；「连喊都喊不出来」无直接依据，无害。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    },
+    {
+      "segment_id": "seg_0024",
+      "narration_text": "烟尘散去，地上多了一个巨大的坑，那几只青蛙连影子都没剩下。和真瞪大眼睛：好厉害，一瞬间就全没了，这就是魔法。",
+      "text_sha256": "d73e3edf4daab312ca71a8efb07623f3424d39f636421a741cd19ab7f98c8307",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          544,
+          548
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "medium",
+      "alteration_origin": "manga",
+      "pages_declared": [
+        "page_0040"
+      ],
+      "pages_actual": [
+        "page_0040"
+      ],
+      "evidence": "第一章 545「蟾蜍爆裂开来」、547「形成了一个二十公尺以上的陨石坑」、548「太猛了吧——这就是魔法啊」；p40「一瞬間就把那些青蛙…」",
+      "review_note": "小说只炸掉**一只**蟾蜍，旁白「那几只青蛙连影子都没剩下」沿用了 p40 漫画台词的复数夸张。属漫画改写、旁白跟随，不是旁白原创。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "rewrite"
+    },
+    {
+      "segment_id": "seg_0025",
+      "narration_text": "他刚说完赢定了，只要靠她的力量连魔王都能轻易解决，就看见阿克娅正被另一只青蛙吞到腰。他心想干脆让这两个人都被吃掉，自己一个人回去算了——这就是他在异世界接下的第一个任务。",
+      "text_sha256": "4148a01469281deadda2f72a991aa03e8cfe3003cd1aed94a7cb837b6c27f0e8",
+      "status": "pending",
+      "novel_chapter": [
+        "ch01"
+      ],
+      "novel_para": [
+        [
+          549,
+          561
+        ]
+      ],
+      "source_type": "novel_beat",
+      "fidelity": "altered",
+      "severity": "medium",
+      "alteration_origin": "manga",
+      "pages_declared": [
+        "page_0041",
+        "page_0042"
+      ],
+      "pages_actual": [
+        "page_0041",
+        "page_0042"
+      ],
+      "evidence": "第一章 549–561「惠惠已经倒在地上了」「我收拾掉…两只蟾蜍」；p41「贏定了！只要靠她的力量，就連魔王也可以輕易地…」、p42「乾脆讓這兩個人都被青蛙吃掉」",
+      "review_note": "漫画把小说的「和真收拾残局」改写成「盘算丢下两人自己回去」的黑色独白；旁白忠于漫画，与小说的差异属漫画改写，不改旁白。",
+      "review_status": "pending_human",
+      "reviewer": null,
+      "recommended_action": "keep"
+    }
+  ],
+  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。"
+}

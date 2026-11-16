@@ -1,0 +1,26 @@
+# 换行符策略——这不是格式洁癖，是哈希门禁的前提。
+#
+# `novel_ref.source.text_sha256`、`script-audit.script_sha256` 和逐段
+# `text_sha256` 绑的都是**文件字节**。只要检出一个 CRLF 版本，哈希立刻全错，
+# 门禁会把"没改过的文件"判定为"被改过"。
+#
+# 本机 `core.autocrlf=true`，不加这个文件，新克隆出来的 JSON / txt 就是 CRLF。
+# 所以这里强制全仓 LF，并显式声明二进制类型（避免 git 试图"规范化"图片）。
+#
+# 规范依据：§4.3.9「哈希口径的实施复验」第 1、2 条（跨平台一致 / CRLF 输入）。
+
+* text=auto eol=lf
+
+# 二进制：绝不做换行转换
+*.jpg   binary
+*.jpeg  binary
+*.png   binary
+*.gif   binary
+*.mp4   binary
+*.wav   binary
+*.m4a   binary
+*.mp3   binary
+*.mobi  binary
+*.epub  binary
+*.ttf   binary
+*.otf   binary

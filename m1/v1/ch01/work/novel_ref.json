@@ -1,0 +1,437 @@
+{
+  "schema": "novel-ref/v1",
+  "chapter_uid": "konosuba-manga-v01-ch01",
+  "chapter_id": "ch01",
+  "label": "第一章 与自称是女神的家伙一起转生到异世界！",
+  "pages": [
+    5,
+    42
+  ],
+  "source": {
+    "file": "1.epub",
+    "volume": 1,
+    "sha256": "3866c6623fa365929acfb6922e75d6c55ffb85454a2fa911e3e50b987e4ac4cd",
+    "text_sha256": "26a023ef76c6cb56319366ebc8a94d4419ad7cc04b57a554284daf4b584688fa"
+  },
+  "novel_chapters": [
+    {
+      "index": "ch00",
+      "title": "序章",
+      "para_from": 0,
+      "para_to": 148,
+      "chars": 4536
+    },
+    {
+      "index": "ch01",
+      "title": "第一章 和这个自称女神转生到异世界！",
+      "para_from": 149,
+      "para_to": 711,
+      "chars": 19142
+    }
+  ],
+  "order": "reordered",
+  "order_note": "漫画把小说的「序章（死亡→选阿克娅→传送）」整体后置成插叙：p6–p9 先演抵达阿克塞尔（小说第一章 152–170），p10–p19 才回到天界演序章，p20 再切回街上。小说顺序是 序章 → 第一章。段落本身没有被改写，只是叙述次序被调换。",
+  "beats": [
+    {
+      "id": "b01",
+      "para": null,
+      "gist": "章节扉页：标题与阿克娅立绘，无剧情",
+      "pages": ["page_0005"],
+      "fidelity": "original",
+      "mapping_confidence": "high",
+      "evidence": "p5 为扉页，无分格、无台词",
+      "review_status": "needs_review",
+      "note": "扉页单列为一个 beat，是为了让页→beat 覆盖不出现空洞；它不承载任何小说内容"
+    },
+    {
+      "id": "b02",
+      "para": [2, 12],
+      "gist": "全白房间，阿克娅宣告和真已死、人生已结束",
+      "pages": ["page_0010"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 2「佐藤和真先生，欢迎来到死后的世界…虽然短暂，您的人生已经结束了」；p10 首格台词同义",
+      "review_status": "needs_review",
+      "note": "p10 同时承载 b02 的宣告与 b03 的回忆开头，页跨 beat 属正常"
+    },
+    {
+      "id": "b03",
+      "para": [13, 24],
+      "gist": "回忆：为买游戏出门，见低头看手机的女高中生走上斑马线，和真推开她",
+      "pages": ["page_0010", "page_0011"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 14–24；p10 末格「平常我一直都不去上學」起回忆，p11 为推开动作",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b04",
+      "para": [25, 35],
+      "gist": "和真问被推开的女生是否平安，阿克娅答还活着但脚骨折",
+      "pages": ["page_0011", "page_0012"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 29–35；p11「我推開的那個女孩子應該平安無事吧？」，p12「還活著！還活著啦！」",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b05",
+      "para": [36, 55],
+      "gist": "阿克娅补刀：没撞开她反而毫发无伤、那是牵引机、他是被吓死的，医护与家属都在笑",
+      "pages": ["page_0012", "page_0013"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 37–55；p12「除了因為你多管閒事而受的傷」，p13「其實，是牽引機喔」「你是被曳引機嚇到，然後就被嚇死了」",
+      "review_status": "needs_review",
+      "note": "「多管閒事」在小说与漫画里都是阿克娅形容和真的举动，不是和真说的话——旁白曾在此处张冠李戴，见 script-audit seg_0006"
+    },
+    {
+      "id": "b06",
+      "para": [56, 71],
+      "gist": "阿克娅报上名字，给出投胎或上天堂两个选择，并说天堂很无聊",
+      "pages": ["page_0014"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 56「我的名字是阿克娅」、59–63 两个选择与天堂说明；p14 同",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b07",
+      "para": [72, 91],
+      "gist": "说明异世界被魔王军入侵、死者拒绝投胎，可带一样东西过去",
+      "pages": ["page_0014", "page_0015"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 74–80；p14「還有別的異世界，那個世界有『魔王』」、p15 魔王军与移民政策说明",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b08",
+      "para": [92, 110],
+      "gist": "阿克娅拿出型录，和真挑不出来，被她催",
+      "pages": ["page_0016"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 93–106；p16「有很棒的特別贈品」「可以選一個喜歡的東西帶過去」",
+      "review_status": "needs_review",
+      "note": "小说里是「型录」，漫画改写成「特別贈品」的口头推销，功能相同"
+    },
+    {
+      "id": "b09",
+      "para": [111, 117],
+      "gist": "和真指着阿克娅说「那就你吧」，阿克娅当场僵住",
+      "pages": ["page_0017"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 111–116；p17「妳！那我就選妳！」",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b10",
+      "para": [118, 148],
+      "gist": "天使接手阿克娅的工作，魔法阵启动，两人被光送往异世界",
+      "pages": ["page_0018", "page_0019"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 118–148；p18 天使现身与「遵命！」，p19 阿克娅被拖走惨叫",
+      "review_status": "needs_review",
+      "note": "小说里是魔法阵自动启动，和真并未「抓住女神的手带她进去」——旁白有此捏造，见 seg_0009"
+    },
+    {
+      "id": "b11",
+      "para": [152, 160],
+      "gist": "抵达阿克塞尔：石板路、红砖街景、兽耳与精灵耳，和真兴奋",
+      "pages": ["page_0006", "page_0007", "page_0008"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 152–160「马车驶过石板路」「是兽耳！…还有精灵耳！」；p6 全景、p7–p8 街上",
+      "review_status": "needs_review",
+      "note": "城墙、货摊、披甲骑士只见于画面，小说未写"
+    },
+    {
+      "id": "b12",
+      "para": [161, 170],
+      "gist": "阿克娅抱头大叫、哭着扑上来，和真让她回去，她说回不去",
+      "pages": ["page_0009"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 161–170「就是因为回不去我才伤脑筋啊」；p9 同",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b13",
+      "para": [171, 180],
+      "gist": "阿克娅报名字，和真问冒险者公会在哪，她答不上来",
+      "pages": ["page_0020"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 171–180；p20「我怎麼會知道啊！」「死廢人」",
+      "review_status": "needs_review",
+      "note": "「死废人」是小说 180「这家伙真是没用」的漫画化粗口，语义一致"
+    },
+    {
+      "id": "b14",
+      "para": [181, 194],
+      "gist": "向路过的阿姨问路，得知这是新手冒险者的城镇阿克塞尔，走进公会",
+      "pages": ["page_0021"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 181–194「欢迎来到新手冒险者的城镇，阿克塞尔」；p21 问路与公会外观",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b15",
+      "para": [195, 229],
+      "gist": "公会兼营酒吧，柜台小姐接待，登录需要手续费",
+      "pages": ["page_0021", "page_0022"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 195–229「登录需要支付登录手续费」；p21 末格接待、p22「一人要收一千艾莉絲」",
+      "review_status": "needs_review",
+      "note": "小说里柜台小姐**没有名字**，全书检索「露娜」0 次；旁白给她取名属无来源，见 seg_0012/0014/0015"
+    },
+    {
+      "id": "b16",
+      "para": [230, 259],
+      "gist": "两人没钱，阿克娅向艾莉丝教祭司讨到三千艾莉丝，凑出登录费",
+      "pages": ["page_0023"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 242–257「我是阿克西斯教团所祭拜的神体…能不能请汝帮个忙，借我一点钱」「阿克娅从祭司那里要来的钱有三千艾莉丝」；p23 同",
+      "review_status": "needs_review",
+      "note": "祭司给的是**钱**并告诫她别冒用女神名号；「教典」是他用来自证艾莉丝教徒身份的道具，不是礼物"
+    },
+    {
+      "id": "b17",
+      "para": [260, 278],
+      "gist": "说明冒险者是万事屋、卡片会显示等级与能力值、经验值可升级",
+      "pages": ["page_0024", "page_0025"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 259–278；p24「就像是萬事屋一樣」、p25 卡片与经验值说明",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b18",
+      "para": [279, 292],
+      "gist": "和真数值全普通、只有幸运极高，只能选基本职业「冒险者」",
+      "pages": ["page_0025", "page_0026"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 278–291「每一项都很普通…幸运非常高」；p25 末格、p26 职业说明",
+      "review_status": "needs_review",
+      "note": "小说 278 另写「智力略高」，漫画只画「都很普通」；不构成冲突"
+    },
+    {
+      "id": "b19",
+      "para": [293, 308],
+      "gist": "阿克娅魔力爆表、智力偏低、幸运最低，登录为上级职业「大祭司」",
+      "pages": ["page_0026", "page_0027"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 292–303「魔力更是高到离谱」「以我而言应该是大祭司吧」；p26–p27 同",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b20",
+      "para": [309, 387],
+      "gist": "之后两周做土木工、泡大众浴场、睡马厩，和真抱怨没有冒险",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "high",
+      "evidence": "小说 309–387 整节（含浴场 321–327、马厩 333–338、抱怨 339–387）",
+      "review_status": "needs_review",
+      "note": "漫画完全跳过这一节，登记完直接出城接任务。这是本章最大的一处省略（79 段 / 约 3,400 字），也是「漫画第一章为什么短」的主要原因"
+    },
+    {
+      "id": "b21",
+      "para": [388, 411],
+      "gist": "出城接任务，巨型蟾蜍追和真，阿克娅在旁边笑并索要敬称",
+      "pages": ["page_0028", "page_0029"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 388–411「巨型蟾蜍」「首先你在叫我的时候加上小姐的敬称」；p28–p29 同",
+      "review_status": "needs_review",
+      "note": "小说明写「比牛还大」（399），旁白写成「比人还高」属尺寸错误，见 seg_0016"
+    },
+    {
+      "id": "b22",
+      "para": [412, 427],
+      "gist": "蟾蜍转向阿克娅把她吞进嘴里，和真拔短剑冲上去敲碎它的头",
+      "pages": ["page_0030"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 412–427「一条腿从蟾蜍的嘴角掉了出来」「被我敲碎脑袋的蟾蜍」；p30 同",
+      "review_status": "needs_review",
+      "note": "旁白把「被吞进去」弱化成「被黏液浇透」，见 seg_0017"
+    },
+    {
+      "id": "b23",
+      "para": [428, 443],
+      "gist": "和真提议撤退，阿克娅不服，神光拳对蟾蜍无效，和真打倒第二只",
+      "pages": ["page_0030", "page_0031"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 429–443「神光拳！」「拳头打在蟾蜍柔软的腹部上便陷了进去」；p30 末格",
+      "review_status": "needs_review",
+      "note": "p31 起已回公会，属 b24"
+    },
+    {
+      "id": "b24",
+      "para": [444, 462],
+      "gist": "回镇卖蟾蜍肉，在公会吃炸蟾蜍腿，决定招募同伴",
+      "pages": ["page_0031"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 444–461「还是招募同伴吧！」「有本小姐在，想找同伴只需要招募一下」；p31 同",
+      "review_status": "needs_review",
+      "note": "小说 445–446 先回大众浴场洗澡再回公会；漫画跳过洗澡，属压缩。p31「這個任務要賭上性命，但是報酬卻很少」是漫画台词，小说 451 只说「和土木工程的打工费差不了多少」"
+    },
+    {
+      "id": "b25",
+      "para": [463, 480],
+      "gist": "贴出征人告示，半天没人来，和真提议去掉「仅限上级职业」",
+      "pages": ["page_0032"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 463–480「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b26",
+      "para": [481, 497],
+      "gist": "惠惠登场，自称红魔族首屈一指的大法师，用爆裂魔法，三天没吃饭",
+      "pages": ["page_0033", "page_0034"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 480–497「吾乃惠惠！职业乃大法师…爆裂魔法」「我已经三天没吃任何东西了」；p33–p34 同",
+      "review_status": "needs_review",
+      "note": "小说职业名为「大法师」，漫画写「大魔法師」，同一职业的两种译法"
+    },
+    {
+      "id": "b27",
+      "para": [498, 514],
+      "gist": "眼罩的玩笑、红魔族智力高魔力强、父母名字、卡片魔力值很高",
+      "pages": ["page_0034", "page_0035"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 498–514「此乃压抑吾之强大魔力的魔法道具」「妈妈叫唯唯，爸爸叫飘三郎」；p34 末格父母名字、p35 红魔族说明",
+      "review_status": "needs_review",
+      "note": "拉眼罩的是**和真**（小说 500、p34），不是惠惠自己"
+    },
+    {
+      "id": "b28",
+      "para": [515, 518],
+      "gist": "和真递菜单，互相自我介绍",
+      "pages": ["page_0035"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 515–517「我是和真。这个家伙叫阿克娅」；p35 惠惠进食",
+      "review_status": "needs_review",
+      "note": "小说递的是菜单，漫画画成她已在喝饮料；旁白写成「抓起面包就啃」，面包无来源"
+    },
+    {
+      "id": "b29",
+      "para": [519, 534],
+      "gist": "再战蟾蜍，惠惠要求先绊住它，阿克娅自暴自弃冲上去又被吞",
+      "pages": ["page_0036"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 519–534「在我准备好之前，请你们绊住那只蟾蜍」「毫无学习能力的阿克娅果然成功进入蟾蜍的体内」；p36 同",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b30",
+      "para": [535, 543],
+      "gist": "惠惠咏唱，法杖前端聚光，喊出爆裂魔法",
+      "pages": ["page_0037", "page_0038", "page_0039"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 535–543「这正是最极致的攻击魔法」「『Explosion』！」；p37 举杖、p38「爆裂魔法！」、p39 聚光",
+      "review_status": "needs_review",
+      "note": ""
+    },
+    {
+      "id": "b31",
+      "para": [544, 548],
+      "gist": "闪光命中，蟾蜍炸碎，烟尘散去留下陨石坑，和真感叹「这就是魔法」",
+      "pages": ["page_0040"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 544–548「形成了一个二十公尺以上的陨石坑」「太猛了吧——这就是魔法啊」；p40 同",
+      "review_status": "needs_review",
+      "note": "小说只炸掉**一只**蟾蜍；p40 台词「一瞬間就把那些青蛙…」是漫画的复数夸张"
+    },
+    {
+      "id": "b32",
+      "para": [549, 561],
+      "gist": "地底爬出一只蟾蜍，惠惠魔力耗尽倒地，和真收拾两只，完成任务",
+      "pages": ["page_0041", "page_0042"],
+      "fidelity": "drawn",
+      "mapping_confidence": "high",
+      "evidence": "小说 549–561「惠惠已经倒在地上了」「总算是完成了…讨伐五只巨型蟾蜍的任务」；p41–p42 同",
+      "review_status": "needs_review",
+      "note": "p41「贏定了！只要靠她的力量，就連魔王也可以輕易地…」与 p42「乾脆讓這兩個人都被青蛙吃掉」都是漫画原创台词，小说无"
+    },
+    {
+      "id": "b33",
+      "para": [562, 619],
+      "gist": "回程：禁止再用爆裂魔法、惠惠只会爆裂魔法、抱住和真不放",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "medium",
+      "evidence": "小说 562–619 整节（爆裂魔法唯一论 571–596、抱住不放 600–619）",
+      "review_status": "needs_review",
+      "note": "本章未画。是否在第二章补叙需在第二章样张确认——**此处不做推断**"
+    },
+    {
+      "id": "b34",
+      "para": [620, 711],
+      "gist": "回公会报告任务，和真升到四级",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "medium",
+      "evidence": "小说 620–711「冒险者等级四」",
+      "review_status": "needs_review",
+      "note": "本章未画；同上，不推断是否在第二章补叙"
+    }
+  ],
+  "coverage": {
+    "novel_chars": 23678,
+    "script_chars": 2393,
+    "beats_total": 34,
+    "by_fidelity": {
+      "drawn": 30,
+      "omitted": 3,
+      "altered": 0,
+      "original": 1,
+      "unconfirmed": 0
+    },
+    "page_coverage": {
+      "chapter_pages": 38,
+      "pages_mapped": 38,
+      "pages_unmapped": 0
+    },
+    "note": "altered 为 0 是 beat 级判定：本章漫画对小说的改动集中在「省略」（b20/b33/b34）与台词重写，没有把小说事件改写成别的事。旁白层面的改写与捏造记在 script-audit.json，不重复计入 beat。"
+  },
+  "align_meta": {
+    "tool": "manual",
+    "segments": 25,
+    "novel_para_range": [0, 711],
+    "auto_confirmed": false,
+    "prepared_by": "agent:panelcast-executor",
+    "prepared_at": "2026-11-16T16:00:00+08:00",
+    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。"
+  }
+}

@@ -200,7 +200,7 @@
 | 门禁 | `m1 novel check` 第 1 步先验身份 |
 | 数据迁移 | 2 份索引 + 10 份 `chapter.json` + 2 份 labels 全部补齐 |
 | 实测 | 两卷索引 + 十个章级 work `--verify` 全过 |
-| 测试 | `tests/test_identity.py` 56 例 + `tests/test_novel.py` 89 例 + `tests/test_lf.py` 6 例；全量 **401 tests OK (skipped=2)**（P0-REVIEW-08 后） |
+| 测试 | `tests/test_identity.py` 64 例 + `tests/test_novel.py` 102 例 + `tests/test_lf.py` 6 例；全量 **422 tests OK (skipped=2)**（P0-REVIEW-09 后） |
 
 **审核意见里的反例已写成测试**（`test_counter_example_from_review`）：
 目录 `ch06` + `chapter.json` 说 A + `novel_ref` 说 B + `script-audit` 说 C
@@ -400,7 +400,7 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 
 ---
 
-### P0-REVIEW-08 JSON 结构 fail-closed 与 Schema/Linter 完整对齐【本轮已落地】
+### P0-REVIEW-08 JSON 结构 fail-closed 与 Schema/Linter 完整对齐【部分通过；由 P0-REVIEW-09 补齐】
 
 **来源**：项目负责人独立复审（2026-11-16）。P0-REVIEW-07 的修复成立，
 但 `_read_json()` 对合法 JSON `null` 返回 `(None, "ok")`，`load()` 只看
@@ -437,6 +437,51 @@ python -m panelcast m1 novel --check --work m1/v1/ch02/work
 
 **测试**：`test_identity.py` 50 → 56 例、`test_novel.py` 78 → 89 例；
 全量 **401 tests OK (skipped=2)**（缺真实 EPUB / MOBI 各 1）。
+第一章 `review_status` 仍为 `pending_human`、`reviewed_by` 为 `null`。
+
+**复审结论**：本项判 **PARTIAL**。顶层结构修复成立，但身份数字字段仍接受
+`true` / `1.0`；章节对象内部字段与审计枚举字段遇数组/对象会抛 traceback；
+Schema 条件分支缺 `required`。由 P0-REVIEW-09 关闭。
+
+**边界**：P0-08 最终签核仍由项目负责人完成；本轮不替代人工签核。
+
+---
+
+### P0-REVIEW-09 严格字段类型与验证器全域性【本轮已落地】
+
+**来源**：项目负责人独立复审。P0-REVIEW-08 判 PARTIAL：`True == 1`、`1.0 == 1`
+让错误类型通过身份比较；数组/对象进入枚举集合检查会抛 `TypeError`；
+Schema 的条件分支只写 `minItems` 不写 `required`。
+
+**三块处理**：
+
+| 块 | 处理 |
+| --- | --- |
+| A 身份严格类型 | `volume_number` / `global_chapter_number` / `volume_chapter_number` 必须是 `type(v) is int` 且 ≥ 1，拒绝 `true` / `false` / `1.0` / 字符串 / 数组 / 对象；`chapter_uid` / `series_slug` / `id` / `number` 必须是字符串；唯一性检查只对字符串建键；`f"ch{vcn:02d}"` 前先验类型 |
+| B 审计枚举安全 | `review_status` / `script_schema` / `severity` / `fidelity` / `status` / `disposition` / `alteration_origin` 先验类型再查枚举；数组/对象/数字/布尔一律返回 `(sid, msg)`，不抛 `TypeError` |
+| C Schema/Linter 对齐 | `alteration_origin=manga` 与 `fidelity=drawn/altered` 分支补 `required: pages_declared`；非 `original` 分支补 `required: novel_para`；origin 条件 `if` 要求字段存在；`mixed_note=""` 拒绝；文档区分 Schema 层与业务纪律 |
+
+**验收（逐条实跑，均为退出码 3，无 traceback）**：
+
+| 场景 | 命令 |
+| --- | --- |
+| 身份整数 = `true` / `1.0` / `"one"` | `m1 chapter --verify` |
+| `chapter_uid` / `series_slug` / `id` / `number` = `[]` / `{}` | `m1 chapter --verify` |
+| 索引章节字段 = `[]` / 索引卷号 = `true` / `1.0` | `m1 chapter --verify`（卷级） |
+| 审计枚举 = `[]` / `{}` / 数字 / 布尔 / 错误字符串 / `null` | `m1 novel lint` |
+| `alteration_origin = []` + `fidelity=altered` | `m1 novel lint` |
+
+**正向回归**：第一章样张 `m1 novel lint` exit 0；`m1 novel check` exit 3
+（`script/v1` 无 `source_refs`、34 beat 未确认、未签核）；10 个章级 work 与
+两卷 `chapter_index.json` 的 `--verify` 全部 exit 0。
+
+**Schema/Linter 对照**：新增 `TestSchemaLinterParity`，用 Draft-07 校验器与
+`lint_audit()` 跑同一批正反例；`jsonschema` 仅为测试可选依赖，缺失时 3 条
+对照测试跳过并给出原因。另新增 `TestSchemaConditionalRequired` 直接锁 Schema
+的 `required` 列表，不依赖该库。
+
+**测试**：`test_identity.py` 56 → 64 例、`test_novel.py` 89 → 102 例；
+全量 **422 tests OK (skipped=2)**（缺真实 EPUB / MOBI 各 1）。
 第一章 `review_status` 仍为 `pending_human`、`reviewed_by` 为 `null`。
 
 **边界**：P0-08 最终签核仍由项目负责人完成；本轮不替代人工签核。

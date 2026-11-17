@@ -218,7 +218,7 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   - 测试：`test_identity.py` 50 例、`test_novel.py` 78 例；全量 **384 tests OK (skipped=2)**。
   - 第一章样张仍 `pending_human`，未签核。
 
-- [x] **P0-REVIEW-08 JSON 结构 fail-closed 与 Schema/Linter 完整对齐**【本轮已落地】
+- [~] **P0-REVIEW-08 JSON 结构 fail-closed 与 Schema/Linter 完整对齐**【部分通过：结构修复成立，严格类型由 P0-REVIEW-09 补齐】
   **来源**：项目负责人独立复审（2026-11-16）。结论：P0-REVIEW-07 的修复成立，
   但发现合法 JSON 的 `null` 仍可静默绕过身份校验，且 Linter 与 Schema 仍有
   可复现的不一致；**P0-08 暂不签最终验收**。
@@ -237,6 +237,36 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
     全量 **401 tests OK (skipped=2)**。
   - **未变**：第一章 `review_status=pending_human`、`reviewed_by=null`；
     第二章、九章批量、P0-06、P0-10、横版继续冻结。P0-08 最终签核仍待独立复审。
+  - **2026-11-16 复审结论**：本项判 **PARTIAL**。顶层结构修复成立，但身份数字字段
+    仍接受 `true` / `1.0`，章节对象内部字段与审计枚举字段遇数组/对象会抛 traceback，
+    Schema 条件分支缺 `required`；由 P0-REVIEW-09 关闭。
+
+- [x] **P0-REVIEW-09 严格字段类型与验证器全域性**【本轮已落地】
+  **来源**：项目负责人独立复审。P0-REVIEW-08 判 PARTIAL：`True == 1`、`1.0 == 1`
+  让错误类型通过身份比较；数组/对象进入枚举集合检查会抛 `TypeError`；
+  Schema 的条件分支只写 `minItems` 不写 `required`。
+  - **身份严格类型**：`volume_number` / `global_chapter_number` /
+    `volume_chapter_number` 必须是 `type(v) is int` 且 ≥ 1，拒绝
+    `true` / `false` / `1.0` / 字符串 / 数组 / 对象；`chapter_uid`、`series_slug`、
+    `id`、`number` 必须是字符串。唯一性检查只对字符串建键，`f"ch{vcn:02d}"`
+    前先验类型。
+  - **审计枚举类型安全**：`review_status`、`script_schema`、`severity`、`fidelity`、
+    `status`、`disposition`、`alteration_origin` 先验类型再查枚举。数组/对象/数字/
+    布尔一律返回 `(sid, msg)`，不再抛 `TypeError`。`severity` 的"没写"合法、
+    "写 `null`"非法。
+  - **Schema/Linter 对齐**：条件分支补齐 `required`：`alteration_origin=manga`
+    与 `fidelity=drawn/altered` 必须有 `pages_declared`；非 `original` 必须有
+    `novel_para`；`alteration_origin` 的条件 `if` 要求字段存在；`mixed_note`
+    只要出现就不能为空。文档明确 Schema 层与业务纪律分层。
+  - **对照测试**：新增 Draft-07 Schema 与 `lint_audit()` 正反例对照
+    （`jsonschema` 仅为测试可选依赖，缺失时跳过并注明），以及身份/审计类型
+    的 CLI 矩阵。
+  - **验收**：审核意见列出的错误类型输入全部经真实 CLI 执行，退出码均为 3，
+    无 traceback；十个工作区、两卷索引、样张 lint 复跑通过；`check` 仍拦截。
+  - **测试**：`test_identity.py` 56 → 64 例、`test_novel.py` 89 → 102 例；
+    全量 **422 tests OK (skipped=2)**。
+  - **未变**：第一章 `pending_human` / `reviewed_by=null`；第二章、九章批量、
+    P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 
 - [~] **P0-09 规则冲突核查（以代码为准）**【部分完成，需补一轮】
   已核实并写进规范的冲突：

@@ -75,22 +75,31 @@ def cn_to_int(text):
     return None
 
 
+def _is_int(value):
+    """严格整数：拒绝 `bool`（Python 里 `True == 1`）与 `1.0`。"""
+    return type(value) is int
+
+
 def make_uid(series_slug, volume_number, global_chapter_number):
     """拼 `chapter_uid`。参数不合法就抛错，不做兜底。"""
-    if not re.fullmatch(r"[a-z][a-z0-9-]*", str(series_slug or "")):
+    if not isinstance(series_slug, str) or not re.fullmatch(
+            r"[a-z][a-z0-9-]*", series_slug):
         raise IdentityError(
-            f"error: series_slug 必须是小写 ASCII（a-z0-9-），实为 {series_slug!r}；"
-            f"中文系列名不能直接进 uid")
+            f"error: series_slug 必须是小写 ASCII 字符串（a-z0-9-），"
+            f"实为 {series_slug!r}；中文系列名不能直接进 uid")
     for name, val in (("volume_number", volume_number),
                       ("global_chapter_number", global_chapter_number)):
-        if not isinstance(val, int) or val < 1:
+        if not _is_int(val) or val < 1:
             raise IdentityError(f"error: {name} 必须是正整数，实为 {val!r}")
     return f"{series_slug}-v{volume_number:02d}-ch{global_chapter_number:02d}"
 
 
 def parse_uid(uid):
     """拆 `chapter_uid` → `(slug, volume, global)`。格式不对抛错。"""
-    m = UID_RE.match(str(uid or ""))
+    if not isinstance(uid, str):
+        raise IdentityError(
+            f"error: chapter_uid 必须是字符串，实为 {_json_kind(uid)} {uid!r}")
+    m = UID_RE.match(uid)
     if not m:
         raise IdentityError(
             f"error: chapter_uid 格式非法 {uid!r}；"
@@ -103,11 +112,36 @@ def chapter_problems(ch, series_slug=None, volume_number=None):
 
     `series_slug` / `volume_number` 给了就一并核对——它们是卷级常量，
     单章不该自己另写一个值。
+
+    **先验类型，再做比较/格式化/哈希**。Python 的 `True == 1`、`1.0 == 1`
+    会让"比较相等"冒充"类型正确"，所以整数一律用 `type(v) is int`，
+    不接受 bool / float / 字符串 / 数组 / 对象。
     """
     if not isinstance(ch, dict):
         return [f"章节身份必须是 JSON 对象，实为 {_json_kind(ch)}"]
     out = []
-    label = ch.get("chapter_uid") or ch.get("id") or "?"
+    raw_label = ch.get("chapter_uid") or ch.get("id") or "?"
+    label = raw_label if isinstance(raw_label, str) else "?"
+
+    # 字符串字段：存在时必须是字符串。None 交给下面的 missing 逻辑。
+    for field in ("chapter_uid", "series_slug", "id", "number"):
+        if field in ch and ch[field] is not None and not isinstance(ch[field], str):
+            out.append(f"{label}: {field} 必须是字符串，实为 "
+                       f"{_json_kind(ch[field])} {ch[field]!r}")
+
+    # 整数字段：必须是真正的正整数，不能靠 `==` 蒙混过关。
+    for field in ("volume_number", "global_chapter_number",
+                  "volume_chapter_number"):
+        if field not in ch:
+            continue
+        value = ch[field]
+        if not _is_int(value):
+            out.append(f"{label}: {field} 必须是正整数（JSON integer，"
+                       f"不接受 bool / float / 字符串 / 数组），实为 "
+                       f"{_json_kind(value)} {value!r}")
+        elif value < 1:
+            out.append(f"{label}: {field} 必须是正整数，实为 {value}")
+
     missing = [f for f in IDENTITY_FIELDS if ch.get(f) in (None, "")]
     if missing:
         out.append(f"{label}: 缺身份字段 {missing}；"
@@ -120,31 +154,42 @@ def chapter_problems(ch, series_slug=None, volume_number=None):
         out.append(f"{label}: {exc}")
         return out
 
-    if series_slug and slug != series_slug:
+    series_ok = isinstance(series_slug, str) and bool(series_slug)
+    if series_ok and slug != series_slug:
         out.append(f"{label}: chapter_uid 的系列 {slug!r} != 索引的 {series_slug!r}")
-    if volume_number is not None and vol != volume_number:
+    if _is_int(volume_number) and vol != volume_number:
         out.append(f"{label}: chapter_uid 的卷号 {vol} != 索引的 {volume_number}")
-    if vol != ch["volume_number"]:
+
+    vol_field = ch["volume_number"]
+    glob_field = ch["global_chapter_number"]
+    vcn_field = ch["volume_chapter_number"]
+    if _is_int(vol_field) and vol != vol_field:
         out.append(f"{label}: chapter_uid 卷号 {vol} != volume_number "
-                   f"{ch['volume_number']}；两个字段各说一套")
-    if glob != ch["global_chapter_number"]:
+                   f"{vol_field}；两个字段各说一套")
+    if _is_int(glob_field) and glob != glob_field:
         out.append(f"{label}: chapter_uid 全书号 {glob} != global_chapter_number "
-                   f"{ch['global_chapter_number']}")
+                   f"{glob_field}")
 
     # `number` 是展示用中文串，但它必须与全书号一致——否则人工对数会数错章
-    from_number = cn_to_int(ch.get("number"))
-    if from_number is None:
-        out.append(f"{label}: number={ch.get('number')!r} 解析不出章节号")
-    elif from_number != ch["global_chapter_number"]:
-        out.append(f"{label}: number={ch.get('number')!r} 是第 {from_number} 章，"
-                   f"但 global_chapter_number={ch['global_chapter_number']}")
+    number = ch.get("number")
+    if isinstance(number, str):
+        from_number = cn_to_int(number)
+        if from_number is None:
+            out.append(f"{label}: number={number!r} 解析不出章节号")
+        elif _is_int(glob_field) and from_number != glob_field:
+            out.append(f"{label}: number={number!r} 是第 {from_number} 章，"
+                       f"但 global_chapter_number={glob_field}")
+    elif number is None or number == "":
+        out.append(f"{label}: number={number!r} 解析不出章节号")
 
-    # `id` 是卷内短 id，必须能从 volume_chapter_number 推导出来
-    want_id = f"ch{ch['volume_chapter_number']:02d}"
-    if ch.get("id") != want_id:
-        out.append(f"{label}: id={ch.get('id')!r} 与 volume_chapter_number="
-                   f"{ch['volume_chapter_number']} 不符（应为 {want_id!r}）；"
-                   f"id 只作兼容字段，不许承载第二种含义")
+    # `id` 是卷内短 id，必须能从 volume_chapter_number 推导出来。
+    # 先验类型，避免对字符串/浮点数执行 `:02d` 直接抛 ValueError。
+    if _is_int(vcn_field) and vcn_field >= 1:
+        want_id = f"ch{vcn_field:02d}"
+        if ch.get("id") != want_id:
+            out.append(f"{label}: id={ch.get('id')!r} 与 volume_chapter_number="
+                       f"{vcn_field} 不符（应为 {want_id!r}）；"
+                       f"id 只作兼容字段，不许承载第二种含义")
     return out
 
 
@@ -170,18 +215,30 @@ def index_problems(index):
     out = []
     slug = index.get("series_slug")
     vol = index.get("volume_number")
-    if not slug:
+    if slug is None or slug == "":
         out.append("索引缺 series_slug：没有它就没法生成 chapter_uid")
-    if not isinstance(vol, int):
-        out.append(f"索引缺 volume_number（整数），实为 {vol!r}")
+    elif not isinstance(slug, str):
+        out.append(f"索引 series_slug 必须是字符串，实为 "
+                   f"{_json_kind(slug)} {slug!r}")
+    if not _is_int(vol):
+        out.append(f"索引 volume_number 必须是正整数（JSON integer），实为 "
+                   f"{_json_kind(vol)} {vol!r}")
+    elif vol < 1:
+        out.append(f"索引 volume_number 必须是正整数，实为 {vol}")
     for ch in chapters:
-        out.extend(chapter_problems(ch, series_slug=slug, volume_number=vol))
+        out.extend(chapter_problems(
+            ch,
+            series_slug=slug if isinstance(slug, str) else None,
+            volume_number=vol if _is_int(vol) else None))
 
-    # 唯一性：uid / id / number 都不许重复，否则查找必然歧义
+    # 唯一性：uid / id / number 都不许重复，否则查找必然歧义。
+    # 只把字符串放进字典键——数组/对象不可哈希，直接 `seen[v]` 会抛 TypeError。
     for field in ("chapter_uid", "id", "number"):
         seen = {}
         for ch in chapters:
             v = ch.get(field)
+            if not isinstance(v, str):
+                continue  # 类型错误已由 chapter_problems 报出
             if v in seen:
                 out.append(f"{field} 重复：{v!r} 同时出现在 "
                            f"{seen[v]} 与 {ch.get('chapter_uid') or ch.get('id')}")
@@ -408,29 +465,40 @@ def check_work_identity(work, authority=None):
     if chapter is None:
         return errors, warnings
 
-    uid = chapter.get("chapter_uid")
-    if not uid:
+    raw_uid = chapter.get("chapter_uid")
+    uid = None
+    if raw_uid is None or raw_uid == "":
         errors.append("chapter.json 缺 chapter_uid：它是唯一权威身份，不能省")
+    elif not isinstance(raw_uid, str):
+        errors.append(f"chapter.json 的 chapter_uid 必须是字符串，实为 "
+                      f"{_json_kind(raw_uid)} {raw_uid!r}")
     else:
         try:
-            parse_uid(uid)
-        except IdentityError as exc:
-            errors.append(f"chapter.json: {exc}")
-        errors.extend(chapter_problems(
-            {**chapter, "chapter_uid": uid},
-            series_slug=chapter.get("series_slug"),
-            volume_number=chapter.get("volume_number")))
+            parse_uid(raw_uid)
+            uid = raw_uid
+        except IdentityError:
+            pass  # chapter_problems 会给出具体格式错误
+    errors.extend(chapter_problems(
+        chapter,
+        series_slug=chapter.get("series_slug"),
+        volume_number=chapter.get("volume_number")))
 
     # 找到一份索引 ≠ 找到当前卷的索引。索引顶层声明的卷必须与本章一致，
     # 否则一份结构完全合法、内部也自洽的**别卷**索引会被拿来当权威表。
     if isinstance(auth_doc, dict):
-        for field, label in (("series_slug", "系列"), ("volume_number", "卷号")):
-            want = auth_doc.get(field)
-            got = chapter.get(field)
-            if want is not None and got is not None and want != got:
-                errors.append(
-                    f"权威表的 {field}={want!r} 与 chapter.json 的 {got!r} 不符："
-                    f"找到的索引不是本章所属{label}的权威表")
+        want_slug = auth_doc.get("series_slug")
+        got_slug = chapter.get("series_slug")
+        if (isinstance(want_slug, str) and isinstance(got_slug, str)
+                and want_slug != got_slug):
+            errors.append(
+                f"权威表的 series_slug={want_slug!r} 与 chapter.json 的 "
+                f"{got_slug!r} 不符：找到的索引不是本章所属系列的权威表")
+        want_vol = auth_doc.get("volume_number")
+        got_vol = chapter.get("volume_number")
+        if _is_int(want_vol) and _is_int(got_vol) and want_vol != got_vol:
+            errors.append(
+                f"权威表的 volume_number={want_vol!r} 与 chapter.json 的 "
+                f"{got_vol!r} 不符：找到的索引不是本章所属卷的权威表")
 
     # 目录名（ch06）指的是**全书号**，不是卷内号。
     # 章级 work 通常长这样：`m1/v2/ch06/work`——目录名在**上一层**，
@@ -440,13 +508,14 @@ def check_work_identity(work, authority=None):
         candidates.append(work.parent.name)
     for name in candidates:
         m = DIR_RE.match(name)
-        if not m or chapter.get("global_chapter_number") is None:
+        glob = chapter.get("global_chapter_number")
+        if not m or not _is_int(glob):
             continue
-        if int(m.group("n")) != chapter["global_chapter_number"]:
+        if int(m.group("n")) != glob:
             errors.append(
                 f"目录名 {name!r} 表示全书第 {int(m.group('n'))} 章，"
                 f"但 chapter.json 的 global_chapter_number="
-                f"{chapter['global_chapter_number']}（chapter_uid={uid}）")
+                f"{glob}（chapter_uid={uid}）")
 
     # 收集所有"自称属于哪一章"的来源，供逐项比对与两两交叉比对。
     # 目录名只给全书号、给不出完整 uid，所以不进 claims（它在上面单独比）。
@@ -465,14 +534,25 @@ def check_work_identity(work, authority=None):
         docs[name] = doc
         if doc is None:
             continue
-        val = getter(doc)
-        if not val:
-            if name == "script.json":
+        if name == "script.json":
+            # 显式写了 chapter_uid 就必须是有效字符串；不能因为它是空值/
+            # 错误类型就悄悄退回 chapter 字段。
+            has_uid = "chapter_uid" in doc
+            val = doc.get("chapter_uid") if has_uid else doc.get("chapter")
+        else:
+            has_uid = True
+            val = getter(doc)
+        if val is None or val == "":
+            if name == "script.json" and not has_uid:
                 # 唯一例外：十章 v1 讲稿没有章节声明，P0-11 迁移后消失。
                 warnings.append("script.json 没有声明所属章节（P0-11 迁移后补 chapter_uid）")
             else:
                 errors.append(f"{name} 缺 chapter_uid：身份绑定文件不能省，"
                               f"缺了就无法证明它属于这一章")
+            continue
+        if not isinstance(val, str):
+            errors.append(f"{name} 的 chapter_uid/chapter 必须是字符串，实为 "
+                          f"{_json_kind(val)} {val!r}")
             continue
         claims[name] = val
         if uid and val != uid:
@@ -530,7 +610,11 @@ def check_work_identity(work, authority=None):
                 for field in ("global_chapter_number", "volume_number", "id"):
                     want = matches[0].get(field)
                     got = chapter.get(field)
-                    if want is not None and got is not None and want != got:
+                    if field == "id":
+                        same_type = isinstance(want, str) and isinstance(got, str)
+                    else:
+                        same_type = _is_int(want) and _is_int(got)
+                    if same_type and want != got:
                         errors.append(
                             f"chapter.json 的 {field}={got!r} "
                             f"与权威表中 {uid!r} 的 {want!r} 不符")

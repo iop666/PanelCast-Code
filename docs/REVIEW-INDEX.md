@@ -135,6 +135,28 @@
 注意：`severity` 是可选字段，但"没写"合法、"写了 `null`"非法；
 Schema 里 `severity` 只有四个字符串枚举，没有 `null`。
 
+### 类型错误不是身份（P0-REVIEW-09）
+
+Python 里 `True == 1 == 1.0`，所以"数值相等"不能证明"类型正确"。
+现在身份整数一律用 `type(v) is int`，字符串字段必须真是字符串；
+唯一性检查只把字符串放进字典键，格式化 `ch{vcn:02d}` 前先验类型。
+
+| 输入 | 结果 |
+| --- | --- |
+| 身份整数 = `true` / `false` / `1.0` / `"1"` / `[]` / `{}` | 章级/卷级 `--verify` 退出码 3 |
+| `chapter_uid` / `series_slug` / `id` / `number` = `123` / `true` / `[]` / `{}` | 退出码 3 |
+| 索引章节的 `id` / `chapter_uid` / `number` = `[]` / `{}` | 卷级 `--verify` 退出码 3，不抛 `TypeError` |
+| 审计枚举 = `[]` / `{}` / 数字 / 布尔 / 错误字符串 / `null` | `m1 novel lint` 退出码 3，不抛 `TypeError` |
+| `alteration_origin = []` 且 `fidelity=altered` | `m1 novel lint` 退出码 3 |
+| 非 `original` 删除 `novel_para`，或 `drawn/altered` 删除 `pages_declared` | Schema 与 Linter 都拒绝 |
+| 非 mixed 记录写 `mixed_note=""` | Schema 与 Linter 都拒绝 |
+| `approved` 且 `reviewed_by == prepared_by` | Schema 通过，Linter 拒绝：这是业务纪律 |
+
+Schema 层负责结构、类型、枚举、格式和可表达的条件规则；`lint_audit()` 额外执行
+Schema 无法表达的业务纪律。两边不能对同一基础规则给出相反结果。
+`TestSchemaLinterParity` 用 `jsonschema` 做正反例对照（仅测试可选依赖；
+环境没有该库时这 3 条会跳过并给出原因）。
+
 ### LF 证据链的三条边界
 
 **不许单独拿 `i/lf` 推导"所有平台工作区都是 LF"**：
@@ -163,7 +185,7 @@ Schema 里 `severity` 只有四个字符串枚举，没有 `null`。
 | **审核报告 Schema 校验** | `m1 novel lint`（只校格式、不要求签核） |
 | **章节身份强校验** | `m1 chapter --verify`（不一致就报错，不猜"最接近"） |
 | **第一章逐段来源审计** | 25 段 100% 审完，**未签核** |
-| 测试 | **401 tests OK (skipped=2)**（`test_novel.py` 89 例 / `test_identity.py` 56 例 / `test_lf.py` 6 例） |
+| 测试 | **422 tests OK (skipped=2)**（`test_novel.py` 102 例 / `test_identity.py` 64 例 / `test_lf.py` 6 例） |
 
 ### P0 任务状态
 
@@ -176,7 +198,7 @@ Schema 里 `severity` 只有四个字符串枚举，没有 `null`。
 | P0-05 | `m1 novel --align/--check` | ✅ **已完成**（含验收第 5 条补修 + lint 拆分） |
 | P0-06 | 正式出片门禁（`--draft` + 审核报告） | ⬜ 未开始 |
 | P0-07 | 文档与实现统一 | 🔄 进行中 |
-| P0-08 | 章节身份统一 | 🔄 **主体完成，待最终签核**（P0-REVIEW-08 已关闭结构绕过，仍待独立复审） |
+| P0-08 | 章节身份统一 | 🔄 **主体完成，待最终签核**（P0-REVIEW-09 已关闭严格类型绕过，仍待独立复审） |
 | P0-09 | 规则冲突核查 | 🔄 部分完成（1/2/3 页映射密度未验） |
 | P0-10 | `m1 verify --visual` 三层视觉验收 | ⬜ 未开始 |
 | P0-11 | `script.json` v1→v2 迁移（含三态） | ⬜ 未开始 |
@@ -184,7 +206,8 @@ Schema 里 `severity` 只有四个字符串枚举，没有 `null`。
 | P0-REVIEW-05 | 四条风险落地（mixed / rewritten / scope / LF） | ✅ **已完成**（Schema 11 条条件规则 + 6 例换行复验） |
 | P0-REVIEW-06 | 身份测试矩阵 + 权威表校验 | ✅ **已完成**（七类局部错配 + CLI 端到端拒绝） |
 | P0-REVIEW-07 | fail-closed 身份 + 审计完整性 | ✅ **已完成**（权威表缺失/损坏/不合格一律拒绝；重复段落拒绝；`severity` 补齐） |
-| P0-REVIEW-08 | JSON 结构 fail-closed + Schema/Linter 对齐 | ✅ **本轮已落地**（顶层类型三分、多权威表拒绝、Linter 结构先验；10 类负例 CLI 均 exit 3） |
+| P0-REVIEW-08 | JSON 结构 fail-closed + Schema/Linter 对齐 | 🔄 **部分通过**（顶层结构/权威表修复成立；严格字段类型与枚举安全由 P0-REVIEW-09 补齐） |
+| P0-REVIEW-09 | 严格字段类型与验证器全域性 | ✅ **本轮已落地**（int/string 严格类型、枚举不可哈希安全、Schema 条件 required；类型负例 CLI 均 exit 3） |
 
 ### 放行条件
 
@@ -200,7 +223,7 @@ Schema 里 `severity` 只有四个字符串枚举，没有 `null`。
 ## 复核命令（新克隆即可复现）
 
 ```bash
-python -m unittest discover -s tests     # 期望 Ran 401 tests / OK (skipped=2)
+python -m unittest discover -s tests     # 期望 Ran 422 tests / OK (skipped=2)
 python -m panelcast m1 novel lint --work m1/v1/ch01/work   # 格式校验，应通过
 python -m panelcast m1 novel check --work m1/v1/ch01/work --novel-dir <小说文本目录>
                                           # 门禁，样张应卡在第 3/4/5 步（退出码 3）

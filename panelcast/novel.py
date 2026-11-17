@@ -406,7 +406,16 @@ def _preview(items, n=5):
 
 
 def lint_audit(audit, segs=None, page_set=None):
-    """只校验 `script-audit.json` 的 **Schema**，不要求签核。
+    """校验 `script-audit.json`：Schema 可表达约束 + 额外审核纪律。
+
+    分两层，不能混为一谈：
+
+    1. **Schema 层**：与 `docs/schemas/script-audit.schema.json` 对齐的
+       结构、类型、枚举、格式和条件规则。两边由测试锁死，不允许对同一条
+       基础规则给出相反结果。
+    2. **业务层**：Schema 无法表达的审核纪律，例如 `reviewed_by` 不得等于
+       `prepared_by`、`unknown` 不许签核。它们只在这里执行，不是删除
+       Schema 约束的理由。
 
     存在的理由：门禁第 5 步把"结构合法"和"人已签核"混在一起判，导致一份
     **尚未签核**的报告根本没法被机器校验——它连"我这份格式对不对"都问不出来。
@@ -429,8 +438,8 @@ def lint_audit(audit, segs=None, page_set=None):
     if not audit.get("audit_spec_version"):
         out.append((None, "缺 audit_spec_version（审核标准版本）"))
     rs = audit.get("review_status")
-    if rs not in REVIEW_STATUSES:
-        out.append((None, f"review_status 非法：{rs!r}；只能是 "
+    if not isinstance(rs, str) or rs not in REVIEW_STATUSES:
+        out.append((None, f"review_status 非法：{rs!r}；必须是字符串，且只能是 "
                           f"{'/'.join(sorted(REVIEW_STATUSES))}"))
     reviewer = audit.get("reviewed_by")
     if ("reviewed_by" in audit and reviewer is not None
@@ -483,9 +492,9 @@ def lint_audit(audit, segs=None, page_set=None):
             out.append((None, f"{field} 必须是对象，实为 "
                               f"{_json_kind(audit.get(field))}"))
     ss = audit.get("script_schema")
-    if ss is not None and ss not in SCRIPT_SCHEMAS:
-        out.append((None, f"script_schema 非法：{ss!r}；"
-                          f"只能是 {'/'.join(sorted(SCRIPT_SCHEMAS))}"))
+    if ss is not None and (not isinstance(ss, str) or ss not in SCRIPT_SCHEMAS):
+        out.append((None, f"script_schema 非法：{ss!r}；必须是字符串，且只能是 "
+                          f"{'/'.join(sorted(SCRIPT_SCHEMAS))}"))
     for field in ("script_sha256", "novel_ref_sha256"):
         v = audit.get(field)
         if v is not None and not SHA256_RE.match(str(v)):
@@ -580,8 +589,8 @@ def _lint_segment(sid, rec, page_set):
     # `null` 不是 enum 成员——"没写"和"写了 null"必须区分。
     if "severity" in rec:
         sev = rec.get("severity")
-        if sev not in SEVERITIES:
-            out.append(f"severity 非法：{sev!r}；只能是 "
+        if not isinstance(sev, str) or sev not in SEVERITIES:
+            out.append(f"severity 非法：{sev!r}；必须是字符串，且只能是 "
                        f"{'/'.join(sorted(SEVERITIES))}")
     sha = rec.get("text_sha256")
     if sha not in (None, "") and (not isinstance(sha, str)
@@ -606,27 +615,30 @@ def _lint_segment(sid, rec, page_set):
             out.append(f"{field} 必须是字符串，实为 "
                        f"{_json_kind(rec.get(field))}")
 
-    if fid not in FIDELITIES:
-        out.append(f"fidelity 非法：{fid!r}；只能是 {'/'.join(sorted(FIDELITIES))}")
-    if status not in AUDIT_STATUSES:
+    if not isinstance(fid, str) or fid not in FIDELITIES:
+        out.append(f"fidelity 非法：{fid!r}；必须是字符串，且只能是 "
+                   f"{'/'.join(sorted(FIDELITIES))}")
+    if not isinstance(status, str) or status not in AUDIT_STATUSES:
         hint = "（`pending` 已废弃，语义是「已审出问题、尚未改写」的请用 `pending_rewrite`）" \
             if status == "pending" else ""
-        out.append(f"status 非法：{status!r}；只能是 "
+        out.append(f"status 非法：{status!r}；必须是字符串，且只能是 "
                    f"{'/'.join(sorted(AUDIT_STATUSES))}{hint}")
-    if disp not in DISPOSITIONS:
-        out.append(f"disposition 非法：{disp!r}；只能是 {'/'.join(sorted(DISPOSITIONS))}")
+    if not isinstance(disp, str) or disp not in DISPOSITIONS:
+        out.append(f"disposition 非法：{disp!r}；必须是字符串，且只能是 "
+                   f"{'/'.join(sorted(DISPOSITIONS))}")
 
     # ---- alteration_origin：只在"有差异"时才有值 ----
     if origin is not None and not isinstance(origin, str):
         out.append(f"alteration_origin 必须是字符串或 null，实为 "
                    f"{_json_kind(origin)}")
     if fid == "altered":
-        if origin not in ALTERATION_ORIGINS:
+        if not isinstance(origin, str) or origin not in ALTERATION_ORIGINS:
             out.append(f"fidelity=altered 但 alteration_origin={origin!r}；"
                        f"必须说明差异责任方（{'/'.join(sorted(ALTERATION_ORIGINS))}），"
                        f"否则无法判断该不该改稿")
     elif fid == "original":
-        if origin not in (None, "narration"):
+        if origin is not None and (
+                not isinstance(origin, str) or origin != "narration"):
             out.append(f"fidelity=original 的差异只能是旁白造成的，"
                        f"alteration_origin={origin!r} 不成立")
     elif origin is not None:
@@ -646,9 +658,12 @@ def _lint_segment(sid, rec, page_set):
                    f"「漫画改的」本身就是一条关于画面的断言，必须附页码")
     # `mixed` 是最容易被当成逃生门的分类：一句"又像漫画又像原创"就绕过了举证。
     # 所以要求把新增部分**单独写出来**，不许混在 evidence 里含糊带过。
-    if "mixed_note" in rec and not isinstance(rec.get("mixed_note"), str):
-        out.append(f"mixed_note 必须是字符串，实为 "
-                   f"{_json_kind(rec.get('mixed_note'))}")
+    if "mixed_note" in rec:
+        note = rec.get("mixed_note")
+        if not isinstance(note, str):
+            out.append(f"mixed_note 必须是字符串，实为 {_json_kind(note)}")
+        elif not note.strip():
+            out.append("mixed_note 不能为空字符串；只要写了就必须是可核对说明")
     if origin == "mixed" and not str(rec.get("mixed_note") or "").strip():
         out.append("alteration_origin=mixed 必须填 mixed_note，"
                    "写明哪部分是漫画给的、哪部分是旁白新增的；"

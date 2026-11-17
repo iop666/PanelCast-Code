@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://panelcast.local/schemas/script-audit.v2.json",
   "title": "PanelCast script audit (v2)",
-  "description": "逐段内容审计报告。规范 §4.3.10 的机器可读形式。注意 judgement_scope 区分两层语义：本文件判「旁白 vs 来源」，novel_ref 判「漫画 vs 小说」。可执行校验器是 panelcast.novel.lint_audit()，两者枚举必须一致（有测试锁住）。",
+  "description": "逐段内容审计报告。规范 §4.3.10 的机器可读形式。注意 judgement_scope 区分两层语义：本文件判「旁白 vs 来源」，novel_ref 判「漫画 vs 小说」。可执行校验器是 panelcast.novel.lint_audit()：它执行本 Schema 的结构、类型、枚举、格式与条件约束，并额外执行业务纪律（如 reviewed_by 不得等于 prepared_by）；两者不能对同一基础规则给出相反结果（有测试锁住）。",
   "type": "object",
   "required": [
     "schema",
@@ -218,6 +218,9 @@
           },
           {
             "if": {
+              "required": [
+                "alteration_origin"
+              ],
               "properties": {
                 "alteration_origin": {
                   "const": "manga"
@@ -226,6 +229,9 @@
             },
             "then": {
               "description": "「漫画改的」是关于画面的断言，必须指得出页码。",
+              "required": [
+                "pages_declared"
+              ],
               "properties": {
                 "pages_declared": {
                   "minItems": 1
@@ -245,6 +251,9 @@
               }
             },
             "then": {
+              "required": [
+                "pages_declared"
+              ],
               "properties": {
                 "pages_declared": {
                   "minItems": 1
@@ -263,6 +272,9 @@
               }
             },
             "then": {
+              "required": [
+                "novel_para"
+              ],
               "properties": {
                 "novel_para": {
                   "minItems": 1
@@ -309,6 +321,9 @@
           },
           {
             "if": {
+              "required": [
+                "alteration_origin"
+              ],
               "properties": {
                 "alteration_origin": {
                   "const": "mixed"
@@ -328,6 +343,9 @@
           },
           {
             "if": {
+              "required": [
+                "alteration_origin"
+              ],
               "properties": {
                 "alteration_origin": {
                   "const": "narration"
@@ -348,6 +366,9 @@
           },
           {
             "if": {
+              "required": [
+                "alteration_origin"
+              ],
               "properties": {
                 "alteration_origin": {
                   "const": "unknown"

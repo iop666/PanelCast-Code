@@ -18,6 +18,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:  # 仅测试用；运行时 Linter 仍是标准库实现
+    import jsonschema
+except ImportError:  # pragma: no cover - ZIP 环境可能没有
+    jsonschema = None
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -959,6 +964,223 @@ class TestStructuralFailClosed(Base):
                 self.assertEqual(r.returncode, 3,
                                  f"{label}: stderr={r.stderr}\nstdout={r.stdout}")
                 self.assertIn(expected, r.stderr)
+
+
+class TestStrictEnumTypes(Base):
+    """P0-REVIEW-09：枚举字段先验字符串类型，再做集合成员检查。
+
+    数组/对象不可哈希，直接 `value not in SET` 会抛 TypeError，
+    CLI 变成退出码 1 + traceback，而不是约定的结构化失败。
+    """
+
+    PAGES = {"page_0045", "page_0046", "page_0047"}
+
+    def _base_audit(self):
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        return json.loads((self.work / "script-audit.json").read_text(encoding="utf-8"))
+
+    def _lint(self, audit):
+        return lint_audit(audit, page_set=self.PAGES)
+
+    def _text(self, problems):
+        return " ".join(m for _sid, m in problems)
+
+    def test_top_level_enum_fields_reject_non_strings(self):
+        base = self._base_audit()
+        for field in ("review_status", "script_schema"):
+            for bad in ([], {}, 123, True, 1.0, "bogus", None):
+                with self.subTest(field=field, value=bad):
+                    audit = json.loads(json.dumps(base))
+                    audit[field] = bad
+                    joined = self._text(self._lint(audit))
+                    self.assertIn(field, joined)
+                    self.assertTrue("非法" in joined or "缺必填" in joined, joined)
+
+    def test_segment_enum_fields_reject_non_strings(self):
+        base = self._base_audit()
+        for field in ("fidelity", "status", "disposition"):
+            for bad in ([], {}, 123, True, 1.0, "bogus", None):
+                with self.subTest(field=field, value=bad):
+                    audit = json.loads(json.dumps(base))
+                    audit["audited_segments"][0][field] = bad
+                    joined = self._text(self._lint(audit))
+                    self.assertIn(field, joined)
+                    self.assertIn("非法", joined)
+
+    def test_severity_null_and_wrong_types_are_rejected(self):
+        base = self._base_audit()
+        for bad in ([], {}, 123, True, 1.0, "bogus", None):
+            with self.subTest(value=bad):
+                audit = json.loads(json.dumps(base))
+                audit["audited_segments"][0]["severity"] = bad
+                self.assertIn("severity 非法", self._text(self._lint(audit)))
+
+    def test_alteration_origin_non_string_with_altered_is_rejected(self):
+        base = self._base_audit()
+        for bad in ([], {}, 123, True, 1.0, "bogus", None):
+            with self.subTest(value=bad):
+                audit = json.loads(json.dumps(base))
+                audit["audited_segments"][0].update({
+                    "fidelity": "altered", "alteration_origin": bad})
+                joined = self._text(self._lint(audit))
+                self.assertIn("alteration_origin", joined)
+
+    def test_gate_returns_step5_for_enum_type_error(self):
+        """`check()` 也不能在枚举字段为数组时抛 TypeError。"""
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        path = self.work / "script-audit.json"
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        doc["audited_segments"][0]["fidelity"] = []
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+        ok, problems = check(self.work, self.novel_dir)
+        self.assertFalse(ok)
+        step5 = " ".join(m for s, m in problems if s == 5)
+        self.assertIn("fidelity", step5)
+        self.assertIn("非法", step5)
+
+    def test_cli_returns_3_for_enum_type_errors(self):
+        base = self._base_audit()
+        path = self.work / "script-audit.json"
+        fields = [
+            ("review_status", "top"), ("script_schema", "top"),
+            ("severity", "seg"), ("fidelity", "seg"),
+            ("status", "seg"), ("disposition", "seg"),
+            ("alteration_origin", "seg-altered"),
+        ]
+        bad_values = ([], {}, 123, True, "bogus", None)
+        for field, where in fields:
+            for bad in bad_values:
+                with self.subTest(field=field, value=bad):
+                    doc = json.loads(json.dumps(base))
+                    if where == "top":
+                        doc[field] = bad
+                    else:
+                        doc["audited_segments"][0][field] = bad
+                        if where == "seg-altered":
+                            doc["audited_segments"][0]["fidelity"] = "altered"
+                    path.write_text(
+                        json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+                    r = subprocess.run(
+                        [sys.executable, "-m", "panelcast", "m1", "novel", "lint",
+                         "--work", str(self.work)],
+                        cwd=str(ROOT), capture_output=True, text=True)
+                    self.assertEqual(r.returncode, 3,
+                                     f"stderr={r.stderr}\nstdout={r.stdout}")
+                    self.assertIn(field, r.stderr)
+                    self.assertNotIn("Traceback", r.stderr)
+
+
+class TestSchemaConditionalRequired(unittest.TestCase):
+    """P0-REVIEW-09：Schema 的条件分支必须补齐 required，而不是只写 minItems。"""
+
+    @classmethod
+    def setUpClass(cls):
+        path = ROOT / "docs" / "schemas" / "script-audit.schema.json"
+        cls.schema = json.loads(path.read_text(encoding="utf-8"))
+        cls.seg = cls.schema["properties"]["audited_segments"]["items"]
+        cls.branches = cls.seg["allOf"]
+
+    def _branch(self, prop, value):
+        for branch in self.branches:
+            cond = branch.get("if", {}).get("properties", {}).get(prop, {})
+            if cond.get("const") == value or cond.get("enum") == value:
+                return branch
+        self.fail(f"找不到 {prop}={value!r} 的条件分支")
+
+    def test_manga_requires_pages_declared(self):
+        branch = self._branch("alteration_origin", "manga")
+        self.assertIn("pages_declared", branch["then"].get("required", []))
+        self.assertIn("alteration_origin", branch["if"].get("required", []))
+
+    def test_drawn_and_altered_require_pages_declared(self):
+        branch = self._branch("fidelity", ["drawn", "altered"])
+        self.assertIn("pages_declared", branch["then"].get("required", []))
+
+    def test_origin_conditions_only_fire_when_origin_present(self):
+        for origin in ("mixed", "narration", "unknown"):
+            with self.subTest(origin=origin):
+                branch = self._branch("alteration_origin", origin)
+                self.assertIn("alteration_origin", branch["if"].get("required", []))
+
+    def test_mixed_note_is_non_empty_when_present(self):
+        note = self.seg["properties"]["mixed_note"]
+        self.assertEqual(note.get("minLength"), 1)
+
+
+class TestSchemaLinterParity(Base):
+    """P0-REVIEW-09：同一批文档分别交给 Draft-07 Schema 与 lint_audit()。
+
+    只比较枚举集合不够；这里直接跑两边，锁住"同一基础规则不给出相反结果"。
+    jsonschema 只用于测试；运行时校验器仍是标准库实现。
+    """
+
+    PAGES = {"page_0045", "page_0046", "page_0047"}
+
+    @classmethod
+    def setUpClass(cls):
+        path = ROOT / "docs" / "schemas" / "script-audit.schema.json"
+        cls.schema = json.loads(path.read_text(encoding="utf-8"))
+
+    def _base_audit(self):
+        ref = self._v2_ready()
+        write_audit(self.work, ref, schema="script/v2")
+        return json.loads((self.work / "script-audit.json").read_text(encoding="utf-8"))
+
+    def _schema_ok(self, doc):
+        if jsonschema is None:
+            self.skipTest("jsonschema not installed")
+        return not list(jsonschema.Draft7Validator(self.schema).iter_errors(doc))
+
+    def _lint_ok(self, doc):
+        return not lint_audit(doc, page_set=self.PAGES)
+
+    def test_positive_fixture_agrees(self):
+        audit = self._base_audit()
+        self.assertTrue(self._schema_ok(audit))
+        self.assertTrue(self._lint_ok(audit))
+
+    def test_structural_negatives_agree(self):
+        base = self._base_audit()
+        cases = [
+            ("mixed-note-empty",
+             lambda d: d["audited_segments"][0].__setitem__("mixed_note", "")),
+            ("altered-manga-no-pages",
+             lambda d: (d["audited_segments"][0].update(
+                 {"fidelity": "altered", "alteration_origin": "manga"}),
+                 d["audited_segments"][0].pop("pages_declared"))),
+            ("drawn-no-pages",
+             lambda d: d["audited_segments"][0].pop("pages_declared")),
+            ("non-original-no-novel-para",
+             lambda d: d["audited_segments"][0].pop("novel_para")),
+            ("severity-null",
+             lambda d: d["audited_segments"][0].__setitem__("severity", None)),
+            ("pages-actual-bad",
+             lambda d: d["audited_segments"][0].__setitem__(
+                 "pages_actual", ["p45"])),
+            ("reviewed-by-array",
+             lambda d: d.__setitem__("reviewed_by", [])),
+            ("audited-segments-null",
+             lambda d: d.__setitem__("audited_segments", [None])),
+        ]
+        for label, mutate in cases:
+            with self.subTest(case=label):
+                doc = json.loads(json.dumps(base))
+                mutate(doc)
+                self.assertFalse(self._schema_ok(doc), label)
+                self.assertFalse(self._lint_ok(doc), label)
+
+    def test_business_rule_is_layered_on_top_of_schema(self):
+        """reviewed_by == prepared_by 是业务纪律；Schema 不表达，Linter 必须拒绝。"""
+        audit = self._base_audit()
+        audit["review_status"] = "approved"
+        audit["reviewed_by"] = "human:same-hand"
+        audit["prepared_by"] = "human:same-hand"
+        self.assertTrue(self._schema_ok(audit))
+        self.assertFalse(self._lint_ok(audit))
 
 
 class TestSchemaFile(unittest.TestCase):

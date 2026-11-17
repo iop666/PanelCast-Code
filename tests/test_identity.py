@@ -696,5 +696,132 @@ class TestWrongTopLevelTypes(unittest.TestCase):
                 self.assertIn("顶层必须是对象", r.stderr)
 
 
+class TestStrictFieldTypes(unittest.TestCase):
+    """P0-REVIEW-09：身份字段必须先验类型，再做比较/格式化/哈希。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write(self, folder, name, doc):
+        folder = Path(folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_text(
+            json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def test_integer_fields_reject_bool_float_string_array_object(self):
+        for field in ("volume_number", "global_chapter_number",
+                      "volume_chapter_number"):
+            for bad in (True, False, 1.0, 6.0, "6", [], {}):
+                with self.subTest(field=field, value=bad):
+                    problems = chapter_problems(chapter(**{field: bad}))
+                    joined = " | ".join(problems)
+                    self.assertIn(field, joined)
+                    self.assertIn("必须是正整数", joined)
+
+    def test_volume_chapter_number_never_reaches_format_code(self):
+        """`f\"ch{vcn:02d}\"` 以前会对字符串/浮点数抛 ValueError。"""
+        for bad in ("one", 1.0, True, [], {}):
+            with self.subTest(value=bad):
+                problems = chapter_problems(chapter(volume_chapter_number=bad))
+                self.assertTrue(any("volume_chapter_number" in p for p in problems),
+                                problems)
+
+    def test_string_identity_fields_reject_non_strings(self):
+        for field in ("chapter_uid", "series_slug", "id", "number"):
+            for bad in (123, True, [], {}):
+                with self.subTest(field=field, value=bad):
+                    problems = chapter_problems(chapter(**{field: bad}))
+                    joined = " | ".join(problems)
+                    self.assertIn(f"{field} 必须是字符串", joined)
+
+    def test_index_uniqueness_skips_unhashable_values(self):
+        """数组/对象不能当字典键；唯一性检查前必须先验类型。"""
+        for field in ("chapter_uid", "id", "number"):
+            with self.subTest(field=field):
+                problems = index_problems(index_of(chapter(**{field: []})))
+                self.assertIsInstance(problems, list)
+                self.assertTrue(any(field in p and "必须是字符串" in p
+                                    for p in problems), problems)
+
+    def test_index_top_level_types_are_strict(self):
+        for bad in (True, 1.0, "1", [], {}):
+            with self.subTest(field="volume_number", value=bad):
+                idx = index_of(chapter())
+                idx["volume_number"] = bad
+                joined = " | ".join(index_problems(idx))
+                self.assertIn("volume_number", joined)
+                self.assertIn("必须是正整数", joined)
+        for bad in (123, True, [], {}):
+            with self.subTest(field="series_slug", value=bad):
+                idx = index_of(chapter())
+                idx["series_slug"] = bad
+                joined = " | ".join(index_problems(idx))
+                self.assertIn("series_slug", joined)
+                self.assertIn("必须是字符串", joined)
+
+    def test_parse_uid_and_make_uid_reject_non_types(self):
+        for bad in ([], {}, 123, True):
+            with self.subTest(value=bad):
+                with self.assertRaises(IdentityError):
+                    parse_uid(bad)
+        for bad in (True, 1.0, "1"):
+            with self.subTest(value=bad):
+                with self.assertRaises(IdentityError):
+                    make_uid("konosuba-manga", bad, 1)
+
+    def test_cli_rejects_strict_type_violations(self):
+        cases = [
+            ("volume_number", 1.0), ("global_chapter_number", True),
+            ("volume_chapter_number", "one"), ("chapter_uid", []),
+            ("series_slug", []), ("id", []), ("number", []),
+        ]
+        for i, (field, bad) in enumerate(cases):
+            with self.subTest(field=field, value=bad):
+                root = self.root / f"case{i}"
+                work = root / "ch06" / "work"
+                work.mkdir(parents=True)
+                self._write(root, "chapter_index.json", index_of(chapter()))
+                self._write(work, "chapter.json", chapter(**{field: bad}))
+                r = subprocess.run(
+                    [sys.executable, "-m", "panelcast", "m1", "chapter",
+                     "--verify", "--work", str(work)],
+                    cwd=str(ROOT), capture_output=True, text=True)
+                self.assertEqual(r.returncode, 3,
+                                 f"stderr={r.stderr}\nstdout={r.stdout}")
+                self.assertIn(field, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+
+    def test_cli_rejects_index_field_type_violations(self):
+        cases = [
+            ("chapter_uid", []), ("id", []), ("number", []),
+            ("volume_number", True), ("volume_number", 1.0),
+            ("series_slug", []),
+        ]
+        for i, (field, bad) in enumerate(cases):
+            with self.subTest(field=field, value=bad):
+                idx = index_of(chapter())
+                if field == "volume_number":
+                    idx[field] = bad
+                elif field == "series_slug":
+                    idx[field] = bad
+                else:
+                    idx["chapters"][0][field] = bad
+                work = self.root / f"idx{i}" / "work"
+                work.mkdir(parents=True)
+                self._write(work, "chapter_index.json", idx)
+                r = subprocess.run(
+                    [sys.executable, "-m", "panelcast", "m1", "chapter",
+                     "--verify", "--work", str(work)],
+                    cwd=str(ROOT), capture_output=True, text=True)
+                self.assertEqual(r.returncode, 3,
+                                 f"stderr={r.stderr}\nstdout={r.stdout}")
+                self.assertIn(field, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

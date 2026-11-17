@@ -549,12 +549,13 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 4. 成片 hash 用 `sha256sum` 实测，不是抄 `delivery.md`。
 
 **进度（2026-11-16）：第一章样张已完成，其余九章未动。**
-**2026-11-17 复核状态：`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。映射主体与 seg_0014 来源同步均已复核通过（seg_0014 来源范围已由 259–278 收窄为 259–277；beat 数 34 → 37，37/37 仍 needs_review）。**
+**2026-11-18 复核状态：`P0-01-CH01-BEAT-OWNER-DECISION = RETURNED`；`P0-01-CH01-BEAT-MAPPING-REVIEW-FIX = IMPLEMENTED / AWAITING_FINAL_INDEPENDENT_REVIEW`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。独立审核对 37 条给出 33 PASS / 4 RETURN（b24/b26/b29/b30）；已拆分 b24/b29、补 b26 的 p32、前移 b30 起点，beat 数 37 → 40，40/40 仍 needs_review。**
 
 - 产物：`m1/audit/chapter-map.md`（第一章 30 条段落锚点 + 十章总表）
 - 第一章结论：漫画 ch01 p5–42 = 小说 **序章 0–148 + 第一章 149–711（部分）**，
   `order: reordered`（漫画把序章后置成插叙）
-- 小说有、漫画没画：ch01 309–387（两周土木工/浴场/马厩，约 3,400 字）、562–619、620–711
+- 小说有、漫画没画：ch01 309–387（两周土木工/浴场/马厩，约 3,400 字）、
+  445–454（回镇/洗澡/卖肉）、530–533（阿克娅冲入蟾蜍）、562–619、620–711
 - 新增副产物：`m1/v2/ch06–ch10` 的目录名（ch06–ch10）与 `chapter.json` 的 `id`
   （ch01–ch05）、`number`（第六–十章）三者不一致 → P0-08 的直接证据
 - 未完成：另九章的段区间与成片 hash（211 页 / 143 段）
@@ -562,12 +563,18 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
   第一轮用 6 页拼图看错了格序，第二轮改逐页读才纠正
 - 复核修订（2026-11-17）：b18/b19、b25/b26 段号边界修正；
   b01 扉页描述修正；`seg_0005/0016/0018/0023` 按裁定修订；
-  `novel_ref.json` 重绑 `novel_ref_sha256`；37 beats 仍全部 `needs_review`
+  `novel_ref.json` 重绑 `novel_ref_sha256`；当时 37 beats 全部 `needs_review`
 - BEAT-MAPPING-FIX（2026-11-17）：b16 230–258、b17 259–277、b18 278–291；
   b23 拆为 b23a/b23b/b23c，b34 拆为 b34a/b34b；beat 数 34 → 37，
   37/37 仍 `needs_review`
 - 来源同步（2026-11-17，已复核通过）：seg_0014 `novel_para`
   `[259,278] → [259,277]`，`evidence` 同步；`novel_ref.json` 未改
+- BEAT-MAPPING-REVIEW-FIX（2026-11-18）：b24 拆为 b24a/b24b/b24c
+  （444 drawn / 445–454 omitted / 455–462 altered）；b29 拆为 b29a/b29b
+  （519–529 drawn / 530–533 omitted）；b26 补 page_0032；b30 起点 535 → 534；
+  beat 数 37 → 40，40/40 仍 `needs_review`
+- 同轮来源同步：seg_0018 `[[444,444],[455,461]]`、seg_0022
+  `[[519,529],[534,543]]`、seg_0020 锚点 480/487/494；chapter-map 同步
 
 ---
 

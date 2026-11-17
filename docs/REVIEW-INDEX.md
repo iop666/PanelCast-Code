@@ -16,7 +16,7 @@
 | 执行报告（A–L 十二节，先看这个） | [`m1/audit/P0-01-SAMPLE-CH01-report.md`](../m1/audit/P0-01-SAMPLE-CH01-report.md) |
 | 25 段逐段审计（人读版，808 行） | [`m1/audit/script-audit-ch01.md`](../m1/audit/script-audit-ch01.md) |
 | 章节对应表（30 条页段锚点） | [`m1/audit/chapter-map.md`](../m1/audit/chapter-map.md) |
-| 底稿（37 beats，机器可读） | [`m1/v1/ch01/novel_ref.json`](../m1/v1/ch01/work/novel_ref.json) |
+| 底稿（40 beats，机器可读） | [`m1/v1/ch01/novel_ref.json`](../m1/v1/ch01/work/novel_ref.json) |
 | 审核报告（25 段，三层哈希绑定） | [`m1/v1/ch01/script-audit.json`](../m1/v1/ch01/work/script-audit.json) |
 
 **如果看到的是"novel_ref 待建 / 四步门禁 / 没有 script-audit"，那是旧版本文档。**
@@ -210,8 +210,8 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 | ID | 任务 | 状态 |
 | --- | --- | --- |
-| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`，映射与 seg_0014 来源同步均已复核通过；37 beats 待确认；其余九章未核 |
-| P0-02 | 十章各建 `novel_ref.json` | 🔄 **ch01 完成**（37 beats，含 b23/b34 拆分，全部 `needs_review`），其余九章未建 |
+| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；`P0-01-CH01-BEAT-OWNER-DECISION = RETURNED`，`BEAT-MAPPING-REVIEW-FIX = IMPLEMENTED / AWAITING_FINAL_INDEPENDENT_REVIEW`；40 beats 待确认；其余九章未核 |
+| P0-02 | 十章各建 `novel_ref.json` | 🔄 **ch01 完成**（40 beats，含 b23/b24/b29/b34 拆分，全部 `needs_review`），其余九章未建 |
 | P0-03 | 讲稿来源 **100%** 复核 | 🔄 **ch01 完成**（12 段待改写 + 1 段改页映射；未签核），其余九章未审 |
 | P0-04 | 改稿后重出受影响成片 | ⬜ 未开始（等 P0-03） |
 | P0-05 | `m1 novel --align/--check` | ✅ **已完成**（含验收第 5 条补修 + lint 拆分） |
@@ -236,19 +236,18 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 ### 现在卡在哪
 
-独立复核在提交后再次核对 38 页与小说原文，发现 b16–b18 边界、b23 与 b34
-事件拆分问题；已执行 **`P0-01-CH01-BEAT-MAPPING-FIX`**（beat 数 34 → 37，
-37/37 仍 `needs_review`）。当前状态：**`P0-01-CH01-BEAT-MAPPING-FIX =
-MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`**。
-映射主体与 seg_0014 来源同步均已复核通过；seg_0014 的 `novel_para`
-已由 259–278 收窄为 259–277（para 278 属能力值揭晓，归 seg_0015）。审计未签核；
+独立审核对 37 条给出 33 PASS / 4 RETURN（b24、b26、b29、b30），
+已执行 **`P0-01-CH01-BEAT-MAPPING-REVIEW-FIX`**（beat 数 37 → 40，
+40/40 仍 `needs_review`）。当前状态：**`P0-01-CH01-BEAT-OWNER-DECISION = RETURNED`；
+`P0-01-CH01-BEAT-MAPPING-REVIEW-FIX = IMPLEMENTED / AWAITING_FINAL_INDEPENDENT_REVIEW`；
+`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`**。上一轮
+`MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS` 只覆盖 37-beat 版本。审计未签核；
 `m1 novel check` 仍会同时拦截 v1 讲稿、未确认 beats 与未签核三项，这是当前预期行为。
 
-修订内容：五条争议裁定落地（`seg_0016` 改判 `drawn/keep`、`seg_0005`
-改为 `mixed/中危`、`seg_0018` 改 `mixed`、`seg_0023` 补记表现性推断），
-b18/b19、b25/b26 段号边界修正，b01 扉页描述修正，b21/seg_0019/seg_0020
-证据同步；`P0-01-CH01-BEAT-MAPPING-FIX` 修正 b16–b18 边界并拆分 b23/b34；
-`novel_ref.json` 字节变化后 `novel_ref_sha256` 已重绑。
+本轮修订：b24 拆为 `b24a/b24b/b24c`（444 drawn / 445–454 omitted / 455–462 altered），
+b29 拆为 `b29a/b29b`（519–529 drawn / 530–533 omitted），b26 补 `page_0032`，
+b30 起点 535 → 534；`seg_0018/seg_0020/seg_0022` 来源范围与锚点同步；
+para 479 是过渡句、para 480 是惠惠直接出场台词。`novel_ref_sha256` 已第四次重绑。
 
 签核时把 `m1/v1/ch01/script-audit.json` 的 `reviewed_by` 填 `human:<name>`、
 `review_status` 改 `approved`。签核前 `m1 novel check` 会一直卡在第 3/4/5 步——

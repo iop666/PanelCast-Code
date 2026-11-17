@@ -1226,7 +1226,7 @@ python -m panelcast m1 novel lint --work m1/v1/ch01/work
 | `check` | 能不能出片 | **必须不过**（`review_status` 与 `reviewed_by` 两处拦） |
 
 第一章样张就是这个状态的实例：`lint` 全过、`check` 卡在第 5 步，
-同时因为讲稿还是 v1 卡在第 3 步、因为 37 个 beat 未人工确认卡在第 4 步。
+同时因为讲稿还是 v1 卡在第 3 步、因为 40 个 beat 未人工确认卡在第 4 步。
 
 ##### 第一章样张（`P0-01-SAMPLE-CH01`）
 
@@ -1235,7 +1235,7 @@ python -m panelcast m1 novel lint --work m1/v1/ch01/work
 | 产物 | 位置 | 说明 |
 | --- | --- | --- |
 | 章节对应表 | `m1/audit/chapter-map.md` | 为什么不能靠编号 + 判定四步法 + 30 行页段对照 |
-| 底稿 | `m1/v1/ch01/work/novel_ref.json` | 37 beats，页覆盖 38/38，`order: reordered` |
+| 底稿 | `m1/v1/ch01/work/novel_ref.json` | 40 beats，页覆盖 38/38，`order: reordered` |
 | 审核报告 | `m1/v1/ch01/work/script-audit.json` | 25 段全审，`review_status: pending_human` |
 | 审计明细 | `m1/audit/script-audit-ch01.md` | 逐段判据、反例回归、高危案例 |
 
@@ -1245,8 +1245,10 @@ python -m panelcast m1 novel lint --work m1/v1/ch01/work
 改成「我要当大贤者」、把被推开的女生说的「好痛」归到和真身上。
 2026-11-17 项目负责人复核裁定 `REVIEW_RETURNED`，已按裁定修订
 （b18/b19、b25/b26 段号边界、b01 扉页描述、`seg_0005/0016/0018/0023` 判定）；
-映射与 seg_0014 来源同步均已复核通过（`MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`），
-仍未签核。
+上一轮映射与 seg_0014 来源同步已复核通过（`MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`）。
+2026-11-18 独立审核对 37 条给出 33 PASS / 4 RETURN（b24、b26、b29、b30），
+已执行 `BEAT-MAPPING-REVIEW-FIX`：拆分 b24/b29、补 b26 的 `page_0032`、
+前移 b30 起点，beat 数 37 → 40，40/40 仍 `needs_review`，待最终独立复核；仍未签核。
 
 **其余九章未核**，不得据第一章的结果推断它们的状态。
 

@@ -26,9 +26,9 @@
     ]
   },
   "script_sha256": "1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3",
-  "novel_ref_sha256": "e78e89f0ec3520ccf9621e8d23eb59a2a7e621520258b55a501d8c561da1ab25",
+  "novel_ref_sha256": "5d709aa051cb748e80d4ea89a7d733fd0fdfe8c7edc9593ea7b902067d75ad07",
   "review_status": "pending_human",
-  "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。2026-11-17 项目负责人复核裁定为 REVIEW_RETURNED：已按裁定修订 seg_0005/0016/0018/0023 等判定与 novel_ref 段号边界，修订后重新送审，仍无人签核。",
+  "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。2026-11-17 项目负责人复核裁定为 REVIEW_RETURNED：已按裁定修订 seg_0005/0016/0018/0023 等判定与 novel_ref 段号边界，修订后重新送审，仍无人签核。2026-11-18 独立审核对 37 条给出 33 PASS / 4 RETURN（b24/b26/b29/b30），已按裁定修订并重新送审；仍无人签核。",
   "reviewed_by": null,
   "reviewed_at": null,
   "prepared_by": "agent:panelcast-executor",
@@ -645,6 +645,10 @@
       "novel_para": [
         [
           444,
+          444
+        ],
+        [
+          455,
           461
         ]
       ],
@@ -652,15 +656,15 @@
       "fidelity": "altered",
       "severity": "low",
       "alteration_origin": "mixed",
-      "mixed_note": "p31 漫画台词「這個任務要賭上性命，但是報酬卻很少」提供了「赌上性命、报酬少」；「两人对着账本发愁」是旁白新增，小说 446–461 是吃着酥炸蟾蜍腿开会，没有账本。",
+      "mixed_note": "p31 漫画台词「這個任務要賭上性命，但是報酬卻很少」提供了「赌上性命、报酬少」；「两人对着账本发愁」是旁白新增，小说 455–461 的招募讨论没有账本；445–454 的回镇、洗澡、卖肉、吃蟾蜍腿均未画。",
       "pages_declared": [
         "page_0031"
       ],
       "pages_actual": [
         "page_0031"
       ],
-      "evidence": "第一章 444–461「还是招募同伴吧！」「有本小姐在，想找同伴只需要招募一下」；p31「這個任務要賭上性命，但是報酬卻很少…」",
-      "review_note": "「报酬少得可怜」来自 p31 漫画台词（小说 451 只说「和土木工程的打工费差不了多少」，属程度放大），这部分是漫画改写、旁白跟随；「两人对着账本发愁」才是旁白新增、无来源的细节（小说 446–461 是吃着酥炸蟾蜍腿开会）。故整体为 mixed。",
+      "evidence": "第一章 444「只有我们两个人打不过。还是招募同伴吧！」；455–461「有本小姐在，想找同伴只需要招募一下」；451「和土木工程的打工费差不了多少」与 p31「這個任務要賭上性命，但是報酬卻很少…」是程度差异；p31 同",
+      "review_note": "「报酬少得可怜」来自 p31 漫画台词（小说 451 只说「和土木工程的打工费差不了多少」，属程度放大），这部分是漫画改写、旁白跟随；「两人对着账本发愁」才是旁白新增、无来源的细节（小说 455–461 是招募讨论，445–454 的回镇、洗澡、卖肉与吃蟾蜍腿均未画）。故整体为 mixed。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "rewrite"
@@ -721,7 +725,7 @@
         "page_0033",
         "page_0034"
       ],
-      "evidence": "第一章 481「我看见在招募上级职业冒险者的告示」、488「吾乃惠惠！职业乃大法师…爆裂魔法」、494「红魔族首屈一指的魔法师」、495「我已经三天没吃任何东西了」；p33–p34 同",
+      "evidence": "第一章 480「我看见在招募上级职业冒险者的告示」、487「吾乃惠惠！职业乃大法师…爆裂魔法」、494「红魔族首屈一指的魔法师」「我已经三天没吃任何东西了」；p33–p34 同",
       "review_note": "「最高阶职业」与小说「大法师」（上级职业）一致；「红着脸」画面依据不足，但无害。",
       "review_status": "pending_human",
       "reviewer": null,
@@ -768,6 +772,10 @@
       "novel_para": [
         [
           519,
+          529
+        ],
+        [
+          534,
           543
         ]
       ],
@@ -783,8 +791,8 @@
         "page_0036",
         "page_0037"
       ],
-      "evidence": "第一章 519「在我准备好之前，请你们绊住那只蟾蜍」、538「这就是人类所能实行的攻击手段当中威力最强的一种」；p36–p37 同",
-      "review_note": "「几只青蛙」小说为两只（一远一近），p36 画面多于两只，属画面差异。",
+      "evidence": "第一章 519–529、534–543「在我准备好之前，请你们绊住那只蟾蜍」519、「这就是人类所能实行的攻击手段当中威力最强的一种」537；p36–p37 同",
+      "review_note": "「几只青蛙」小说为两只（一远一近），p36 画面多于两只，属画面差异。小说 530–533 的阿克娅冲入蟾蜍未画，也不在本段旁白来源内。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "keep"
@@ -884,5 +892,5 @@
       "disposition": "keep"
     }
   ],
-  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。提交后复核再修：b21.note 与 seg_0016 判定对齐；seg_0019 来源范围收窄为 463–479；seg_0020 登场台词锚点由 480 修正为 481；novel_ref_sha256 再次重绑。2026-11-17 BEAT-MAPPING-FIX：novel_ref 修正 b16–b18 边界，拆分 b23 → b23a/b23b/b23c、b34 → b34a/b34b，beat 数 34 → 37；novel_ref_sha256 随之重绑。"
+  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。提交后复核再修：b21.note 与 seg_0016 判定对齐；seg_0019 来源范围收窄为 463–479；seg_0020 登场台词锚点由 481 修正为 480（方向更正）；novel_ref_sha256 再次重绑。2026-11-17 BEAT-MAPPING-FIX：novel_ref 修正 b16–b18 边界，拆分 b23 → b23a/b23b/b23c、b34 → b34a/b34b，beat 数 34 → 37；novel_ref_sha256 随之重绑。2026-11-18 P0-01-CH01-BEAT-MAPPING-REVIEW-FIX：按独立审核裁定拆分 b24 → b24a/b24b/b24c、b29 → b29a/b29b，b26 补 page_0032，b30 起点前移至 534，同步 seg_0018/seg_0020/seg_0022 来源；beat 数 37 → 40。另更正：seg_0020 登场台词锚点为 para 480（此前一处 480/481 方向写反已修正）。"
 }

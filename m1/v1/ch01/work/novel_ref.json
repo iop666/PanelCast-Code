@@ -309,15 +309,37 @@
       "note": "复核拆分：第一章 p5–p42 未画第二只蟾蜍战斗，因此判 omitted；不代表后续章节不会补叙"
     },
     {
-      "id": "b24",
-      "para": [444, 462],
-      "gist": "回镇卖蟾蜍肉，在公会吃炸蟾蜍腿，决定招募同伴",
+      "id": "b24a",
+      "para": [444, 444],
+      "gist": "和真承认两人打不过，决定招募同伴",
       "pages": ["page_0031"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 444–461「还是招募同伴吧！」「有本小姐在，想找同伴只需要招募一下」；p31 同",
+      "evidence": "小说 444「只有我们两个人打不过。还是招募同伴吧！」；p31 阿克娅把和真叫起来、两人决定招募",
       "review_status": "needs_review",
-      "note": "小说 445–446 先回大众浴场洗澡再回公会；漫画跳过洗澡，属压缩。p31「這個任務要賭上性命，但是報酬卻很少」是漫画台词，小说 451 只说「和土木工程的打工费差不了多少」"
+      "note": "p31 同时画出招募讨论，属 b24c；本 beat 只承载「决定招募」"
+    },
+    {
+      "id": "b24b",
+      "para": [445, 454],
+      "gist": "回镇洗澡、卖蟾蜍肉换钱、在公会吃炸蟾蜍腿并讨论作战",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "high",
+      "evidence": "小说 445–454「回到镇上之后，第一件事就是冲到大众浴场」「把蟾蜍肉卖给公会」「酥炸蟾蜍倒是意外的好吃」；p31 只画公会招募讨论，未画回镇、洗澡、卖肉、进食",
+      "review_status": "needs_review",
+      "note": "p31 的公会长椅场景不等于 445–454 全部内容；吃蟾蜍腿、卖肉、洗澡均未呈现"
+    },
+    {
+      "id": "b24c",
+      "para": [455, 462],
+      "gist": "招募讨论：漫画强调任务风险、报酬少、队伍攻击力不足",
+      "pages": ["page_0031"],
+      "fidelity": "altered",
+      "mapping_confidence": "high",
+      "evidence": "小说 455–461「会有人想和才刚起步的我们组队吗」「有本小姐在，想找同伴只需要招募一下」；p31 将讨论改写为「這個任務要賭上性命，但是報酬卻很少」「我們隊伍的攻擊力不夠」",
+      "review_status": "needs_review",
+      "note": "漫画台词「赌上性命、报酬少」相对小说 451「和土木工程的打工费差不了多少」是程度放大；p31 的「账本」无来源，旁白问题记在 seg_0018"
     },
     {
       "id": "b25",
@@ -328,18 +350,18 @@
       "mapping_confidence": "high",
       "evidence": "小说 463–479「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
       "review_status": "needs_review",
-      "note": ""
+      "note": "p32 底部已出现惠惠的开场招呼，页级与 b26 有意重叠；b25 段级止于 para 479"
     },
     {
       "id": "b26",
       "para": [480, 497],
       "gist": "惠惠登场，自称红魔族首屈一指的大法师，用爆裂魔法，三天没吃饭",
-      "pages": ["page_0033", "page_0034"],
+      "pages": ["page_0032", "page_0033", "page_0034"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 480–497「吾乃惠惠！职业乃大法师…爆裂魔法」「我已经三天没吃任何东西了」；p33–p34 同",
+      "evidence": "小说 480–497「吾乃惠惠！职业乃大法师…爆裂魔法」「我已经三天没吃任何东西了」；p32 底部开场招呼、p33–p34 同",
       "review_status": "needs_review",
-      "note": "小说职业名为「大法师」，漫画写「大魔法師」，同一职业的两种译法"
+      "note": "小说职业名为「大法师」，漫画写「大魔法師」，同一职业的两种译法；p32 底部已出现惠惠，和 b25 共页"
     },
     {
       "id": "b27",
@@ -364,26 +386,37 @@
       "note": "小说递的是菜单，漫画画成她已在喝饮料；旁白写成「抓起面包就啃」，面包无来源"
     },
     {
-      "id": "b29",
-      "para": [519, 534],
-      "gist": "再战蟾蜍，惠惠要求先绊住它，阿克娅自暴自弃冲上去又被吞",
+      "id": "b29a",
+      "para": [519, 529],
+      "gist": "再战蟾蜍：惠惠要求两人先绊住蟾蜍，和真与阿克娅确认战术",
       "pages": ["page_0036"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 519–534「在我准备好之前，请你们绊住那只蟾蜍」「毫无学习能力的阿克娅果然成功进入蟾蜍的体内」；p36 同",
+      "evidence": "小说 519–529「在我准备好之前，请你们绊住那只蟾蜍」「你的魔法就锁定比较远的那一只」「她偶尔会脱口说出类似的话」；p36 两只蟾蜍与对话",
       "review_status": "needs_review",
-      "note": ""
+      "note": "p36 只画到惠惠说「你們看著吧！」，未画阿克娅冲入蟾蜍"
+    },
+    {
+      "id": "b29b",
+      "para": [530, 533],
+      "gist": "阿克娅自暴自弃冲向近处蟾蜍，进入其体内并绊住它",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "high",
+      "evidence": "小说 530–533「有点自暴自弃地朝比较近的那只蟾蜍冲了过去」「成功进入蟾蜍的体内」；p36 未呈现",
+      "review_status": "needs_review",
+      "note": "p36 没有阿克娅冲上前或被吞的画面；不能把小说后续动作算进 p36"
     },
     {
       "id": "b30",
-      "para": [535, 543],
-      "gist": "惠惠咏唱，法杖前端聚光，喊出爆裂魔法",
+      "para": [534, 543],
+      "gist": "惠惠身边的空气开始震荡，咏唱、聚光，喊出爆裂魔法",
       "pages": ["page_0037", "page_0038", "page_0039"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 535–543「这正是最极致的攻击魔法」「『Explosion』！」；p37 举杖、p38「爆裂魔法！」、p39 聚光",
+      "evidence": "小说 534–543「惠惠身边的空气开始震荡」「这正是最极致的攻击魔法」「『Explosion』！」；p37 举杖、p38「爆裂魔法！」、p39 聚光",
       "review_status": "needs_review",
-      "note": ""
+      "note": "para 534 已进入 p37 的施法准备画面，故起点由 535 前移"
     },
     {
       "id": "b31",
@@ -444,11 +477,11 @@
   "coverage": {
     "novel_chars": 23678,
     "script_chars": 2393,
-    "beats_total": 37,
+    "beats_total": 40,
     "by_fidelity": {
       "drawn": 30,
-      "omitted": 6,
-      "altered": 0,
+      "omitted": 8,
+      "altered": 1,
       "original": 1,
       "unconfirmed": 0
     },
@@ -457,7 +490,7 @@
       "pages_mapped": 38,
       "pages_unmapped": 0
     },
-    "note": "altered 为 0 是 beat 级判定：本章漫画对小说的改动集中在「省略」（b20/b33/b34a/b34b/b23a/b23c）与台词重写，没有把小说事件改写成别的事。旁白层面的改写与捏造记在 script-audit.json，不重复计入 beat。2026-11-17 复核拆分后 beat 数 34 → 37：b23 → b23a/b23b/b23c，b34 → b34a/b34b。"
+    "note": "altered 为 1（b24c：漫画把招募讨论改写为任务风险、报酬少与队伍攻击力不足）。2026-11-17 复核拆分后 beat 数 34 → 37：b23 → b23a/b23b/b23c，b34 → b34a/b34b。2026-11-18 BEAT-MAPPING-REVIEW-FIX：b24 → b24a/b24b/b24c、b29 → b29a/b29b，b26 补 page_0032，b30 起点 535 → 534；beat 数 37 → 40，全部仍需人工确认。"
   },
   "align_meta": {
     "tool": "manual",
@@ -466,6 +499,6 @@
     "auto_confirmed": false,
     "prepared_by": "agent:panelcast-executor",
     "prepared_at": "2026-11-16T16:00:00+08:00",
-    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。2026-11-17 项目负责人复核裁定：修正 b18/b19（292 属阿克娅能力值）、b25/b26（480 属惠惠登场）段号边界，并按裁定修正 b01 扉页描述；修订后仍需人工确认。2026-11-17 BEAT-MAPPING-FIX：修正 b16–b18 边界（b16 230–258、b17 259–277、b18 278–291），拆分 b23 → b23a/b23b/b23c、b34 → b34a/b34b；beat 数 34 → 37，全部仍需人工确认。"
+    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。2026-11-17 项目负责人复核裁定：修正 b18/b19（292 属阿克娅能力值）、b25/b26（480 属惠惠登场）段号边界，并按裁定修正 b01 扉页描述；修订后仍需人工确认。2026-11-17 BEAT-MAPPING-FIX：修正 b16–b18 边界（b16 230–258、b17 259–277、b18 278–291），拆分 b23 → b23a/b23b/b23c、b34 → b34a/b34b；beat 数 34 → 37，全部仍需人工确认。2026-11-18 P0-01-CH01-BEAT-MAPPING-REVIEW-FIX：按独立审核裁定拆分 b24 → b24a/b24b/b24c、b29 → b29a/b29b，b26 补 page_0032，b30 起点前移至 534；同步 seg_0018/seg_0020/seg_0022 来源；beat 数 37 → 40，全部仍需人工确认。"
   }
 }

@@ -80,11 +80,12 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   **不得凭记忆填，必须逐章读小说原文核对。**
 
   **状态：第一章样张已完成（P0-01-SAMPLE-CH01），其余九章未核。**
-  **2026-11-17 复核状态：`P0-01-SAMPLE-CH01 = REVISION_CONTENT_REVIEW_PASS /
-  COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`——第一章 P0-01 样张审计复核
-  仅剩负责人签核；34 个 novel beats 的人工确认属于独立的 P0-02 工作，尚未完成。
-  `m1 novel check` 仍拦截 v1 讲稿、未确认 beats 与未签核三项，属预期行为。
-  此前裁定为 `REVIEW_RETURNED`，修订已完成。下一阶段：`P0-01-CH01-OWNER-REVIEW-CLOSEOUT`。**
+  **2026-11-17 复核状态：`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。**
+  独立复核发现 b16–b18 边界、b23 与 b34 事件拆分问题，已执行
+  `P0-01-CH01-BEAT-MAPPING-FIX`（beat 数 34 → 37，37/37 仍 `needs_review`），
+  待负责人针对性复核；审计未签核。此前对提交 `3973f93` 的
+  `COMMITTED_ARTIFACT_REVIEW_PASS` 不覆盖本轮新修订。
+  `m1 novel check` 仍拦截 v1 讲稿、未确认 beats 与未签核三项，属预期行为。**
   - `m1/audit/chapter-map.md`：第一章 30 条段落锚点 + 十章总表（九章标「未核」，不推断）
   - 第一章结论：漫画 ch01（p5–42）= 小说 **序章 0–148 + 第一章 149–711（部分）**，
     `order: reordered`（漫画把序章后置成插叙）
@@ -97,7 +98,7 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   - 复核修订内容：b18/b19、b25/b26 段号边界修正（para 292 属阿克娅能力值、
     para 480 属惠惠登场）；b01 扉页描述修正；`seg_0005/0016/0018/0023` 按裁定修订；
     `novel_ref.json` 字节变化后 `novel_ref_sha256` 已重绑为 `48a97638…`
-  - **未签核**：`review_status: pending_human`、`reviewed_by: null`；34 beats 仍全部
+  - **未签核**：`review_status: pending_human`、`reviewed_by: null`；37 beats 仍全部
     `needs_review`。`m1 novel lint` 全过、`m1 novel check` 在第 3/4/5 步拦截
     （v1 讲稿 + beat 未确认 + 未签核）
 

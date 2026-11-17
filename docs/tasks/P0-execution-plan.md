@@ -549,7 +549,7 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 4. 成片 hash 用 `sha256sum` 实测，不是抄 `delivery.md`。
 
 **进度（2026-11-16）：第一章样张已完成，其余九章未动。**
-**2026-11-17 复核状态：`REVISION_CONTENT_REVIEW_PASS / COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`（修订内容与提交产物均已通过；第一章审计签核待负责人，34 beats 人工确认属 P0-02 尚未完成）。**
+**2026-11-17 复核状态：`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`；`P0-01-CH01-BEAT-MAPPING-FIX` 已执行，待负责人针对性复核（beat 数 34 → 37，37/37 仍 needs_review）。**
 
 - 产物：`m1/audit/chapter-map.md`（第一章 30 条段落锚点 + 十章总表）
 - 第一章结论：漫画 ch01 p5–42 = 小说 **序章 0–148 + 第一章 149–711（部分）**，
@@ -562,7 +562,10 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
   第一轮用 6 页拼图看错了格序，第二轮改逐页读才纠正
 - 复核修订（2026-11-17）：b18/b19、b25/b26 段号边界修正；
   b01 扉页描述修正；`seg_0005/0016/0018/0023` 按裁定修订；
-  `novel_ref.json` 重绑 `novel_ref_sha256`；34 beats 仍全部 `needs_review`
+  `novel_ref.json` 重绑 `novel_ref_sha256`；37 beats 仍全部 `needs_review`
+- BEAT-MAPPING-FIX（2026-11-17）：b16 230–258、b17 259–277、b18 278–291；
+  b23 拆为 b23a/b23b/b23c，b34 拆为 b34a/b34b；beat 数 34 → 37，
+  37/37 仍 `needs_review`
 
 ---
 

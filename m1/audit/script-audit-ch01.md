@@ -1,7 +1,7 @@
 # 第一章讲稿来源审计（P0-01-SAMPLE-CH01）
 
 > 对象：`m1/v1/ch01/work/script.json`（`script/v1`，25 段 / 2,393 字）
-> 底稿：`m1/v1/ch01/work/novel_ref.json`（34 beats，全部 `needs_review`）
+> 底稿：`m1/v1/ch01/work/novel_ref.json`（37 beats，全部 `needs_review`）
 > 机器可读版：`m1/v1/ch01/work/script-audit.json`
 >
 > **本报告没有人工签核。** `reviewed_by` 为 `null`，`review_status` 为 `pending_human`。
@@ -695,7 +695,7 @@
 $ python -m panelcast m1 novel check --work m1/v1/ch01/work --novel-dir .local/source/epub/text
 error: 底稿门禁不过（4 项）：
   [step 3] 讲稿是 script/v1，没有 source_refs 字段，无法校验来源；需先迁到 script/v2（P0-11）
-  [step 4] 34 个 beat 仍是 needs_review：b01、b02、b03、b04、b05 … 共 34 个；候选与骨架不等于结论，必须人工确认后才能过门禁
+  [step 4] 37 个 beat 仍是 needs_review：b01、b02、b03、b04、b05 … 共 37 个；候选与骨架不等于结论，必须人工确认后才能过门禁
   [step 5] reviewed_by 必须是 human:<name>，实为 ''
   [step 5] review_status='pending_human'，只有 approved 允许出片
 退出码: 3
@@ -749,7 +749,7 @@ P0-05 的验收第 5 条写着「`--check` 对未确认的 beat **报错而不�
 - **`novel_index.json` 的章界有一处偏移**：`序章` 标 `0–148`，但 para 148 是
   「一阵明亮的光芒，笼罩住我和哭喊的阿克娅……！」，属序章最后一句；`第一章` 从 149 起
   才是标题行。不影响本样张（我用的是具体段号，不是章界），但会在"按章取区间"时出偏差。
-- **`b33` / `b34` 是否在第二章补叙**：本章看不到，本样张**不推断**，
+- **`b33` / `b34a` / `b34b` 是否在第二章补叙**：本章看不到，本样张**不推断**，
   留给第二章样张核。
 - **`v2/ch02`（第七章「梦幻竹笋」）疑似漫画原创**：只在 `chapter-map.md` 里记为待核项，
   没有写成结论。

@@ -200,7 +200,7 @@
     },
     {
       "id": "b16",
-      "para": [230, 259],
+      "para": [230, 258],
       "gist": "两人没钱，阿克娅向艾莉丝教祭司讨到三千艾莉丝，凑出登录费",
       "pages": ["page_0023"],
       "fidelity": "drawn",
@@ -211,18 +211,18 @@
     },
     {
       "id": "b17",
-      "para": [260, 278],
+      "para": [259, 277],
       "gist": "说明冒险者是万事屋、卡片会显示等级与能力值、经验值可升级",
       "pages": ["page_0024", "page_0025"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 259–278；p24「就像是萬事屋一樣」、p25 卡片与经验值说明",
+      "evidence": "小说 259–277；p24「就像是萬事屋一樣」、p25 卡片与经验值说明",
       "review_status": "needs_review",
-      "note": ""
+      "note": "para 259 起说明冒险者工作性质；para 278 起为和真能力值，属 b18"
     },
     {
       "id": "b18",
-      "para": [279, 291],
+      "para": [278, 291],
       "gist": "和真数值全普通、只有幸运极高，只能选基本职业「冒险者」",
       "pages": ["page_0025", "page_0026"],
       "fidelity": "drawn",
@@ -276,15 +276,37 @@
       "note": "旁白把「被吞进去」弱化成「被黏液浇透」，见 seg_0017"
     },
     {
-      "id": "b23",
-      "para": [428, 443],
-      "gist": "和真提议撤退，阿克娅不服，神光拳对蟾蜍无效，和真打倒第二只",
-      "pages": ["page_0030", "page_0031"],
+      "id": "b23a",
+      "para": [428, 430],
+      "gist": "和真提议撤退，并解释第一只蟾蜍因吞咽而停止动作；第一章未明确呈现",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "high",
+      "evidence": "小说 428–430「今天我们先回去了吧」「为了吞咽它的猎物而停止了动作」；p30 未完整呈现撤退建议与解释",
+      "review_status": "needs_review",
+      "note": "复核拆分：原 b23 把 428–443 合并判 drawn；p30 没有完整呈现这段撤退建议与原因解释"
+    },
+    {
+      "id": "b23b",
+      "para": [431, 433],
+      "gist": "阿克娅不愿带着污秽形象撤退，和真吐槽她平时更狼狈",
+      "pages": ["page_0030"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 429–443「神光拳！」「拳头打在蟾蜍柔软的腹部上便陷了进去」；p30 末格",
+      "evidence": "小说 431–433「怎么可能乖乖撤退」「已经被玷污了」；p30 阿克娅抱怨黏液、和真回应",
       "review_status": "needs_review",
-      "note": "p31 起已回公会，属 b24"
+      "note": "p30 有对应画面与对白；p31 起已回公会，属 b24"
+    },
+    {
+      "id": "b23c",
+      "para": [434, 443],
+      "gist": "阿克娅攻击第二只蟾蜍、神光拳无效，和真解决战斗；第一章未呈现",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "high",
+      "evidence": "小说 434–443「神光拳！」「打倒了第二只…巨型蟾蜍」；p30–p31 未显示第二只蟾蜍战斗或神光拳",
+      "review_status": "needs_review",
+      "note": "复核拆分：第一章 p5–p42 未画第二只蟾蜍战斗，因此判 omitted；不代表后续章节不会补叙"
     },
     {
       "id": "b24",
@@ -397,24 +419,35 @@
       "note": "本章未画。是否在第二章补叙需在第二章样张确认——**此处不做推断**"
     },
     {
-      "id": "b34",
-      "para": [620, 711],
-      "gist": "回公会报告任务，和真升到四级",
+      "id": "b34a",
+      "para": [620, 656],
+      "gist": "回公会报告任务、结算报酬、和真升到四级、查看任务公告、开始思乡",
       "pages": [],
       "fidelity": "omitted",
       "mapping_confidence": "medium",
-      "evidence": "小说 620–711「冒险者等级四」",
+      "evidence": "小说 620–656「冒险者等级四」及任务公告、思乡；第一章 p5–p42 未画",
       "review_status": "needs_review",
-      "note": "本章未画；同上，不推断是否在第二章补叙"
+      "note": "本章未画；任务结算与等级提升是否在第二章补叙，不推断"
+    },
+    {
+      "id": "b34b",
+      "para": [657, 711],
+      "gist": "达克妮丝前来应征、请求加入小队，并介绍十字骑士职业与自身战斗特点",
+      "pages": [],
+      "fidelity": "omitted",
+      "mapping_confidence": "medium",
+      "evidence": "小说 657–711 达克妮丝登场与应征；第一章 p5–p42 未画",
+      "review_status": "needs_review",
+      "note": "本章未画；达克妮丝登场是否在第二章补叙，不推断"
     }
   ],
   "coverage": {
     "novel_chars": 23678,
     "script_chars": 2393,
-    "beats_total": 34,
+    "beats_total": 37,
     "by_fidelity": {
       "drawn": 30,
-      "omitted": 3,
+      "omitted": 6,
       "altered": 0,
       "original": 1,
       "unconfirmed": 0
@@ -424,7 +457,7 @@
       "pages_mapped": 38,
       "pages_unmapped": 0
     },
-    "note": "altered 为 0 是 beat 级判定：本章漫画对小说的改动集中在「省略」（b20/b33/b34）与台词重写，没有把小说事件改写成别的事。旁白层面的改写与捏造记在 script-audit.json，不重复计入 beat。"
+    "note": "altered 为 0 是 beat 级判定：本章漫画对小说的改动集中在「省略」（b20/b33/b34a/b34b/b23a/b23c）与台词重写，没有把小说事件改写成别的事。旁白层面的改写与捏造记在 script-audit.json，不重复计入 beat。2026-11-17 复核拆分后 beat 数 34 → 37：b23 → b23a/b23b/b23c，b34 → b34a/b34b。"
   },
   "align_meta": {
     "tool": "manual",
@@ -433,6 +466,6 @@
     "auto_confirmed": false,
     "prepared_by": "agent:panelcast-executor",
     "prepared_at": "2026-11-16T16:00:00+08:00",
-    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。2026-11-17 项目负责人复核裁定：修正 b18/b19（292 属阿克娅能力值）、b25/b26（480 属惠惠登场）段号边界，并按裁定修正 b01 扉页描述；修订后仍需人工确认。"
+    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。2026-11-17 项目负责人复核裁定：修正 b18/b19（292 属阿克娅能力值）、b25/b26（480 属惠惠登场）段号边界，并按裁定修正 b01 扉页描述；修订后仍需人工确认。2026-11-17 BEAT-MAPPING-FIX：修正 b16–b18 边界（b16 230–258、b17 259–277、b18 278–291），拆分 b23 → b23a/b23b/b23c、b34 → b34a/b34b；beat 数 34 → 37，全部仍需人工确认。"
   }
 }

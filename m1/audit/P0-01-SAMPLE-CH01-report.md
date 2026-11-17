@@ -27,7 +27,7 @@
 | 路径 | 大小 | 说明 |
 | --- | --- | --- |
 | `m1/audit/chapter-map.md` | 11,928 B | 章节对应表（第一章详解 + 十章总表） |
-| `m1/v1/ch01/work/novel_ref.json` | 19,294 B | 34 个 beat，全部 `needs_review`（P0-REVIEW-04 后） |
+| `m1/v1/ch01/work/novel_ref.json` | 21,959 B | 37 个 beat，全部 `needs_review`（BEAT-MAPPING-FIX 后） |
 | `m1/v1/ch01/work/script-audit.json` | 37,655 B | 25 段逐段审计（`script-audit/v2`） |
 | `m1/audit/script-audit-ch01.md` | 见 §G | 同一份审计的人读版（801 行） |
 | `m1/audit/P0-01-SAMPLE-CH01-report.md` | 本文件 | 执行报告 |
@@ -101,27 +101,30 @@ p10 首格才出现"没错！真是短暂的人生。"——由此转入天界�
 
 | 项 | 值 |
 | --- | --- |
-| beats 总数 | **34** |
+| beats 总数 | **37** |
 | `drawn` | 30 |
-| `omitted` | 3（b20 / b33 / b34） |
+| `omitted` | 6（b20 / b23a / b23c / b33 / b34a / b34b） |
 | `altered` | 0 |
 | `original` | 1（b01 扉页） |
 | `review_status = confirmed` | **0** |
-| `review_status = needs_review` | **34** |
+| `review_status = needs_review` | **37** |
 
 | 页覆盖 | 值 |
 | --- | --- |
 | 章节页数 | 38 |
 | 已映射页 | **38**（无空洞、无越界） |
 
-**为什么 34 个 beat 全部 `needs_review`**：beat 的段落区间是我逐页比对定下来的，
+**为什么 37 个 beat 全部 `needs_review`**：beat 的段落区间是我逐页比对定下来的，
 但"定下来"和"人签核过"是两件事。规范 §4.3.10 写明 `reviewed_by` 必须是 `human:`，
 所以这里一个都不签。**签核是项目负责人的动作，不是执行 Agent 的动作。**
 
-**2026-11-17 复核修正**：b18 `279–291`、b19 `292–308`、b25 `463–479`、b26 `480–497`
+**2026-11-17 复核修正**：b18 `278–291`、b19 `292–308`、b25 `463–479`、b26 `480–497`
 （原文 292 已是阿克娅能力值；480 是惠惠登场的过渡句「这么说着，就在我正准备站起来的时候」，
 直接台词在 481），并修正 b01 扉页描述。
-beat 计数不变，仍全部 `needs_review`。
+
+**2026-11-17 BEAT-MAPPING-FIX**：b16 `230–258`、b17 `259–277`、b18 `278–291`；
+b23 拆为 `b23a/b23b/b23c`，b34 拆为 `b34a/b34b`；beat 数 34 → 37，
+全部仍 `needs_review`。
 
 ---
 
@@ -177,7 +180,7 @@ beat 计数不变，仍全部 `needs_review`。
 
 | 项 | 说明 |
 | --- | --- |
-| `b33`（ch01 562–619）/ `b34`（620–711）是否在第二章补叙 | 第一章看不到。**不推断**，留给第二章样张核 |
+| `b33`（ch01 562–619）/ `b34a`（620–656）/ `b34b`（657–711）是否在第二章补叙 | 第一章看不到。**不推断**，留给第二章样张核 |
 | `m1/v2/ch07`（第七章「梦幻竹笋」）是否漫画原创 | 该标题在小说第一卷 0 次，但"0 次"只说明第一卷没有，不说明它是原创。**记为待核，不写结论** |
 
 ### E.2 判定存在争议（我给了结论，但换个人可能判得不一样）
@@ -265,23 +268,24 @@ beat 计数不变，仍全部 `needs_review`。
 | 文件 | 首次交付（eff6fad） | P0-REVIEW-04 后 | 复核修订后（2026-11-17） | 说明 |
 | --- | --- | --- | --- | --- |
 | `script.json` | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | **同左** | **同左** | **一字未改**，符合"审计不改稿" |
-| `novel_ref.json` | `c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a` | `9cdba901ea8d3c57cb83c89be28b19a76297ad206d06d81af52a4bfddafee0d5` | `694aa4db300b5726f166e4d60a0f97b2006bb8a8269682411391c9c1bcc5bb10` | 加 `judgement_scope`；复核修正两处段号边界、b21 note 与 b01 描述 |
-| `script-audit.json` | `da5118e34320a4fe9f4635725ee87d78b0c7d081aadcdee76a6bb32c9a9f6d71` | `1c0da012abb61dbc92c05779fc375356bc23a173a49a23f3c7a279e15fcef0db` | `11e996e2e8ac2b76b562a01b4bf5114c9e6073776b71c8b400b0d828dbb74192` | 升 v2 + 改 1 处判定；复核按裁定修订并两次重绑 `novel_ref_sha256` |
+| `novel_ref.json` | `c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a` | `9cdba901ea8d3c57cb83c89be28b19a76297ad206d06d81af52a4bfddafee0d5` | `e78e89f0ec3520ccf9621e8d23eb59a2a7e621520258b55a501d8c561da1ab25` | 加 `judgement_scope`；复核修正边界、b21 note、b01 描述，并拆分 b23/b34 |
+| `script-audit.json` | `da5118e34320a4fe9f4635725ee87d78b0c7d081aadcdee76a6bb32c9a9f6d71` | `1c0da012abb61dbc92c05779fc375356bc23a173a49a23f3c7a279e15fcef0db` | `98af7660695837fde716df3601925e31f63359781cba1d0865efdc7bf67a5435` | 升 v2 + 改 1 处判定；复核按裁定修订并三次重绑 `novel_ref_sha256` |
 | `m1/audit/chapter-map.md` | `fea1d6a7d161d2adc1e9d486cb3164ca4281e96ad9eaf3a26b4f15898dcb77ce` | **同左** | **同左** | 未改 |
-| `m1/audit/script-audit-ch01.md` | `bb8b258995df000403bf17ecbcc61d0b7c1a87a79e77402bc78eecb168974711` | `c940541941225f49bc969c66bec2f84fb59fb39f636e30419db0c5d09f72a483` | `733b8f4a9b0e5c25db81cdb229e15c838be2e5bb71fba916e3ff2792cd3c34e5` | 枚举与计数同步；复核后同步裁定、计数与 480/481 锚点 |
+| `m1/audit/script-audit-ch01.md` | `bb8b258995df000403bf17ecbcc61d0b7c1a87a79e77402bc78eecb168974711` | `c940541941225f49bc969c66bec2f84fb59fb39f636e30419db0c5d09f72a483` | `220e787f2ca9a623e5bd2b8671275b0bebbc355fceb36b54bed12725c472068d` | 枚举与计数同步；复核后同步裁定、计数、锚点与拆分 |
 
 **审计报告内部绑定的三个哈希**（`script-audit.json` 里）：
 
 | 字段 | 值 | 校验什么 |
 | --- | --- | --- |
 | `script_sha256` | `1ac90fae…` | 改一句台词 → 审计立即失效 |
-| `novel_ref_sha256` | `48a97638…` | 底稿一改 → 审计立即失效 |
+| `novel_ref_sha256` | `e78e89f0…` | 底稿一改 → 审计立即失效 |
 | `audited_segments[].text_sha256` | 25 条，逐段 | 能定位"到底哪一段被改了" |
 
 > 注意 `novel_ref_sha256` 变过：加 `judgement_scope` 改了底稿字节，
 > 审核报告里的绑定值必须跟着重算，否则第 5 步会误报"底稿改过但审计没重做"。
 > 2026-11-17 复核修正段号边界后重绑（`9cdba901…` → `48a97638…`）；
-> 提交后针对性复核修正 b21.note 与 480/481 锚点，再次重绑（`48a97638…` → `694aa4db…`）。
+> 提交后针对性复核修正 b21.note 与 480/481 锚点，再次重绑（`48a97638…` → `694aa4db…`）；
+> BEAT-MAPPING-FIX 修正 b16–b18 边界并拆分 b23/b34，第三次重绑（`694aa4db…` → `e78e89f0…`）。
 > 这正是哈希绑定的正常代价——**改底稿就必须重绑，不许只改一边**。
 
 ### G.1 门禁当前的实际表现
@@ -290,7 +294,7 @@ beat 计数不变，仍全部 `needs_review`。
 $ python -m panelcast m1 novel check --work m1/v1/ch01/work --novel-dir .local/source/epub/text
 error: 底稿门禁不过（4 项）：
   [step 3] 讲稿是 script/v1，没有 source_refs 字段，无法校验来源；需先迁到 script/v2（P0-11）
-  [step 4] 34 个 beat 仍是 needs_review：b01、b02、b03、b04、b05 … 共 34 个；候选与骨架不等于结论，必须人工确认后才能过门禁
+  [step 4] 37 个 beat 仍是 needs_review：b01、b02、b03、b04、b05 … 共 37 个；候选与骨架不等于结论，必须人工确认后才能过门禁
   [step 5] reviewed_by 必须是 human:<name>，实为 ''
   [step 5] review_status='pending_human'，只有 approved 允许出片
 退出码: 3
@@ -358,7 +362,7 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 | 2 | `seg_0003` 页引用少一页（p9 → p9+p10） | P0-03 / 重出片时一并修 |
 | 3 | 讲稿仍是 `script/v1`，没有 `source_refs` | P0-11 |
 | 4 | `novel_index.json` 章界偏移一处（序章 0–148，但 para 148 属序章末句，第一章从 149 才是标题行） | 工具侧，影响"按章取区间" |
-| 5 | `b33`/`b34` 是否在第二章补叙 | 第二章样张 |
+| 5 | `b33`/`b34a`/`b34b` 是否在第二章补叙 | 第二章样张 |
 | 6 | `v2/ch07` 是否漫画原创 | 第二章 / 第七章样张 |
 | 7 | 十章中另外九章完全未核（211 页 / 143 段） | P0-02/03 |
 
@@ -437,11 +441,11 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 项目负责人逐段/逐页复核后裁定 **P0-01-SAMPLE-CH01 = REVIEW_RETURNED**。
 本节记录据此完成的修订；修订不改任何旁白，也不签核。
 
-**复核状态（2026-11-17）：`REVISION_CONTENT_REVIEW_PASS /
-COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`。**
-修订内容与提交后产物（实际 diff、两个哈希绑定、最终清单、clone 测试记录）
-均已复核通过。边界分开记：**第一章 P0-01 样张审计复核仅剩负责人签核；
-34 个 beat 的人工确认属于独立的 P0-02 工作，尚未完成。**
+**复核状态（2026-11-17）：`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`；
+`P0-01-CH01-BEAT-MAPPING-FIX = IMPLEMENTED / AWAITING_OWNER_REVIEW`。**
+此前对提交 `3973f93` 的 `COMMITTED_ARTIFACT_REVIEW_PASS` 不覆盖本轮新修订：
+独立复核发现 b16–b18 边界、b23 与 b34 事件拆分问题，已按裁定修订，
+beat 数 34 → 37，37/37 仍 `needs_review`，审计未签核。
 `m1 novel check` 仍会同时拦截 v1 讲稿、未确认 beats 与未签核三项。
 
 ### M.1 对象与边界
@@ -449,7 +453,7 @@ COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`。**
 - 样张：`m1/v1/ch01`（仅第一章）。第二章、九章批量、P0-06、P0-10、P0-11、横版继续冻结。
 - `script.json` 字节未动（`script_sha256` 仍为 `1ac90fae…`），改写仍归 P0-03。
 - `script-audit.json` 保持 `review_status=pending_human`、`reviewed_by=null`；
-  34 个 beat 全部保持 `needs_review`。
+  37 个 beat 全部保持 `needs_review`。
 
 ### M.2 五条争议最终裁定
 
@@ -472,7 +476,11 @@ COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`。**
 - 提交后复核再修：b21 `note` 与 `seg_0016` 的最终判定对齐（「比人还高」不构成事实错误，
   仅保留措辞建议）；`seg_0019` 来源范围收窄为 `463–479`；`seg_0020` 登场台词锚点
   由 480 修正为 481。
-- 34 beats 仍全部 `needs_review`。
+- `P0-01-CH01-BEAT-MAPPING-FIX`（2026-11-17）：b16 `230–258`、b17 `259–277`、
+  b18 `278–291`；b23 `428–443` 拆为 `b23a`（428–430，omitted）、
+  `b23b`（431–433，drawn，p30）、`b23c`（434–443，omitted）；
+  b34 `620–711` 拆为 `b34a`（620–656，omitted）、`b34b`（657–711，omitted）。
+- beat 数 34 → 37，37 个 beat 仍全部 `needs_review`。
 
 ### M.4 计数（修订后实测）
 
@@ -483,23 +491,25 @@ COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`。**
 | `keep / fix_pages / rewrite` | 12 / 1 / 12 |
 | `narration / manga / mixed` | 10 / 2 / 2 |
 | `approved / pending_rewrite` | 12 / 13 |
+| `beats_total / needs_review` | 37 / 37 |
 
 ### M.5 哈希与门禁
 
-- `novel_ref.json` = `694aa4db…`（字节已变）；`script-audit.json` 的 `novel_ref_sha256`
-  已重绑为同值（本轮第二次重绑）。
+- `novel_ref.json` = `e78e89f0…`（字节已变）；`script-audit.json` 的 `novel_ref_sha256`
+  已重绑为同值（BEAT-MAPPING-FIX 后第三次重绑）。
 - `script.json` = `1ac90fae…`（未变），25 条逐段 `text_sha256` 仍有效。
 - `m1 novel lint` 通过（格式合法，不代表签核）。
-- `m1 novel check` 仍退出码 3，拦在第 3/4/5 步（script/v1、34 beat `needs_review`、未签核）——预期行为。
+- `m1 novel check` 仍退出码 3，拦在第 3/4/5 步（script/v1、37 beat `needs_review`、未签核）——预期行为。
 - 提交后复核：`Ran 430 tests / OK (skipped=2)`，clone 测试实际执行并通过（2026-11-17）。
 
 ### M.6 下一步
 
-1. 提交后针对性复核已于 2026-11-17 完成并通过；下一阶段命名为
-   `P0-01-CH01-OWNER-REVIEW-CLOSEOUT`。
+1. `P0-01-CH01-BEAT-MAPPING-FIX` 已于 2026-11-17 执行，待项目负责人针对性复核；
+   `P0-01-CH01-OWNER-REVIEW-CLOSEOUT` 仍未关闭。
 2. 剩余待办分开记，不得合并成一个 PASS：
-   ① 项目负责人对 `script-audit.json` 签核（P0-01 收尾）；
-   ② 34 个 beat 的人工确认（独立的 P0-02 工作，尚未完成）。
+   ① 项目负责人针对 b16–b18、b23/b34 的修订做针对性复核；
+   ② 37 个 beat 的人工确认（独立的 P0-02 工作，尚未完成）；
+   ③ 最后才是 `script-audit.json` 签核。
    签核前 `m1 novel check` 仍会退出码 3，且同时因 v1 讲稿与未确认 beats 拦截。
 3. 冻结项维持不变。
 
@@ -555,7 +565,7 @@ novel lint: Schema 合法 -> m1/v1/ch01/work/script-audit.json
 
 ```
 [step 3] 讲稿是 script/v1，没有 source_refs 字段 → 需先迁 P0-11
-[step 4] 34 个 beat 仍是 needs_review → 需人工确认
+[step 4] 37 个 beat 仍是 needs_review → 需人工确认
 [step 5] reviewed_by 必须是 human:<name>
 [step 5] review_status='pending_human'，只有 approved 允许出片
 ```

@@ -26,7 +26,7 @@
     ]
   },
   "script_sha256": "1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3",
-  "novel_ref_sha256": "694aa4db300b5726f166e4d60a0f97b2006bb8a8269682411391c9c1bcc5bb10",
+  "novel_ref_sha256": "e78e89f0ec3520ccf9621e8d23eb59a2a7e621520258b55a501d8c561da1ab25",
   "review_status": "pending_human",
   "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。2026-11-17 项目负责人复核裁定为 REVIEW_RETURNED：已按裁定修订 seg_0005/0016/0018/0023 等判定与 novel_ref 段号边界，修订后重新送审，仍无人签核。",
   "reviewed_by": null,
@@ -884,5 +884,5 @@
       "disposition": "keep"
     }
   ],
-  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。提交后复核再修：b21.note 与 seg_0016 判定对齐；seg_0019 来源范围收窄为 463–479；seg_0020 登场台词锚点由 480 修正为 481；novel_ref_sha256 再次重绑。"
+  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。提交后复核再修：b21.note 与 seg_0016 判定对齐；seg_0019 来源范围收窄为 463–479；seg_0020 登场台词锚点由 480 修正为 481；novel_ref_sha256 再次重绑。2026-11-17 BEAT-MAPPING-FIX：novel_ref 修正 b16–b18 边界，拆分 b23 → b23a/b23b/b23c、b34 → b34a/b34b，beat 数 34 → 37；novel_ref_sha256 随之重绑。"
 }

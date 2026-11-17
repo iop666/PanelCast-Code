@@ -1226,7 +1226,7 @@ python -m panelcast m1 novel lint --work m1/v1/ch01/work
 | `check` | 能不能出片 | **必须不过**（`review_status` 与 `reviewed_by` 两处拦） |
 
 第一章样张就是这个状态的实例：`lint` 全过、`check` 卡在第 5 步，
-同时因为讲稿还是 v1 卡在第 3 步、因为 34 个 beat 未人工确认卡在第 4 步。
+同时因为讲稿还是 v1 卡在第 3 步、因为 37 个 beat 未人工确认卡在第 4 步。
 
 ##### 第一章样张（`P0-01-SAMPLE-CH01`）
 
@@ -1235,7 +1235,7 @@ python -m panelcast m1 novel lint --work m1/v1/ch01/work
 | 产物 | 位置 | 说明 |
 | --- | --- | --- |
 | 章节对应表 | `m1/audit/chapter-map.md` | 为什么不能靠编号 + 判定四步法 + 30 行页段对照 |
-| 底稿 | `m1/v1/ch01/work/novel_ref.json` | 34 beats，页覆盖 38/38，`order: reordered` |
+| 底稿 | `m1/v1/ch01/work/novel_ref.json` | 37 beats，页覆盖 38/38，`order: reordered` |
 | 审核报告 | `m1/v1/ch01/work/script-audit.json` | 25 段全审，`review_status: pending_human` |
 | 审计明细 | `m1/audit/script-audit-ch01.md` | 逐段判据、反例回归、高危案例 |
 

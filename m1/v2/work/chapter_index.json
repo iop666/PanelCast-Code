@@ -31,7 +31,8 @@
       "start_page": 3,
       "end_page": 30,
       "page_count": 28,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     },
     {
       "id": "ch02",
@@ -45,7 +46,8 @@
       "start_page": 31,
       "end_page": 38,
       "page_count": 8,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     },
     {
       "id": "ch03",
@@ -59,7 +61,8 @@
       "start_page": 39,
       "end_page": 66,
       "page_count": 28,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     },
     {
       "id": "ch04",
@@ -73,7 +76,8 @@
       "start_page": 67,
       "end_page": 82,
       "page_count": 16,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     },
     {
       "id": "ch05",
@@ -87,7 +91,8 @@
       "start_page": 83,
       "end_page": 106,
       "page_count": 24,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     },
     {
       "id": "ch06",
@@ -101,7 +106,8 @@
       "start_page": 107,
       "end_page": 137,
       "page_count": 31,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     },
     {
       "id": "ch07",
@@ -115,7 +121,8 @@
       "start_page": 138,
       "end_page": 148,
       "page_count": 11,
-      "confirmed": true
+      "confirmed": true,
+      "series_slug": "konosuba-manga"
     }
   ]
 }

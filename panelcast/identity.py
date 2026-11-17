@@ -50,8 +50,10 @@ UID_RE = re.compile(r"^(?P<slug>[a-z][a-z0-9-]*)-v(?P<vol>\d{2})-ch(?P<ch>\d{2})
 DIR_RE = re.compile(r"^ch(?P<n>\d{2,3})$")
 
 #: 索引/章级文档里必须存在的身份字段。
-IDENTITY_FIELDS = ("chapter_uid", "volume_number", "global_chapter_number",
-                   "volume_chapter_number")
+#: `series_slug` 虽可从 `chapter_uid` 推出，但它是记录自己声明的冗余字段，
+#: 缺失或写错同样会让人工/机器对不上，所以必须显式校验。
+IDENTITY_FIELDS = ("chapter_uid", "series_slug", "volume_number",
+                   "global_chapter_number", "volume_chapter_number")
 
 
 class IdentityError(RuntimeError):
@@ -154,6 +156,12 @@ def chapter_problems(ch, series_slug=None, volume_number=None):
         out.append(f"{label}: {exc}")
         return out
 
+    # 记录自己的 series_slug 必须与 chapter_uid 解析出的 slug 一致。
+    # 不能只看索引顶层：章节记录可以是"uid 对、冗余字段错"。
+    ch_slug = ch["series_slug"]
+    if ch_slug != slug:
+        out.append(f"{label}: series_slug={ch_slug!r} 与 chapter_uid 的系列 "
+                   f"{slug!r} 不符；冗余身份字段也必须一致")
     series_ok = isinstance(series_slug, str) and bool(series_slug)
     if series_ok and slug != series_slug:
         out.append(f"{label}: chapter_uid 的系列 {slug!r} != 索引的 {series_slug!r}")

@@ -1026,6 +1026,16 @@ class TestStrictEnumTypes(Base):
                 joined = self._text(self._lint(audit))
                 self.assertIn("alteration_origin", joined)
 
+    def test_whitespace_only_text_fields_are_rejected(self):
+        base = self._base_audit()
+        for field in ("mixed_note", "evidence"):
+            for bad in ("", " ", "\t\n"):
+                with self.subTest(field=field, value=bad):
+                    audit = json.loads(json.dumps(base))
+                    audit["audited_segments"][0][field] = bad
+                    joined = self._text(self._lint(audit))
+                    self.assertIn(field, joined)
+
     def test_gate_returns_step5_for_enum_type_error(self):
         """`check()` 也不能在枚举字段为数组时抛 TypeError。"""
         ref = self._v2_ready()
@@ -1109,6 +1119,14 @@ class TestSchemaConditionalRequired(unittest.TestCase):
     def test_mixed_note_is_non_empty_when_present(self):
         note = self.seg["properties"]["mixed_note"]
         self.assertEqual(note.get("minLength"), 1)
+        self.assertEqual(note.get("pattern"), r"\S")
+
+    def test_evidence_and_mixed_note_reject_whitespace_only(self):
+        for field in ("evidence", "mixed_note"):
+            with self.subTest(field=field):
+                prop = self.seg["properties"][field]
+                self.assertEqual(prop.get("minLength"), 1)
+                self.assertEqual(prop.get("pattern"), r"\S")
 
 
 class TestSchemaLinterParity(Base):
@@ -1172,6 +1190,17 @@ class TestSchemaLinterParity(Base):
                 mutate(doc)
                 self.assertFalse(self._schema_ok(doc), label)
                 self.assertFalse(self._lint_ok(doc), label)
+
+    def test_whitespace_only_text_fields_agree(self):
+        base = self._base_audit()
+        for field in ("mixed_note", "evidence"):
+            for value, expected_ok in (("", False), (" ", False),
+                                       ("\t\n", False), ("有内容", True)):
+                with self.subTest(field=field, value=value):
+                    doc = json.loads(json.dumps(base))
+                    doc["audited_segments"][0][field] = value
+                    self.assertEqual(self._schema_ok(doc), expected_ok)
+                    self.assertEqual(self._lint_ok(doc), expected_ok)
 
     def test_business_rule_is_layered_on_top_of_schema(self):
         """reviewed_by == prepared_by 是业务纪律；Schema 不表达，Linter 必须拒绝。"""

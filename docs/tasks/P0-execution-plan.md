@@ -200,7 +200,7 @@
 | 门禁 | `m1 novel check` 第 1 步先验身份 |
 | 数据迁移 | 2 份索引 + 10 份 `chapter.json` + 2 份 labels 全部补齐 |
 | 实测 | 两卷索引 + 十个章级 work `--verify` 全过 |
-| 测试 | `tests/test_identity.py` 64 例 + `tests/test_novel.py` 102 例 + `tests/test_lf.py` 6 例；全量 **422 tests OK (skipped=2)**（P0-REVIEW-09 后） |
+| 测试 | `tests/test_identity.py` 68 例 + `tests/test_novel.py` 105 例 + `tests/test_lf.py` 6 例；全量 **430 tests OK (skipped=2)**（P0-REVIEW-10 后） |
 
 **审核意见里的反例已写成测试**（`test_counter_example_from_review`）：
 目录 `ch06` + `chapter.json` 说 A + `novel_ref` 说 B + `script-audit` 说 C
@@ -447,7 +447,7 @@ Schema 条件分支缺 `required`。由 P0-REVIEW-09 关闭。
 
 ---
 
-### P0-REVIEW-09 严格字段类型与验证器全域性【本轮已落地】
+### P0-REVIEW-09 严格字段类型与验证器全域性【部分通过；由 P0-REVIEW-10 补齐】
 
 **来源**：项目负责人独立复审。P0-REVIEW-08 判 PARTIAL：`True == 1`、`1.0 == 1`
 让错误类型通过身份比较；数组/对象进入枚举集合检查会抛 `TypeError`；
@@ -484,7 +484,39 @@ Schema 的条件分支只写 `minItems` 不写 `required`。
 全量 **422 tests OK (skipped=2)**（缺真实 EPUB / MOBI 各 1）。
 第一章 `review_status` 仍为 `pending_human`、`reviewed_by` 为 `null`。
 
+**复审结论**：本项判 **PARTIAL**。A/B 两项成立，但 `series_slug` 缺失/null
+仍可放行，章节索引记录内的 `series_slug` 未参与一致性检查；`mixed_note` /
+`evidence` 的纯空白仍是 Schema 通过、Linter 拒绝。由 P0-REVIEW-10 关闭。
+
 **边界**：P0-08 最终签核仍由项目负责人完成；本轮不替代人工签核。
+
+---
+
+### P0-REVIEW-10 `series_slug` 契约 + 空白文本一致性【本轮已落地】
+
+**来源**：项目负责人独立复审。只处理两个边界，不扩大架构范围。
+
+| 块 | 处理 |
+| --- | --- |
+| A `series_slug` | 加入 `IDENTITY_FIELDS`；`chapter.json` 与索引 `chapters[]` 的 `series_slug` 缺失/null 直接失败；每条记录必须与 `chapter_uid` 解析出的 slug、索引顶层 `series_slug` 一致；`build_index()` 与两份真实索引同步补字段 |
+| B 空白文本 | Schema 的 `mixed_note` / `evidence` 增加 `pattern: "\\S"`，与 Linter `.strip()` 对齐；`""`、`" "`、`"\t\n"` 两边都拒绝，有实际内容两边都通过 |
+
+**验收（逐条实跑，均为退出码 3，无 traceback）**：
+
+| 场景 | 命令 |
+| --- | --- |
+| `chapter.json.series_slug` 缺失 / `null` / 错配 / 非字符串 | `m1 chapter --verify` |
+| `chapter_index.chapters[].series_slug` 缺失 / `null` / 错配 | `m1 chapter --verify`（卷级） |
+| `mixed_note` / `evidence` = `""` / `" "` / `"\t\n"` | `m1 novel lint` |
+
+**正向回归**：第一章样张 `m1 novel lint` exit 0；`m1 novel check` exit 3；
+10 个章级 work 与两卷索引 `--verify` 全部 exit 0。
+
+**测试**：`test_identity.py` 64 → 68 例、`test_novel.py` 102 → 105 例、
+`test_chapters.py` +1 例；全量 **430 tests OK (skipped=2)**。
+
+**边界**：第一章 `pending_human` / `reviewed_by=null` 不变；第二章、九章批量、
+P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 
 ---
 

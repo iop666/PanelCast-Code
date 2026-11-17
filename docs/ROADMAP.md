@@ -241,7 +241,7 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
     仍接受 `true` / `1.0`，章节对象内部字段与审计枚举字段遇数组/对象会抛 traceback，
     Schema 条件分支缺 `required`；由 P0-REVIEW-09 关闭。
 
-- [x] **P0-REVIEW-09 严格字段类型与验证器全域性**【本轮已落地】
+- [~] **P0-REVIEW-09 严格字段类型与验证器全域性**【部分通过：A/B 修复成立，`series_slug` 与空白边界由 P0-REVIEW-10 补齐】
   **来源**：项目负责人独立复审。P0-REVIEW-08 判 PARTIAL：`True == 1`、`1.0 == 1`
   让错误类型通过身份比较；数组/对象进入枚举集合检查会抛 `TypeError`；
   Schema 的条件分支只写 `minItems` 不写 `required`。
@@ -265,6 +265,27 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
     无 traceback；十个工作区、两卷索引、样张 lint 复跑通过；`check` 仍拦截。
   - **测试**：`test_identity.py` 56 → 64 例、`test_novel.py` 89 → 102 例；
     全量 **422 tests OK (skipped=2)**。
+  - **未变**：第一章 `pending_human` / `reviewed_by=null`；第二章、九章批量、
+    P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
+  - **2026-11-17 复审结论**：本项判 **PARTIAL**。A/B 两项成立，但
+    `series_slug` 缺失/null 仍可放行，章节索引记录内的 `series_slug` 未参与
+    一致性检查；`mixed_note` / `evidence` 的纯空白仍是 Schema 通过、Linter 拒绝。
+    由 P0-REVIEW-10 关闭。
+
+- [x] **P0-REVIEW-10 `series_slug` 契约 + 空白文本一致性**【本轮已落地】
+  **来源**：项目负责人独立复审。只处理两个边界，不扩大架构范围。
+  - **`series_slug` 必须参与身份一致性**：加入 `IDENTITY_FIELDS`，缺失/null
+    直接失败；每条章节记录（`chapter.json` 与索引 `chapters[]`）的
+    `series_slug` 必须与 `chapter_uid` 解析出的 slug、索引顶层 `series_slug`
+    一致。`build_index()` 产出的章节记录也补写 `series_slug`；两份真实
+    `chapter_index.json` 同步迁移。
+  - **空白文本一致**：Schema 的 `mixed_note` / `evidence` 增加 `pattern: "\\S"`，
+    与 Linter 的 `.strip()` 对齐；`""`、`" "`、`"\t\n"` 两边都拒绝，
+    有实际内容两边都通过。
+  - **验收**：章级/卷级 `series_slug` 缺失、null、错配的 CLI 负例全部 exit 3，
+    无 traceback；空白文本 6 个 CLI 负例全部 exit 3。
+  - **测试**：`test_identity.py` 64 → 68 例、`test_novel.py` 102 → 105 例、
+    `test_chapters.py` +1 例；全量 **430 tests OK (skipped=2)**。
   - **未变**：第一章 `pending_human` / `reviewed_by=null`；第二章、九章批量、
     P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 

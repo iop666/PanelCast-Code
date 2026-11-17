@@ -157,6 +157,25 @@ Schema 无法表达的业务纪律。两边不能对同一基础规则给出相�
 `TestSchemaLinterParity` 用 `jsonschema` 做正反例对照（仅测试可选依赖；
 环境没有该库时这 3 条会跳过并给出原因）。
 
+### `series_slug` 与空白文本（P0-REVIEW-10）
+
+`series_slug` 虽然能从 `chapter_uid` 推出，但它是记录自己声明的冗余字段。
+现在它进入 `IDENTITY_FIELDS`，并且每条章节记录都必须与两处一致：
+`chapter_uid` 解析出的 slug、索引顶层 `series_slug`。
+
+| 输入 | 结果 |
+| --- | --- |
+| `chapter.json.series_slug` 缺失 / `null` | 章级 `--verify` 退出码 3 |
+| `chapter.json.series_slug` 与 `chapter_uid` 不一致 | 退出码 3 |
+| `chapter_index.chapters[].series_slug` 缺失 / `null` / 错配 | 卷级 `--verify` 退出码 3 |
+| 索引顶层 `series_slug` 与章节记录不一致 | 退出码 3 |
+| `mixed_note` / `evidence` = `""`、`" "`、`"\t\n"` | Schema 与 Linter 都拒绝 |
+| 同一字段有实际内容 | Schema 与 Linter 都通过 |
+
+Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的 `.strip()`
+对齐；`build_index()` 与两份真实 `chapter_index.json` 都已补上章节级
+`series_slug`。
+
 ### LF 证据链的三条边界
 
 **不许单独拿 `i/lf` 推导"所有平台工作区都是 LF"**：
@@ -185,7 +204,7 @@ Schema 无法表达的业务纪律。两边不能对同一基础规则给出相�
 | **审核报告 Schema 校验** | `m1 novel lint`（只校格式、不要求签核） |
 | **章节身份强校验** | `m1 chapter --verify`（不一致就报错，不猜"最接近"） |
 | **第一章逐段来源审计** | 25 段 100% 审完，**未签核** |
-| 测试 | **422 tests OK (skipped=2)**（`test_novel.py` 102 例 / `test_identity.py` 64 例 / `test_lf.py` 6 例） |
+| 测试 | **430 tests OK (skipped=2)**（`test_novel.py` 105 例 / `test_identity.py` 68 例 / `test_lf.py` 6 例） |
 
 ### P0 任务状态
 
@@ -198,7 +217,7 @@ Schema 无法表达的业务纪律。两边不能对同一基础规则给出相�
 | P0-05 | `m1 novel --align/--check` | ✅ **已完成**（含验收第 5 条补修 + lint 拆分） |
 | P0-06 | 正式出片门禁（`--draft` + 审核报告） | ⬜ 未开始 |
 | P0-07 | 文档与实现统一 | 🔄 进行中 |
-| P0-08 | 章节身份统一 | 🔄 **主体完成，待最终签核**（P0-REVIEW-09 已关闭严格类型绕过，仍待独立复审） |
+| P0-08 | 章节身份统一 | 🔄 **主体完成，待最终签核**（P0-REVIEW-10 已关闭 `series_slug` 边界，仍待独立复审） |
 | P0-09 | 规则冲突核查 | 🔄 部分完成（1/2/3 页映射密度未验） |
 | P0-10 | `m1 verify --visual` 三层视觉验收 | ⬜ 未开始 |
 | P0-11 | `script.json` v1→v2 迁移（含三态） | ⬜ 未开始 |
@@ -207,7 +226,8 @@ Schema 无法表达的业务纪律。两边不能对同一基础规则给出相�
 | P0-REVIEW-06 | 身份测试矩阵 + 权威表校验 | ✅ **已完成**（七类局部错配 + CLI 端到端拒绝） |
 | P0-REVIEW-07 | fail-closed 身份 + 审计完整性 | ✅ **已完成**（权威表缺失/损坏/不合格一律拒绝；重复段落拒绝；`severity` 补齐） |
 | P0-REVIEW-08 | JSON 结构 fail-closed + Schema/Linter 对齐 | 🔄 **部分通过**（顶层结构/权威表修复成立；严格字段类型与枚举安全由 P0-REVIEW-09 补齐） |
-| P0-REVIEW-09 | 严格字段类型与验证器全域性 | ✅ **本轮已落地**（int/string 严格类型、枚举不可哈希安全、Schema 条件 required；类型负例 CLI 均 exit 3） |
+| P0-REVIEW-09 | 严格字段类型与验证器全域性 | 🔄 **部分通过**（A/B 成立；`series_slug` 与空白边界由 P0-REVIEW-10 补齐） |
+| P0-REVIEW-10 | `series_slug` 契约 + 空白文本一致性 | ✅ **本轮已落地**（章节级 slug 三处一致；Schema/Linter 同拒纯空白） |
 
 ### 放行条件
 
@@ -223,7 +243,7 @@ Schema 无法表达的业务纪律。两边不能对同一基础规则给出相�
 ## 复核命令（新克隆即可复现）
 
 ```bash
-python -m unittest discover -s tests     # 期望 Ran 422 tests / OK (skipped=2)
+python -m unittest discover -s tests     # 期望 Ran 430 tests / OK (skipped=2)
 python -m panelcast m1 novel lint --work m1/v1/ch01/work   # 格式校验，应通过
 python -m panelcast m1 novel check --work m1/v1/ch01/work --novel-dir <小说文本目录>
                                           # 门禁，样张应卡在第 3/4/5 步（退出码 3）

@@ -104,7 +104,8 @@
           "mixed_note": {
             "type": "string",
             "minLength": 1,
-            "description": "alteration_origin=mixed 时必填：写明哪部分是漫画给的、哪部分是旁白新增的。混在一句话里含糊带过等于没有举证。"
+            "pattern": "\\S",
+            "description": "alteration_origin=mixed 时必填：写明哪部分是漫画给的、哪部分是旁白新增的。混在一句话里含糊带过等于没有举证；纯空白不算说明。"
           },
           "disposition": {
             "enum": [
@@ -136,7 +137,8 @@
           "evidence": {
             "type": "string",
             "minLength": 1,
-            "description": "人读证据：页码 + 小说段号 + 一句可核对的话。不许只写「已核验」。"
+            "pattern": "\\S",
+            "description": "人读证据：页码 + 小说段号 + 一句可核对的话。不许只写「已核验」；纯空白不算证据。"
           },
           "severity": {
             "enum": [

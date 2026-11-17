@@ -207,6 +207,7 @@ def build_index(rows, labels=None, series="", volume="",
                 glob = first_global_chapter + i
             if glob is not None:
                 item["chapter_uid"] = make_uid(series_slug, volume_number, glob)
+                item["series_slug"] = series_slug
                 item["volume_chapter_number"] = i + 1
                 item["global_chapter_number"] = glob
                 item["volume_number"] = volume_number

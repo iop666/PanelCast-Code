@@ -763,6 +763,90 @@ class TestStrictFieldTypes(unittest.TestCase):
                 self.assertIn("series_slug", joined)
                 self.assertIn("必须是字符串", joined)
 
+    def test_chapter_series_slug_is_required_and_consistent(self):
+        missing = chapter()
+        missing.pop("series_slug")
+        for bad in (missing, chapter(series_slug=None)):
+            with self.subTest(value=bad.get("series_slug")):
+                joined = " | ".join(chapter_problems(bad))
+                self.assertIn("series_slug", joined)
+                self.assertIn("缺身份字段", joined)
+        for bad in ("other-series", 123, [], {}):
+            with self.subTest(value=bad):
+                joined = " | ".join(chapter_problems(chapter(series_slug=bad)))
+                self.assertIn("series_slug", joined)
+                self.assertTrue("不符" in joined or "必须是字符串" in joined, joined)
+
+    def test_index_chapter_series_slug_is_required_and_consistent(self):
+        def missing(idx):
+            idx["chapters"][0].pop("series_slug")
+
+        def null(idx):
+            idx["chapters"][0]["series_slug"] = None
+
+        def wrong(idx):
+            idx["chapters"][0]["series_slug"] = "other-series"
+
+        for label, mutate in (("missing", missing), ("null", null),
+                              ("wrong", wrong)):
+            with self.subTest(case=label):
+                idx = index_of(chapter())
+                mutate(idx)
+                joined = " | ".join(index_problems(idx))
+                self.assertIn("series_slug", joined)
+
+        idx = index_of(chapter())
+        idx["series_slug"] = "other-series"
+        joined = " | ".join(index_problems(idx))
+        self.assertIn("other-series", joined)
+        self.assertIn("索引的", joined)
+
+    def test_cli_rejects_chapter_series_slug_problems(self):
+        cases = [("missing", "missing"), ("null", None),
+                 ("wrong", "other-series"), ("type", 123)]
+        for i, (label, bad) in enumerate(cases):
+            with self.subTest(case=label):
+                root = self.root / f"slug{i}"
+                work = root / "ch06" / "work"
+                work.mkdir(parents=True)
+                self._write(root, "chapter_index.json", index_of(chapter()))
+                doc = chapter()
+                if bad == "missing":
+                    doc.pop("series_slug")
+                else:
+                    doc["series_slug"] = bad
+                self._write(work, "chapter.json", doc)
+                r = subprocess.run(
+                    [sys.executable, "-m", "panelcast", "m1", "chapter",
+                     "--verify", "--work", str(work)],
+                    cwd=str(ROOT), capture_output=True, text=True)
+                self.assertEqual(r.returncode, 3,
+                                 f"stderr={r.stderr}\nstdout={r.stdout}")
+                self.assertIn("series_slug", r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+
+    def test_cli_rejects_index_chapter_series_slug_problems(self):
+        cases = [("missing", "missing"), ("null", None),
+                 ("wrong", "other-series")]
+        for i, (label, bad) in enumerate(cases):
+            with self.subTest(case=label):
+                idx = index_of(chapter())
+                if bad == "missing":
+                    idx["chapters"][0].pop("series_slug")
+                else:
+                    idx["chapters"][0]["series_slug"] = bad
+                work = self.root / f"idxslug{i}" / "work"
+                work.mkdir(parents=True)
+                self._write(work, "chapter_index.json", idx)
+                r = subprocess.run(
+                    [sys.executable, "-m", "panelcast", "m1", "chapter",
+                     "--verify", "--work", str(work)],
+                    cwd=str(ROOT), capture_output=True, text=True)
+                self.assertEqual(r.returncode, 3,
+                                 f"stderr={r.stderr}\nstdout={r.stdout}")
+                self.assertIn("series_slug", r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+
     def test_parse_uid_and_make_uid_reject_non_types(self):
         for bad in ([], {}, 123, True):
             with self.subTest(value=bad):

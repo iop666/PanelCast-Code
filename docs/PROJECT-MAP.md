@@ -59,7 +59,7 @@ PanelCast\
 │       ├── server.py              HTTP + 分格/介绍页读写
 │       └── static/index.html      浏览器界面（两个页签）
 │
-├── tests/                          【跑通】18 个文件 / 422 用例 / OK(skipped=2)
+├── tests/                          【跑通】18 个文件 / 430 用例 / OK(skipped=2)
 │
 ├── tools/                          三个不进 CLI 的辅助脚本
 │   ├── novel_extract.py     114   【跑通】epub → novel.txt + novel_index.json
@@ -320,7 +320,7 @@ y=1821  └──────────────────────┘
 | 验收 | 15 条，`run_report.json` 逐条留痕 |
 | 分格编辑器 | 分格页签 + 介绍页页签（schema 驱动表单） |
 | 小说抽取 | 2,627 段 / 83,599 字；`sha256`（内容）与 `file_sha256`（落盘字节）双哈希稳定 |
-| 测试 | 422 用例通过（skipped=2） |
+| 测试 | 430 用例通过（skipped=2） |
 
 ### 5.2 半自动的
 

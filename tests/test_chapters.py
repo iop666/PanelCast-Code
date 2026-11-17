@@ -110,6 +110,11 @@ class TestBuildIndexFromLabels(unittest.TestCase):
             "back_matter_start": 18,
         }
 
+    def test_chapter_records_carry_series_slug(self):
+        index = build_index(self.rows, labels=self.labels)
+        for ch in index["chapters"]:
+            self.assertEqual(ch["series_slug"], "konosuba-manga")
+
     def test_labels_define_boundaries(self):
         index = build_index(self.rows, labels=self.labels)
         self.assertEqual([(c["start_page"], c["end_page"])

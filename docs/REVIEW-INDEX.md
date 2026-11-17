@@ -210,7 +210,7 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 | ID | 任务 | 状态 |
 | --- | --- | --- |
-| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`，seg_0014 来源同步待复核；37 beats 待确认；其余九章未核 |
+| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`，映射与 seg_0014 来源同步均已复核通过；37 beats 待确认；其余九章未核 |
 | P0-02 | 十章各建 `novel_ref.json` | 🔄 **ch01 完成**（37 beats，含 b23/b34 拆分，全部 `needs_review`），其余九章未建 |
 | P0-03 | 讲稿来源 **100%** 复核 | 🔄 **ch01 完成**（12 段待改写 + 1 段改页映射；未签核），其余九章未审 |
 | P0-04 | 改稿后重出受影响成片 | ⬜ 未开始（等 P0-03） |
@@ -239,9 +239,9 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 独立复核在提交后再次核对 38 页与小说原文，发现 b16–b18 边界、b23 与 b34
 事件拆分问题；已执行 **`P0-01-CH01-BEAT-MAPPING-FIX`**（beat 数 34 → 37，
 37/37 仍 `needs_review`）。当前状态：**`P0-01-CH01-BEAT-MAPPING-FIX =
-MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`**。
-映射主体已获复核通过；seg_0014 的 `novel_para` 已由 259–278 收窄为 259–277
-（para 278 属能力值揭晓，归 seg_0015），待针对性复核。审计未签核；
+MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`**。
+映射主体与 seg_0014 来源同步均已复核通过；seg_0014 的 `novel_para`
+已由 259–278 收窄为 259–277（para 278 属能力值揭晓，归 seg_0015）。审计未签核；
 `m1 novel check` 仍会同时拦截 v1 讲稿、未确认 beats 与未签核三项，这是当前预期行为。
 
 修订内容：五条争议裁定落地（`seg_0016` 改判 `drawn/keep`、`seg_0005`

@@ -438,7 +438,7 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 3. `seg_0025` 这类"漫画改了、旁白忠于漫画" —— 同意判 `altered` 但不改稿；
    按同一规则回检，`seg_0024` 也一并改为 `keep`。
 
-**2026-11-17 复核裁定为 REVIEW_RETURNED，已按裁定修订（见 §M），仍待针对性复核与人工签核。**
+**2026-11-17 复核裁定为 REVIEW_RETURNED，已按裁定修订（见 §M）；映射与 seg_0014 来源同步均已复核通过，人工签核仍未进行。**
 签核动作不变：把 `script-audit.json` 的 `reviewed_by` 填 `human:<name>`、`review_status` 改 `approved`
 （或改 `rejected` 退回重审）。在签核之前，`m1 novel check` 会一直卡在第 5 步——这是设计如此。
 
@@ -449,12 +449,12 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 项目负责人逐段/逐页复核后裁定 **P0-01-SAMPLE-CH01 = REVIEW_RETURNED**。
 本节记录据此完成的修订；修订不改任何旁白，也不签核。
 
-**复核状态（2026-11-17）：`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`；
+**复核状态（2026-11-17）：`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`；
 `P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。**
 此前对提交 `3973f93` 的 `COMMITTED_ARTIFACT_REVIEW_PASS` 不覆盖本轮新修订：
 独立复核发现 b16–b18 边界、b23 与 b34 事件拆分问题，已按裁定修订，
 beat 数 34 → 37，37/37 仍 `needs_review`，审计未签核。
-映射主体已获复核通过；`seg_0014` 的来源范围同步已修正，待针对性复核。
+映射主体与 `seg_0014` 来源同步均已复核通过；37/37 beats 仍 `needs_review`，审计未签核。
 `m1 novel check` 仍会同时拦截 v1 讲稿、未确认 beats 与未签核三项。
 
 ### M.1 对象与边界
@@ -519,14 +519,12 @@ beat 数 34 → 37，37/37 仍 `needs_review`，审计未签核。
 
 ### M.6 下一步
 
-1. `P0-01-CH01-BEAT-MAPPING-FIX` 的映射主体已复核通过
-   （`MAPPING_REVIEW_PASS`）；`seg_0014` 的来源范围同步已修正，
-   待项目负责人做最后一轮针对性复核（`SEGMENT_SOURCE_SYNC_RETURNED`）。
+1. `P0-01-CH01-BEAT-MAPPING-FIX` 的映射主体与 seg_0014 来源同步均已复核通过
+   （`MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS`）；
    `P0-01-CH01-OWNER-REVIEW-CLOSEOUT` 仍未关闭。
 2. 剩余待办分开记，不得合并成一个 PASS：
-   ① 项目负责人复核 seg_0014 两个审计产物的来源范围同步；
-   ② 37 个 beat 的人工确认（独立的 P0-02 工作，尚未完成）；
-   ③ 最后才是 `script-audit.json` 签核。
+   ① 37 个 beat 的人工确认（独立的 P0-02 工作，尚未完成）；
+   ② 最后才是 `script-audit.json` 签核。
    签核前 `m1 novel check` 仍会退出码 3，且同时因 v1 讲稿与未确认 beats 拦截。
 3. 冻结项维持不变。
 

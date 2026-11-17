@@ -14,7 +14,7 @@
 | 想复核什么 | 直链 |
 | --- | --- |
 | 执行报告（A–L 十二节，先看这个） | [`m1/audit/P0-01-SAMPLE-CH01-report.md`](../m1/audit/P0-01-SAMPLE-CH01-report.md) |
-| 25 段逐段审计（人读版，801 行） | [`m1/audit/script-audit-ch01.md`](../m1/audit/script-audit-ch01.md) |
+| 25 段逐段审计（人读版，808 行） | [`m1/audit/script-audit-ch01.md`](../m1/audit/script-audit-ch01.md) |
 | 章节对应表（30 条页段锚点） | [`m1/audit/chapter-map.md`](../m1/audit/chapter-map.md) |
 | 底稿（37 beats，机器可读） | [`m1/v1/ch01/novel_ref.json`](../m1/v1/ch01/work/novel_ref.json) |
 | 审核报告（25 段，三层哈希绑定） | [`m1/v1/ch01/script-audit.json`](../m1/v1/ch01/work/script-audit.json) |
@@ -210,7 +210,7 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 | ID | 任务 | 状态 |
 | --- | --- | --- |
-| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；独立复核发现 beat 映射问题，`P0-01-CH01-BEAT-MAPPING-FIX` 已执行，待针对性复核；37 beats 待确认；其余九章未核 |
+| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`，seg_0014 来源同步待复核；37 beats 待确认；其余九章未核 |
 | P0-02 | 十章各建 `novel_ref.json` | 🔄 **ch01 完成**（37 beats，含 b23/b34 拆分，全部 `needs_review`），其余九章未建 |
 | P0-03 | 讲稿来源 **100%** 复核 | 🔄 **ch01 完成**（12 段待改写 + 1 段改页映射；未签核），其余九章未审 |
 | P0-04 | 改稿后重出受影响成片 | ⬜ 未开始（等 P0-03） |
@@ -238,9 +238,11 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 独立复核在提交后再次核对 38 页与小说原文，发现 b16–b18 边界、b23 与 b34
 事件拆分问题；已执行 **`P0-01-CH01-BEAT-MAPPING-FIX`**（beat 数 34 → 37，
-37/37 仍 `needs_review`）。当前状态：**`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`，
-BEAT-MAPPING-FIX 待负责人针对性复核**。审计未签核；`m1 novel check` 仍会同时
-拦截 v1 讲稿、未确认 beats 与未签核三项，这是当前预期行为。
+37/37 仍 `needs_review`）。当前状态：**`P0-01-CH01-BEAT-MAPPING-FIX =
+MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`**。
+映射主体已获复核通过；seg_0014 的 `novel_para` 已由 259–278 收窄为 259–277
+（para 278 属能力值揭晓，归 seg_0015），待针对性复核。审计未签核；
+`m1 novel check` 仍会同时拦截 v1 讲稿、未确认 beats 与未签核三项，这是当前预期行为。
 
 修订内容：五条争议裁定落地（`seg_0016` 改判 `drawn/keep`、`seg_0005`
 改为 `mixed/中危`、`seg_0018` 改 `mixed`、`seg_0023` 补记表现性推断），

@@ -88,7 +88,7 @@ PanelCast\
 │   ├── capability_report.md        S0 环境探测实测结果
 │   ├── audit/                      【新增】内容审计区（P0-01/02/03 的产物）
 │   │   ├── chapter-map.md          章节对应表（第一章已核，其余九章标「未核」）
-│   │   ├── script-audit-ch01.md    第一章逐段审计（801 行，人读版）
+│   │   ├── script-audit-ch01.md    第一章逐段审计（808 行，人读版）
 │   │   └── P0-01-SAMPLE-CH01-report.md  第一章样张执行报告
 │   ├── v1/work/                    整卷工作区（第 1 卷，169 页）
 │   │   ├── pages/                  169 张页图（git 忽略）
@@ -371,8 +371,8 @@ P0 十一项，按依赖顺序：
 | ID | 任务 | 产出 |
 | --- | --- | --- |
 | P0-01 | 核实十章 ↔ 小说 ↔ 讲稿的真实对应 | `m1/audit/chapter-map.md`（**第一章已核，九章未核**） |
-| P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10（**ch01 已建，37 beats 全 needs_review；BEAT-MAPPING-FIX 已执行待复核**） |
-| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**第一章 25 段来源审计完成，审计修订与提交产物复核通过，待负责人签核；12 段待改写、1 段待修页映射，后续由 P0-04 处理；novel_ref beat 映射已另行修订待复核**） |
+| P0-02 | 十章各建 `novel_ref.json` | `m1/v{n}/chNN/work/novel_ref.json` × 10（**ch01 已建，37 beats 全 needs_review；beat 映射主体复核通过，seg_0014 来源同步待复核**） |
+| P0-03 | 讲稿来源 **100%** 复核（不是抽查） | `m1/audit/script-audit-ch01.md`（**第一章 25 段来源审计完成，审计修订与提交产物复核通过，待负责人签核；12 段待改写、1 段待修页映射，后续由 P0-04 处理；beat 映射主体复核通过，seg_0014 来源同步待复核**） |
 | P0-04 | 改稿后重出受影响成片 | 十章 mp4 + 更新的 `delivery.md` |
 | P0-05 | `m1 novel --align/--check`（五步链）+ `lint`（Schema 校验） | CLI + 测试（`test_novel.py` 78 例） |
 | P0-06 | 正式出片门禁（`--draft` 分离 + 审核报告校验） | `m1 run` 改动 + 测试 |

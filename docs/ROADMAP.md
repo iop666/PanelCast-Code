@@ -80,10 +80,12 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   **不得凭记忆填，必须逐章读小说原文核对。**
 
   **状态：第一章样张已完成（P0-01-SAMPLE-CH01），其余九章未核。**
-  **2026-11-17 复核状态：`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。**
+  **2026-11-17 复核状态：`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`；
+  `P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。**
   独立复核发现 b16–b18 边界、b23 与 b34 事件拆分问题，已执行
   `P0-01-CH01-BEAT-MAPPING-FIX`（beat 数 34 → 37，37/37 仍 `needs_review`），
-  待负责人针对性复核；审计未签核。此前对提交 `3973f93` 的
+  映射主体已获复核通过；seg_0014 来源范围已由 259–278 收窄为 259–277，
+  待针对性复核。审计未签核。此前对提交 `3973f93` 的
   `COMMITTED_ARTIFACT_REVIEW_PASS` 不覆盖本轮新修订。
   `m1 novel check` 仍拦截 v1 讲稿、未确认 beats 与未签核三项，属预期行为。**
   - `m1/audit/chapter-map.md`：第一章 30 条段落锚点 + 十章总表（九章标「未核」，不推断）

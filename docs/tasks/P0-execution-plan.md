@@ -549,7 +549,7 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 4. 成片 hash 用 `sha256sum` 实测，不是抄 `delivery.md`。
 
 **进度（2026-11-16）：第一章样张已完成，其余九章未动。**
-**2026-11-17 复核状态：`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`；`P0-01-CH01-BEAT-MAPPING-FIX` 已执行，待负责人针对性复核（beat 数 34 → 37，37/37 仍 needs_review）。**
+**2026-11-17 复核状态：`P0-01-CH01-BEAT-MAPPING-FIX = MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_RETURNED`；`P0-01-CH01-OWNER-REVIEW-CLOSEOUT = OPEN`。映射主体已获复核通过；seg_0014 来源范围已由 259–278 收窄为 259–277，待针对性复核（beat 数 34 → 37，37/37 仍 needs_review）。**
 
 - 产物：`m1/audit/chapter-map.md`（第一章 30 条段落锚点 + 十章总表）
 - 第一章结论：漫画 ch01 p5–42 = 小说 **序章 0–148 + 第一章 149–711（部分）**，
@@ -566,6 +566,8 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 - BEAT-MAPPING-FIX（2026-11-17）：b16 230–258、b17 259–277、b18 278–291；
   b23 拆为 b23a/b23b/b23c，b34 拆为 b34a/b34b；beat 数 34 → 37，
   37/37 仍 `needs_review`
+- 映射复核通过后的来源同步（2026-11-17）：seg_0014 `novel_para`
+  `[259,278] → [259,277]`，`evidence` 同步；`novel_ref.json` 未改
 
 ---
 

@@ -5,9 +5,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| 本地代码 HEAD | `4f618cf` — P0-01：seg_0014 来源范围同步 259–277 + 报告历史统计说明 |
-| 上一提交 | `38de088` — 清单：430 tests、BEAT-MAPPING-FIX 产物哈希 |
-| 更早基线 | `2fd94f3` — P0-01-CH01-BEAT-MAPPING-FIX：边界修正 + b23/b34 拆分 + 哈希重绑；`88a7352` — 清单；`d5a9991` — 文档：P0-01 复核状态闭环 + 页级映射说明；`4e5f8c2` — P0-01 样张证据同步；`c460019` — 清单；`7aa405e` — P0-01 样张复核修订；`ff02eb5` — 清单；`0b3861c` — P0-REVIEW-10；`7a92652` — P0-REVIEW-09；`69f2913` — P0-REVIEW-08；`d5dfd6c` — 清单：384 tests；`12e8c3f` — P0-REVIEW-07 |
+| 本地代码 HEAD | `9ca6c63` — P0-01：最终状态同步（MAPPING_REVIEW_PASS / SEGMENT_SOURCE_SYNC_PASS） |
+| 上一提交 | `429899f` — 清单：seg_0014 来源同步后的 122 文件哈希 |
+| 更早基线 | `4f618cf` — P0-01：seg_0014 来源范围同步 259–277；`38de088` — 清单：BEAT-MAPPING-FIX 产物哈希；`2fd94f3` — P0-01-CH01-BEAT-MAPPING-FIX：边界修正 + b23/b34 拆分 + 哈希重绑；`88a7352` — 清单；`d5a9991` — 文档：P0-01 复核状态闭环 + 页级映射说明；`4e5f8c2` — P0-01 样张证据同步；`c460019` — 清单；`7aa405e` — P0-01 样张复核修订；`ff02eb5` — 清单；`0b3861c` — P0-REVIEW-10；`7a92652` — P0-REVIEW-09；`69f2913` — P0-REVIEW-08；`d5dfd6c` — 清单：384 tests；`12e8c3f` — P0-REVIEW-07 |
 | 原文档镜像（已删除） | `iop666/ChatGPT-Read` @ `61b685c` |
 | 原代码审查镜像（已改名并覆盖） | `iop666/PanelCast-Code-Review` @ `38c5bed` → `iop666/PanelCast-Code` |
 | 纳入文件数 | 122 |
@@ -25,7 +25,7 @@
 | 本机（完整仓库） | `430 / skipped=2` | 缺真实 EPUB 1、缺真实 MOBI 1 |
 | ZIP 解压（无 `.git`、无 ffmpeg） | 本轮未复跑 | P0-REVIEW-07 时为 `384 / skipped=8`。P0-REVIEW-08/09/10 新增 46 例未在该环境实测；其中 3 条 Schema/Linter 对照测试依赖可选 `jsonschema`，缺失时会另加跳过 |
 
-**2026-11-17 提交 `4f618cf` 后复跑（seg_0014 来源同步）**：`Ran 430 tests / OK (skipped=2)`；
+**2026-11-17 提交 `9ca6c63` 后复跑（最终状态同步）**：`Ran 430 tests / OK (skipped=2)`；
 `test_fresh_clone_matches_working_tree` 实际执行并通过（此前因两个哈希绑定文件
 未提交而在工作区跳过；该跳过不代表通过）。
 
@@ -75,22 +75,22 @@ GitHub Git Tree API 返回的 sha 比对。
 | `README.md` | 6474 | `40c6a91ac22e3b4f6505ef4497f1fc3cc683e226012365c235d7cfc0d6f35cbc` | `72ce08205a` | HEAD |
 | `docs/ADR-001-source-ingestion.md` | 6631 | `bb382d750b82d80145455121c61c481333bd39c6e94b5f224f054628025fba44` | `cb9a9f4cff` | HEAD |
 | `docs/ADR-002-m1-render-stack.md` | 4469 | `43acdc4882f671d5faec9027caa23ac8e89faf08c28d772cbc752618b5499fd5` | `6777f04036` | HEAD |
-| `docs/PROJECT-MAP.md` | 23736 | `8cbeab1f98b08db09486d9a1406b33dd22f5942aca909d73e4d2878ef7940145` | `8cbeab1f98` | HEAD |
-| `docs/REVIEW-INDEX.md` | 16584 | `2caf9db4850b5c648e82672869be305bbd7defd4bdcbf96db11a19d592341d1a` | `2caf9db485` | HEAD |
-| `docs/ROADMAP.md` | 32583 | `1d805b914318139e33d0718f5b5d54f66ae8d7cd90d19d5f1399fc5360ab1925` | `1d805b9143` | HEAD |
-| `docs/WORKFLOW-v1-vertical-manga-narration.md` | 126450 | `2da70dcfada7568e9f703f2054ab67bcd46d55ae7254dd3e408dd117df8c6d07` | `2da70dcfad` | HEAD |
+| `docs/PROJECT-MAP.md` | 23732 | `cbfdac2575855a02f9f39eead6c3cf1a0071e97b2f9ebb0ca7d53dee282afcb3` | `cbfdac2575` | HEAD |
+| `docs/REVIEW-INDEX.md` | 16598 | `a372fea9ece5362b40db542443a9b5d3e0c0b610ef9e2f2c293751dae8690a2e` | `a372fea9ec` | HEAD |
+| `docs/ROADMAP.md` | 32582 | `38df0011956c474558ae7d30e2fd246fd88fd34019e6ca051235f6bec5ad9248` | `38df001195` | HEAD |
+| `docs/WORKFLOW-v1-vertical-manga-narration.md` | 126533 | `7160c810fc3a443485e4739f3b151f214a4db0631f4f05867f4978152715d847` | `7160c810fc` | HEAD |
 | `docs/schemas/page-profile.schema.json` | 7339 | `7f627622a0e8b65dd9f6c3fbbc9084be72d828fca1d75d37a4a653f0b425427d` | `d0ea1ee32a` | HEAD |
 | `docs/schemas/script-audit.schema.json` | 12283 | `dab89397a38d75cd9e53a3a9b71dc1da95423fc60aa9ccf6674a546351072144` | `33975dc4b1` | HEAD |
 | `docs/tasks/M0-content-validation.md` | 10621 | `585e55374ac111baa4d87849db7a29b77fcb9af4785f4eee1fb37c627799085f` | `11056e5ad3` | HEAD |
 | `docs/tasks/M1-minimal-loop.md` | 11666 | `46ebea01efa71267f0d38eb76bad8da16d876a6dda958937aade6af97e69d988` | `dbc7d683aa` | HEAD |
-| `docs/tasks/P0-execution-plan.md` | 45285 | `b8f56fbe45d411d0627cfb6d0510756997063be8ac36ac02d933e83ac0f7cf42` | `b8f56fbe45` | HEAD |
+| `docs/tasks/P0-execution-plan.md` | 45279 | `ca79dc5ccca7d0be3e09bd1d6147327e5d24eef44f399556a5e4aa0fc5212b3e` | `ca79dc5ccc` | HEAD |
 | `docs/tasks/TASK-002-ingest-hardening.md` | 7250 | `8dcb085aa23d392c0ab225ca16c1a3635fed498f513acc8a06ddc64a2959e447` | `3ae7359883` | HEAD |
 | `m0/alignment_note.md` | 2244 | `1bcee4f44f086d2ef6f5fc94a4d277432b58d52c741bc101c9bebb129a1714fa` | `34b182ce9b` | HEAD |
 | `m0/prompts/V1.txt` | 1404 | `15fda37fd55b9a8235c6eb0a8172c67914d14b91f9eb1c3c4b0537bb1c1b99e6` | `184eeb49c5` | HEAD |
 | `m0/prompts/V2.txt` | 1327 | `0b40cb62ebf7fb8c7c9befed65041cbe2e37b9abfd99b2e20f8fb6d94bd9c3cf` | `aa08837674` | HEAD |
 | `m0/prompts/V3.txt` | 2053 | `0e1ae602302b14c706055cba813b9cd0e38cd817dc64059b451315f5d9115bd4` | `f595eca98d` | HEAD |
 | `m0/results.csv` | 150 | `32eba1a22a6fb5d356c5b0b504dcab7aaf8165a8f131f53e0457f3c1f3a8dcaa` | `ed95f1a604` | HEAD |
-| `m1/audit/P0-01-SAMPLE-CH01-report.md` | 30243 | `afd04dfb778ccfa034e4d09c16402d0a82f5949a924f1c24313fb9ac34b3eabf` | `afd04dfb77` | HEAD |
+| `m1/audit/P0-01-SAMPLE-CH01-report.md` | 30131 | `2dd73373e19414bcffc87bb998614028768545e251b6a060a137f2be97c723a2` | `2dd73373e1` | HEAD |
 | `m1/audit/chapter-map.md` | 12880 | `10e1c782808ca7d66bf2efc1a122b103d6bce4a25a1c84f307cdad477d4723bb` | `10e1c78280` | HEAD |
 | `m1/audit/script-audit-ch01.md` | 49988 | `1ddc6a3ae76669d26567d7d37c48a69c98023474a60adaf972f3de231f691b92` | `1ddc6a3ae7` | HEAD |
 | `m1/capability_report.md` | 1482 | `6e117745d74cda9fc9af4b038871e824c9f278ab759e47510e33beda74d7036d` | `79459fc142` | HEAD |

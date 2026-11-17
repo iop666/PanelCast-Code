@@ -5,9 +5,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| 本地代码 HEAD | `7aa405e` — P0-01 样张复核修订：五条裁定 + 段号边界修正 + 哈希重绑 |
-| 上一提交 | `ff02eb5` — 清单：430 tests、P0-REVIEW-10 哈希 |
-| 更早基线 | `0b3861c` — P0-REVIEW-10；`7a92652` — P0-REVIEW-09；`69f2913` — P0-REVIEW-08；`d5dfd6c` — 清单：384 tests；`12e8c3f` — P0-REVIEW-07 |
+| 本地代码 HEAD | `4e5f8c2` — P0-01 样张证据同步：b21 note、480/481 锚点、seg0019 来源范围 |
+| 上一提交 | `c460019` — 清单：430 tests、P0-01 复核修订哈希 |
+| 更早基线 | `7aa405e` — P0-01 样张复核修订；`ff02eb5` — 清单；`0b3861c` — P0-REVIEW-10；`7a92652` — P0-REVIEW-09；`69f2913` — P0-REVIEW-08；`d5dfd6c` — 清单：384 tests；`12e8c3f` — P0-REVIEW-07 |
 | 原文档镜像（已删除） | `iop666/ChatGPT-Read` @ `61b685c` |
 | 原代码审查镜像（已改名并覆盖） | `iop666/PanelCast-Code-Review` @ `38c5bed` → `iop666/PanelCast-Code` |
 | 纳入文件数 | 122 |
@@ -25,7 +25,7 @@
 | 本机（完整仓库） | `430 / skipped=2` | 缺真实 EPUB 1、缺真实 MOBI 1 |
 | ZIP 解压（无 `.git`、无 ffmpeg） | 本轮未复跑 | P0-REVIEW-07 时为 `384 / skipped=8`。P0-REVIEW-08/09/10 新增 46 例未在该环境实测；其中 3 条 Schema/Linter 对照测试依赖可选 `jsonschema`，缺失时会另加跳过 |
 
-**2026-11-17 提交 `7aa405e` 后复跑**：`Ran 430 tests / OK (skipped=2)`；
+**2026-11-17 提交 `4e5f8c2` 后复跑（证据同步修订）**：`Ran 430 tests / OK (skipped=2)`；
 `test_fresh_clone_matches_working_tree` 实际执行并通过（此前因两个哈希绑定文件
 未提交而在工作区跳过；该跳过不代表通过）。
 
@@ -90,9 +90,9 @@ GitHub Git Tree API 返回的 sha 比对。
 | `m0/prompts/V2.txt` | 1327 | `0b40cb62ebf7fb8c7c9befed65041cbe2e37b9abfd99b2e20f8fb6d94bd9c3cf` | `aa08837674` | HEAD |
 | `m0/prompts/V3.txt` | 2053 | `0e1ae602302b14c706055cba813b9cd0e38cd817dc64059b451315f5d9115bd4` | `f595eca98d` | HEAD |
 | `m0/results.csv` | 150 | `32eba1a22a6fb5d356c5b0b504dcab7aaf8165a8f131f53e0457f3c1f3a8dcaa` | `ed95f1a604` | HEAD |
-| `m1/audit/P0-01-SAMPLE-CH01-report.md` | 27033 | `17b5a953c46504f342c9500ef1064e9ca0f8a83ac3bbadd1d187c25f9bd5f291` | `17b5a953c4` | HEAD |
+| `m1/audit/P0-01-SAMPLE-CH01-report.md` | 27636 | `2c54d3e96661226032a9ed51d21de8723c3642360ed63437234c2397894187e5` | `2c54d3e966` | HEAD |
 | `m1/audit/chapter-map.md` | 11928 | `fea1d6a7d161d2adc1e9d486cb3164ca4281e96ad9eaf3a26b4f15898dcb77ce` | `8565e17672` | HEAD |
-| `m1/audit/script-audit-ch01.md` | 49978 | `ea291fdd7e975eaf2d801eafe39a31abaaf46780294fc2648086f9bd6ea99fdf` | `ea291fdd7e` | HEAD |
+| `m1/audit/script-audit-ch01.md` | 49978 | `733b8f4a9b0e5c25db81cdb229e15c838be2e5bb71fba916e3ff2792cd3c34e5` | `733b8f4a9b` | HEAD |
 | `m1/capability_report.md` | 1482 | `6e117745d74cda9fc9af4b038871e824c9f278ab759e47510e33beda74d7036d` | `79459fc142` | HEAD |
 | `m1/ch1/work/script.json` | 9471 | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | `b3e10894a3` | HEAD |
 | `m1/ch1/work/timeline.json` | 29690 | `bb76576f1595920193df6593d495a2964b31dc7b4e66ec839ad77db8d87703fa` | `254e8078aa` | HEAD |
@@ -100,8 +100,8 @@ GitHub Git Tree API 返回的 sha 比对。
 | `m1/labels/v1.json` | 1272 | `2ac310a6e9c788fef5b65287e12afa6f46d2cd090c1a1564711256e6e540c1fc` | `39ab1b6f39` | HEAD |
 | `m1/labels/v2.json` | 1759 | `541e776671cd994c368cd94757e993b9f266fce1653520cad6ddbed2435a9f2d` | `a8bff9d9fb` | HEAD |
 | `m1/v1/ch01/work/chapter.json` | 1216 | `5397af17356f2f88e9ec0caab5bead127b7ae110ef12eeb74953db7949e9b686` | `b2303175de` | HEAD |
-| `m1/v1/ch01/work/novel_ref.json` | 19648 | `48a9763870b07b14b1bb2c5f6649ac2ff21d526a013c8b31a5975eced449cef1` | `48a9763870` | HEAD |
-| `m1/v1/ch01/work/script-audit.json` | 39580 | `b9f06a9acbbb688c8d7092130bea6a28e442a50ec5cc715ef4ff3b9c208e722d` | `b9f06a9acb` | HEAD |
+| `m1/v1/ch01/work/novel_ref.json` | 19786 | `694aa4db300b5726f166e4d60a0f97b2006bb8a8269682411391c9c1bcc5bb10` | `694aa4db30` | HEAD |
+| `m1/v1/ch01/work/script-audit.json` | 39767 | `11e996e2e8ac2b76b562a01b4bf5114c9e6073776b71c8b400b0d828dbb74192` | `11e996e2e8` | HEAD |
 | `m1/v1/ch01/work/script.json` | 9471 | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | `b3e10894a3` | HEAD |
 | `m1/v1/ch01/work/timeline.json` | 29690 | `bb76576f1595920193df6593d495a2964b31dc7b4e66ec839ad77db8d87703fa` | `254e8078aa` | HEAD |
 | `m1/v1/ch02/work/chapter.json` | 1051 | `1d068a0f74e1fd8da72cd2a3f8952ae116321324d159dc35a2d338c9f663755e` | `4bc119c7e9` | HEAD |

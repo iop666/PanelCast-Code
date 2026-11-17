@@ -5,9 +5,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| 本地代码 HEAD | `d5a9991` — 文档：P0-01 复核状态闭环 + 页级映射说明 |
-| 上一提交 | `3973f93` — 清单：430 tests、P0-01 证据同步哈希 |
-| 更早基线 | `4e5f8c2` — P0-01 样张证据同步；`c460019` — 清单；`7aa405e` — P0-01 样张复核修订；`ff02eb5` — 清单；`0b3861c` — P0-REVIEW-10；`7a92652` — P0-REVIEW-09；`69f2913` — P0-REVIEW-08；`d5dfd6c` — 清单：384 tests；`12e8c3f` — P0-REVIEW-07 |
+| 本地代码 HEAD | `2fd94f3` — P0-01-CH01-BEAT-MAPPING-FIX：边界修正 + b23/b34 拆分 + 哈希重绑 |
+| 上一提交 | `88a7352` — 清单：430 tests、P0-01 文档闭环哈希 |
+| 更早基线 | `d5a9991` — 文档：P0-01 复核状态闭环 + 页级映射说明；`4e5f8c2` — P0-01 样张证据同步；`c460019` — 清单；`7aa405e` — P0-01 样张复核修订；`ff02eb5` — 清单；`0b3861c` — P0-REVIEW-10；`7a92652` — P0-REVIEW-09；`69f2913` — P0-REVIEW-08；`d5dfd6c` — 清单：384 tests；`12e8c3f` — P0-REVIEW-07 |
 | 原文档镜像（已删除） | `iop666/ChatGPT-Read` @ `61b685c` |
 | 原代码审查镜像（已改名并覆盖） | `iop666/PanelCast-Code-Review` @ `38c5bed` → `iop666/PanelCast-Code` |
 | 纳入文件数 | 122 |
@@ -25,7 +25,7 @@
 | 本机（完整仓库） | `430 / skipped=2` | 缺真实 EPUB 1、缺真实 MOBI 1 |
 | ZIP 解压（无 `.git`、无 ffmpeg） | 本轮未复跑 | P0-REVIEW-07 时为 `384 / skipped=8`。P0-REVIEW-08/09/10 新增 46 例未在该环境实测；其中 3 条 Schema/Linter 对照测试依赖可选 `jsonschema`，缺失时会另加跳过 |
 
-**2026-11-17 提交 `d5a9991` 后复跑（文档状态闭环）**：`Ran 430 tests / OK (skipped=2)`；
+**2026-11-17 提交 `2fd94f3` 后复跑（BEAT-MAPPING-FIX）**：`Ran 430 tests / OK (skipped=2)`；
 `test_fresh_clone_matches_working_tree` 实际执行并通过（此前因两个哈希绑定文件
 未提交而在工作区跳过；该跳过不代表通过）。
 
@@ -75,24 +75,24 @@ GitHub Git Tree API 返回的 sha 比对。
 | `README.md` | 6474 | `40c6a91ac22e3b4f6505ef4497f1fc3cc683e226012365c235d7cfc0d6f35cbc` | `72ce08205a` | HEAD |
 | `docs/ADR-001-source-ingestion.md` | 6631 | `bb382d750b82d80145455121c61c481333bd39c6e94b5f224f054628025fba44` | `cb9a9f4cff` | HEAD |
 | `docs/ADR-002-m1-render-stack.md` | 4469 | `43acdc4882f671d5faec9027caa23ac8e89faf08c28d772cbc752618b5499fd5` | `6777f04036` | HEAD |
-| `docs/PROJECT-MAP.md` | 23639 | `3f918c92415677b789f505a437597290d97a33bee099b7c5692d7311d37a6235` | `3f918c9241` | HEAD |
-| `docs/REVIEW-INDEX.md` | 16325 | `9ca7238c9a882dd51e6d29f308ba183073ca93999faa1356b780cf5e3171551c` | `9ca7238c9a` | HEAD |
-| `docs/ROADMAP.md` | 32416 | `590a4458449dd641018c88d6f919b736c99c65f797e9ed47598afbf8757df13a` | `590a445844` | HEAD |
-| `docs/WORKFLOW-v1-vertical-manga-narration.md` | 126450 | `580bd510460b7444d509bb2a995f4e469eaec6ce8fda6213e4854e2246244562` | `580bd51046` | HEAD |
+| `docs/PROJECT-MAP.md` | 23692 | `4dd2b54145758009842282ed88e201de0f943c36a427cba5f0c768f2139d765d` | `4dd2b54145` | HEAD |
+| `docs/REVIEW-INDEX.md` | 16362 | `0e11faea87e8f660d390f5772b7dbd26706be095485124da11deee80a10ebf8e` | `0e11faea87` | HEAD |
+| `docs/ROADMAP.md` | 32408 | `8c1572a22a7e009d994deb34cf613f02eb5db4fcb4b7d2cb3cf142ab39625b4d` | `8c1572a22a` | HEAD |
+| `docs/WORKFLOW-v1-vertical-manga-narration.md` | 126450 | `2da70dcfada7568e9f703f2054ab67bcd46d55ae7254dd3e408dd117df8c6d07` | `2da70dcfad` | HEAD |
 | `docs/schemas/page-profile.schema.json` | 7339 | `7f627622a0e8b65dd9f6c3fbbc9084be72d828fca1d75d37a4a653f0b425427d` | `d0ea1ee32a` | HEAD |
 | `docs/schemas/script-audit.schema.json` | 12283 | `dab89397a38d75cd9e53a3a9b71dc1da95423fc60aa9ccf6674a546351072144` | `33975dc4b1` | HEAD |
 | `docs/tasks/M0-content-validation.md` | 10621 | `585e55374ac111baa4d87849db7a29b77fcb9af4785f4eee1fb37c627799085f` | `11056e5ad3` | HEAD |
 | `docs/tasks/M1-minimal-loop.md` | 11666 | `46ebea01efa71267f0d38eb76bad8da16d876a6dda958937aade6af97e69d988` | `dbc7d683aa` | HEAD |
-| `docs/tasks/P0-execution-plan.md` | 44870 | `466d66e50299c875832ce96867c304c7eaec40bb341c58b042ddda4e886a8616` | `466d66e502` | HEAD |
+| `docs/tasks/P0-execution-plan.md` | 45005 | `50989db7f0234f379deb92a5c4935eef9eb8f4bc6a502fb7fc59012f20e8c0a9` | `50989db7f0` | HEAD |
 | `docs/tasks/TASK-002-ingest-hardening.md` | 7250 | `8dcb085aa23d392c0ab225ca16c1a3635fed498f513acc8a06ddc64a2959e447` | `3ae7359883` | HEAD |
 | `m0/alignment_note.md` | 2244 | `1bcee4f44f086d2ef6f5fc94a4d277432b58d52c741bc101c9bebb129a1714fa` | `34b182ce9b` | HEAD |
 | `m0/prompts/V1.txt` | 1404 | `15fda37fd55b9a8235c6eb0a8172c67914d14b91f9eb1c3c4b0537bb1c1b99e6` | `184eeb49c5` | HEAD |
 | `m0/prompts/V2.txt` | 1327 | `0b40cb62ebf7fb8c7c9befed65041cbe2e37b9abfd99b2e20f8fb6d94bd9c3cf` | `aa08837674` | HEAD |
 | `m0/prompts/V3.txt` | 2053 | `0e1ae602302b14c706055cba813b9cd0e38cd817dc64059b451315f5d9115bd4` | `f595eca98d` | HEAD |
 | `m0/results.csv` | 150 | `32eba1a22a6fb5d356c5b0b504dcab7aaf8165a8f131f53e0457f3c1f3a8dcaa` | `ed95f1a604` | HEAD |
-| `m1/audit/P0-01-SAMPLE-CH01-report.md` | 28181 | `05f583b5a30774439261c902f5bb5417302827b3a8f5349fc0e7f15300bc9301` | `05f583b5a3` | HEAD |
-| `m1/audit/chapter-map.md` | 12300 | `a0daa387c425dae36a746298afa6b8b4c0fb2423fbd045b4ff06124b3e7e5514` | `a0daa387c4` | HEAD |
-| `m1/audit/script-audit-ch01.md` | 49978 | `733b8f4a9b0e5c25db81cdb229e15c838be2e5bb71fba916e3ff2792cd3c34e5` | `733b8f4a9b` | HEAD |
+| `m1/audit/P0-01-SAMPLE-CH01-report.md` | 29000 | `b55f31b541e1624a892982625b9807e911a667c818fe0ec03963366d554831ec` | `b55f31b541` | HEAD |
+| `m1/audit/chapter-map.md` | 12880 | `10e1c782808ca7d66bf2efc1a122b103d6bce4a25a1c84f307cdad477d4723bb` | `10e1c78280` | HEAD |
+| `m1/audit/script-audit-ch01.md` | 49988 | `220e787f2ca9a623e5bd2b8671275b0bebbc355fceb36b54bed12725c472068d` | `220e787f2c` | HEAD |
 | `m1/capability_report.md` | 1482 | `6e117745d74cda9fc9af4b038871e824c9f278ab759e47510e33beda74d7036d` | `79459fc142` | HEAD |
 | `m1/ch1/work/script.json` | 9471 | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | `b3e10894a3` | HEAD |
 | `m1/ch1/work/timeline.json` | 29690 | `bb76576f1595920193df6593d495a2964b31dc7b4e66ec839ad77db8d87703fa` | `254e8078aa` | HEAD |
@@ -100,8 +100,8 @@ GitHub Git Tree API 返回的 sha 比对。
 | `m1/labels/v1.json` | 1272 | `2ac310a6e9c788fef5b65287e12afa6f46d2cd090c1a1564711256e6e540c1fc` | `39ab1b6f39` | HEAD |
 | `m1/labels/v2.json` | 1759 | `541e776671cd994c368cd94757e993b9f266fce1653520cad6ddbed2435a9f2d` | `a8bff9d9fb` | HEAD |
 | `m1/v1/ch01/work/chapter.json` | 1216 | `5397af17356f2f88e9ec0caab5bead127b7ae110ef12eeb74953db7949e9b686` | `b2303175de` | HEAD |
-| `m1/v1/ch01/work/novel_ref.json` | 19786 | `694aa4db300b5726f166e4d60a0f97b2006bb8a8269682411391c9c1bcc5bb10` | `694aa4db30` | HEAD |
-| `m1/v1/ch01/work/script-audit.json` | 39767 | `11e996e2e8ac2b76b562a01b4bf5114c9e6073776b71c8b400b0d828dbb74192` | `11e996e2e8` | HEAD |
+| `m1/v1/ch01/work/novel_ref.json` | 21959 | `e78e89f0ec3520ccf9621e8d23eb59a2a7e621520258b55a501d8c561da1ab25` | `e78e89f0ec` | HEAD |
+| `m1/v1/ch01/work/script-audit.json` | 39938 | `98af7660695837fde716df3601925e31f63359781cba1d0865efdc7bf67a5435` | `98af766069` | HEAD |
 | `m1/v1/ch01/work/script.json` | 9471 | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | `b3e10894a3` | HEAD |
 | `m1/v1/ch01/work/timeline.json` | 29690 | `bb76576f1595920193df6593d495a2964b31dc7b4e66ec839ad77db8d87703fa` | `254e8078aa` | HEAD |
 | `m1/v1/ch02/work/chapter.json` | 1051 | `1d068a0f74e1fd8da72cd2a3f8952ae116321324d159dc35a2d338c9f663755e` | `4bc119c7e9` | HEAD |

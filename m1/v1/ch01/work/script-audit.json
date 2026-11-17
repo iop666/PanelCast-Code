@@ -26,7 +26,7 @@
     ]
   },
   "script_sha256": "1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3",
-  "novel_ref_sha256": "48a9763870b07b14b1bb2c5f6649ac2ff21d526a013c8b31a5975eced449cef1",
+  "novel_ref_sha256": "694aa4db300b5726f166e4d60a0f97b2006bb8a8269682411391c9c1bcc5bb10",
   "review_status": "pending_human",
   "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。2026-11-17 项目负责人复核裁定为 REVIEW_RETURNED：已按裁定修订 seg_0005/0016/0018/0023 等判定与 novel_ref 段号边界，修订后重新送审，仍无人签核。",
   "reviewed_by": null,
@@ -676,7 +676,7 @@
       "novel_para": [
         [
           463,
-          480
+          479
         ]
       ],
       "source_type": "novel_beat",
@@ -689,7 +689,7 @@
       "pages_actual": [
         "page_0032"
       ],
-      "evidence": "第一章 463–480「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
+      "evidence": "第一章 463–479「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
       "review_note": "「坐到天黑」对应小说 466「已经持续等超过半天」，可接受。",
       "review_status": "pending_human",
       "reviewer": null,
@@ -721,7 +721,7 @@
         "page_0033",
         "page_0034"
       ],
-      "evidence": "第一章 480「我看见在招募上级职业冒险者的告示」、488「吾乃惠惠！职业乃大法师…爆裂魔法」、494「红魔族首屈一指的魔法师」、495「我已经三天没吃任何东西了」；p33–p34 同",
+      "evidence": "第一章 481「我看见在招募上级职业冒险者的告示」、488「吾乃惠惠！职业乃大法师…爆裂魔法」、494「红魔族首屈一指的魔法师」、495「我已经三天没吃任何东西了」；p33–p34 同",
       "review_note": "「最高阶职业」与小说「大法师」（上级职业）一致；「红着脸」画面依据不足，但无害。",
       "review_status": "pending_human",
       "reviewer": null,
@@ -884,5 +884,5 @@
       "disposition": "keep"
     }
   ],
-  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。"
+  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。提交后复核再修：b21.note 与 seg_0016 判定对齐；seg_0019 来源范围收窄为 463–479；seg_0020 登场台词锚点由 480 修正为 481；novel_ref_sha256 再次重绑。"
 }

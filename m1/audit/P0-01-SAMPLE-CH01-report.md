@@ -119,7 +119,8 @@ p10 首格才出现"没错！真是短暂的人生。"——由此转入天界�
 所以这里一个都不签。**签核是项目负责人的动作，不是执行 Agent 的动作。**
 
 **2026-11-17 复核修正**：b18 `279–291`、b19 `292–308`、b25 `463–479`、b26 `480–497`
-（原文 292 已是阿克娅能力值、480 已是惠惠登场句），并修正 b01 扉页描述。
+（原文 292 已是阿克娅能力值；480 是惠惠登场的过渡句「这么说着，就在我正准备站起来的时候」，
+直接台词在 481），并修正 b01 扉页描述。
 beat 计数不变，仍全部 `needs_review`。
 
 ---
@@ -264,10 +265,10 @@ beat 计数不变，仍全部 `needs_review`。
 | 文件 | 首次交付（eff6fad） | P0-REVIEW-04 后 | 复核修订后（2026-11-17） | 说明 |
 | --- | --- | --- | --- | --- |
 | `script.json` | `1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3` | **同左** | **同左** | **一字未改**，符合"审计不改稿" |
-| `novel_ref.json` | `c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a` | `9cdba901ea8d3c57cb83c89be28b19a76297ad206d06d81af52a4bfddafee0d5` | `48a9763870b07b14b1bb2c5f6649ac2ff21d526a013c8b31a5975eced449cef1` | 加 `judgement_scope`；复核修正两处段号边界与 b01 描述 |
-| `script-audit.json` | `da5118e34320a4fe9f4635725ee87d78b0c7d081aadcdee76a6bb32c9a9f6d71` | `1c0da012abb61dbc92c05779fc375356bc23a173a49a23f3c7a279e15fcef0db` | `b9f06a9acbbb688c8d7092130bea6a28e442a50ec5cc715ef4ff3b9c208e722d` | 升 v2 + 改 1 处判定；复核按裁定修订并重绑 `novel_ref_sha256` |
+| `novel_ref.json` | `c52879d25c70cebd38be06409ae1b87a325265c78d052c223e26f026df25aa6a` | `9cdba901ea8d3c57cb83c89be28b19a76297ad206d06d81af52a4bfddafee0d5` | `694aa4db300b5726f166e4d60a0f97b2006bb8a8269682411391c9c1bcc5bb10` | 加 `judgement_scope`；复核修正两处段号边界、b21 note 与 b01 描述 |
+| `script-audit.json` | `da5118e34320a4fe9f4635725ee87d78b0c7d081aadcdee76a6bb32c9a9f6d71` | `1c0da012abb61dbc92c05779fc375356bc23a173a49a23f3c7a279e15fcef0db` | `11e996e2e8ac2b76b562a01b4bf5114c9e6073776b71c8b400b0d828dbb74192` | 升 v2 + 改 1 处判定；复核按裁定修订并两次重绑 `novel_ref_sha256` |
 | `m1/audit/chapter-map.md` | `fea1d6a7d161d2adc1e9d486cb3164ca4281e96ad9eaf3a26b4f15898dcb77ce` | **同左** | **同左** | 未改 |
-| `m1/audit/script-audit-ch01.md` | `bb8b258995df000403bf17ecbcc61d0b7c1a87a79e77402bc78eecb168974711` | `c940541941225f49bc969c66bec2f84fb59fb39f636e30419db0c5d09f72a483` | `ea291fdd7e975eaf2d801eafe39a31abaaf46780294fc2648086f9bd6ea99fdf` | 枚举与计数同步；复核后同步裁定与计数 |
+| `m1/audit/script-audit-ch01.md` | `bb8b258995df000403bf17ecbcc61d0b7c1a87a79e77402bc78eecb168974711` | `c940541941225f49bc969c66bec2f84fb59fb39f636e30419db0c5d09f72a483` | `733b8f4a9b0e5c25db81cdb229e15c838be2e5bb71fba916e3ff2792cd3c34e5` | 枚举与计数同步；复核后同步裁定、计数与 480/481 锚点 |
 
 **审计报告内部绑定的三个哈希**（`script-audit.json` 里）：
 
@@ -279,7 +280,8 @@ beat 计数不变，仍全部 `needs_review`。
 
 > 注意 `novel_ref_sha256` 变过：加 `judgement_scope` 改了底稿字节，
 > 审核报告里的绑定值必须跟着重算，否则第 5 步会误报"底稿改过但审计没重做"。
-> 2026-11-17 复核修正段号边界后再次重绑（`9cdba901…` → `48a97638…`）。
+> 2026-11-17 复核修正段号边界后重绑（`9cdba901…` → `48a97638…`）；
+> 提交后针对性复核修正 b21.note 与 480/481 锚点，再次重绑（`48a97638…` → `694aa4db…`）。
 > 这正是哈希绑定的正常代价——**改底稿就必须重绑，不许只改一边**。
 
 ### G.1 门禁当前的实际表现
@@ -461,8 +463,12 @@ PENDING_COMMITTED_ARTIFACT_REVIEW`。** 修订方案与计数经项目负责人�
 ### M.3 novel_ref 修订
 
 - b18 `279–292` → `279–291`；b19 `293–308` → `292–308`（para 292 属阿克娅能力值）。
-- b25 `463–480` → `463–479`；b26 `481–497` → `480–497`（para 480 是惠惠登场第一句）。
+- b25 `463–480` → `463–479`；b26 `481–497` → `480–497`（para 480 是登场过渡句
+  「这么说着，就在我正准备站起来的时候」；惠惠的直接台词在 para 481）。
 - b01 `gist`/`evidence` 修正为彩色扉页 + 三人宣传立绘，`fidelity=original`、`para=null` 不变。
+- 提交后复核再修：b21 `note` 与 `seg_0016` 的最终判定对齐（「比人还高」不构成事实错误，
+  仅保留措辞建议）；`seg_0019` 来源范围收窄为 `463–479`；`seg_0020` 登场台词锚点
+  由 480 修正为 481。
 - 34 beats 仍全部 `needs_review`。
 
 ### M.4 计数（修订后实测）
@@ -477,7 +483,8 @@ PENDING_COMMITTED_ARTIFACT_REVIEW`。** 修订方案与计数经项目负责人�
 
 ### M.5 哈希与门禁
 
-- `novel_ref.json` = `48a97638…`（字节已变）；`script-audit.json` 的 `novel_ref_sha256` 已重绑为同值。
+- `novel_ref.json` = `694aa4db…`（字节已变）；`script-audit.json` 的 `novel_ref_sha256`
+  已重绑为同值（本轮第二次重绑）。
 - `script.json` = `1ac90fae…`（未变），25 条逐段 `text_sha256` 仍有效。
 - `m1 novel lint` 通过（格式合法，不代表签核）。
 - `m1 novel check` 仍退出码 3，拦在第 3/4/5 步（script/v1、34 beat `needs_review`、未签核）——预期行为。

@@ -26,9 +26,9 @@
     ]
   },
   "script_sha256": "1ac90fae164b1dbe9c1d77995f5b216bd7ca6f2eee9c9781f7e46dbd300a27f3",
-  "novel_ref_sha256": "9cdba901ea8d3c57cb83c89be28b19a76297ad206d06d81af52a4bfddafee0d5",
+  "novel_ref_sha256": "48a9763870b07b14b1bb2c5f6649ac2ff21d526a013c8b31a5975eced449cef1",
   "review_status": "pending_human",
-  "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。",
+  "review_status_note": "本报告由执行 Agent 逐段产出结论，**没有任何人签核**。reviewed_by 必须由项目负责人填写 human:<name> 并把 review_status 改为 approved 后才可正式出片。2026-11-17 项目负责人复核裁定为 REVIEW_RETURNED：已按裁定修订 seg_0005/0016/0018/0023 等判定与 novel_ref 段号边界，修订后重新送审，仍无人签核。",
   "reviewed_by": null,
   "reviewed_at": null,
   "prepared_by": "agent:panelcast-executor",
@@ -38,26 +38,31 @@
     "segments_audited": 25,
     "coverage_ratio": 1.0,
     "by_fidelity": {
-      "drawn": 10,
-      "altered": 15
+      "drawn": 11,
+      "altered": 14
     },
     "by_severity": {
-      "low": 6,
-      "none": 8,
-      "high": 7,
-      "medium": 4
+      "low": 5,
+      "none": 9,
+      "high": 6,
+      "medium": 5
     },
     "by_status": {
-      "approved": 11,
-      "pending_rewrite": 14
+      "approved": 12,
+      "pending_rewrite": 13
     },
     "by_disposition": {
-      "keep": 11,
+      "keep": 12,
       "fix_pages": 1,
-      "rewrite": 13
+      "rewrite": 12
     },
     "by_source_type": {
       "novel_beat": 25
+    },
+    "by_alteration_origin": {
+      "narration": 10,
+      "manga": 2,
+      "mixed": 2
     },
     "pages_mismatch": [
       "seg_0003"
@@ -96,7 +101,7 @@
         "page_0006"
       ],
       "evidence": "序章 143–148（和真指定阿克娅为「要带去的东西」，光笼罩两人）；第一章 156–160（红砖屋、兽耳、精灵耳、「如果是这个世界，我愿意乖乖出外工作」）",
-      "review_note": "「被城墙环抱」「货摊」「披甲骑士」只见于 p6 全景，小说未写，属画面补充，不冲突。p5 是扉页、无剧情，旁白落在扉页上是版式决定。",
+      "review_note": "「被城墙环抱」「货摊」「披甲骑士」只见于 p6 全景，小说未写，属画面补充，不冲突。p5 为彩色扉页与章节标题、角色宣传立绘（阿克娅、惠惠、达克妮丝），无具体剧情；旁白落在扉页上是版式决定。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "keep"
@@ -221,16 +226,17 @@
       ],
       "source_type": "novel_beat",
       "fidelity": "altered",
-      "severity": "high",
-      "alteration_origin": "narration",
+      "severity": "medium",
+      "alteration_origin": "mixed",
+      "mixed_note": "p12 漫画气泡「還活著！還活著啦！」「除了因為你多管閒事而受的傷」提供了前半段事实；「一个把女神一起拽下界的家里蹲…就此开场了」是旁白新增的编导式收束句，且提前引用尚未发生的 p17–p19。",
       "pages_declared": [
         "page_0012"
       ],
       "pages_actual": [
         "page_0012"
       ],
-      "evidence": "序章 33–35「还活着啊！不过伤势颇为严重，脚都骨折了」「所以我并没有白死」；p12 同",
-      "review_note": "**末两句无来源且时序倒错**：此时尚未发生「把女神拽下界」（那是 p17–p19），旁白却写成既成事实；「他的异世界冒险就此开场」是编导式收束语，小说与漫画都没有。",
+      "evidence": "序章 33–35「还活着啊！不过伤势颇为严重，脚都骨折了」「所以我并没有白死」；p12 气泡「還活著！還活著啦！」「除了因為你多管閒事而受的傷」——前半段均有来源",
+      "review_note": "**前半段有来源，问题只在末尾**：p12 漫画气泡复述了「那孩子还活着」「因为你多管闲事而受的伤」，不是旁白编造；真正无来源的是编导式收束句「一个把女神一起拽下界的家里蹲…就此开场了」，它把尚未发生的 p17–p19 写成既成事实。改为 mixed；改写只针对末尾收束句，前半段保留。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "rewrite"
@@ -497,7 +503,7 @@
         "page_0023"
       ],
       "evidence": "第一章 242「我是阿克娅…阿克西斯教团所祭拜的神体」「能不能请汝帮个忙，借我一点钱」；248 祭司给钱并告诫别冒用名号；253–256「我们拿登录费来了」「阿克娅从祭司那里要来的钱有三千艾莉丝」",
-      "review_note": "**两处事实错误**：①「恭恭敬敬递上教典」——祭司递的是**钱**，「教典」是他用来自证艾莉丝教徒身份的道具（p23「這是我們的教典」），不是礼物；②「和真看不下去，自己把登记费交了」——小说 253–256 与 p23 用的都是**阿克娅讨来的三千艾莉丝**，和真没有自己掏钱。资金因果被改写。",
+      "review_note": "**两处事实错误**：①「恭恭敬敬递上教典」——祭司递的是**钱**，「教典」是他用来自证艾莉丝教徒身份的道具（p23「這是我們的教典」），不是礼物；②「和真看不下去，自己把登记费交了」——小说 253–256 与 p23「我來交登錄費用了」用的都是**阿克娅讨来的三千艾莉丝**，和真只是去交，钱不是他自己掏的。改写必须交代资金来源：祭司给阿克娅一笔钱，阿克娅拿回来，和真将其中的登记费交给柜台小姐；不要笼统写成「和真自己交了」。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "rewrite"
@@ -570,7 +576,7 @@
       "segment_id": "seg_0016",
       "narration_text": "职业栏里只有最基本的冒险者可选，和真咬牙认了。两人刚出城，草丛里窜出一只比人还高的青蛙。和真扭头就跑，一边喊我怎么可能打得赢这种东西。阿克娅在后面笑得直不起腰。",
       "text_sha256": "13ba21babdf7e36d59b9317adf328baf448b3804ffe443d48fcce077d3618e13",
-      "status": "pending_rewrite",
+      "status": "approved",
       "novel_chapter": [
         "ch01"
       ],
@@ -581,9 +587,9 @@
         ]
       ],
       "source_type": "novel_beat",
-      "fidelity": "altered",
-      "severity": "low",
-      "alteration_origin": "narration",
+      "fidelity": "drawn",
+      "severity": "none",
+      "alteration_origin": null,
       "pages_declared": [
         "page_0028"
       ],
@@ -591,10 +597,10 @@
         "page_0028"
       ],
       "evidence": "第一章 392「巨大的蛙型怪物——巨型蟾蜍」、399「它们巨大的身体比牛还大」；p28 巨蛙远大于人",
-      "review_note": "「比人还高」与小说「比牛还大」不符，属尺寸低估；「草丛里窜出」与小说「城镇外面的宽广平原」略偏。",
+      "review_note": "「比人还高」不构成事实错误：小说 399「比牛还大」并不否定「比人还高」，p28 画面也显示巨蛙远高于人物。原判 altered/rewrite 过严，复核改判 drawn/keep。表述建议（非判定依据）：「草丛里窜出」改为更稳妥的「平原上出现巨型蟾蜍」。",
       "review_status": "pending_human",
       "reviewer": null,
-      "disposition": "rewrite"
+      "disposition": "keep"
     },
     {
       "segment_id": "seg_0017",
@@ -645,7 +651,8 @@
       "source_type": "novel_beat",
       "fidelity": "altered",
       "severity": "low",
-      "alteration_origin": "narration",
+      "alteration_origin": "mixed",
+      "mixed_note": "p31 漫画台词「這個任務要賭上性命，但是報酬卻很少」提供了「赌上性命、报酬少」；「两人对着账本发愁」是旁白新增，小说 446–461 是吃着酥炸蟾蜍腿开会，没有账本。",
       "pages_declared": [
         "page_0031"
       ],
@@ -653,7 +660,7 @@
         "page_0031"
       ],
       "evidence": "第一章 444–461「还是招募同伴吧！」「有本小姐在，想找同伴只需要招募一下」；p31「這個任務要賭上性命，但是報酬卻很少…」",
-      "review_note": "「两人对着账本发愁」无来源：小说 446–461 是**吃着酥炸蟾蜍腿**开会，没有账本。「报酬少得可怜」来自 p31 漫画台词，小说 451 只说「和土木工程的打工费差不了多少」，属程度放大。",
+      "review_note": "「报酬少得可怜」来自 p31 漫画台词（小说 451 只说「和土木工程的打工费差不了多少」，属程度放大），这部分是漫画改写、旁白跟随；「两人对着账本发愁」才是旁白新增、无来源的细节（小说 446–461 是吃着酥炸蟾蜍腿开会）。故整体为 mixed。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "rewrite"
@@ -809,7 +816,7 @@
         "page_0039"
       ],
       "evidence": "第一章 539–547 法杖前端聚光、闪光、爆风；p39 球状法器与冲击波",
-      "review_note": "「草叶全部压平」是画面推断（p39 冲击波），小说只说「就快被那凌厉的爆风给吹走」；「连喊都喊不出来」无直接依据，无害。",
+      "review_note": "「草叶全部压平」是画面推断（p39 冲击波），小说只说「就快被那凌厉的爆风给吹走」；「连喊都喊不出来」是据画面作出的表现性推断，无直接原文依据——保留，但记为无来源局部细节，不得当作原文事实。",
       "review_status": "pending_human",
       "reviewer": null,
       "disposition": "keep"
@@ -877,5 +884,5 @@
       "disposition": "keep"
     }
   ],
-  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。"
+  "notes": "第一章样张。全部 25 段逐条审完，未抽样。判据见 m1/audit/script-audit-ch01.md 与 m1/audit/P0-01-SAMPLE-CH01-report.md。fidelity 是相对**小说**的关系；alteration_origin 区分「漫画改写」与「旁白编造」——前者旁白忠于漫画，后者是旁白自己的错。 本文件已按 P0-REVIEW-04 的 Schema 修订升级到 script-audit/v2：status 采用正式枚举（approved/pending_rewrite/rewritten/removed），alteration_origin 采用 manga/narration/mixed/unknown 且无差异时留空，并显式声明 judgement_scope=narration_vs_source。迁移时按已认可规则回检出 1 处自相矛盾（seg_0024）并改正，见 schema_migration.corrections。2026-11-17 按项目负责人复核裁定修订：seg_0005/seg_0018 改 mixed，seg_0016 改 drawn/keep，seg_0023 补记局部无来源细节；novel_ref 两处段号边界已修正并重绑 novel_ref_sha256。"
 }

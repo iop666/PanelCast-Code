@@ -80,16 +80,24 @@ PanelCast 不是"把竖版改造成切格视频"，而是**同一套内容底座
   **不得凭记忆填，必须逐章读小说原文核对。**
 
   **状态：第一章样张已完成（P0-01-SAMPLE-CH01），其余九章未核。**
+  **2026-11-17 复核状态：`P0-01-SAMPLE-CH01 = REVISION_CONTENT_REVIEW_PASS /
+  PENDING_COMMITTED_ARTIFACT_REVIEW`——修订方案与计数经项目负责人复核通过；
+  提交后的实际产物待针对性复核，未签核。此前裁定为 `REVIEW_RETURNED`，修订已完成。**
   - `m1/audit/chapter-map.md`：第一章 30 条段落锚点 + 十章总表（九章标「未核」，不推断）
   - 第一章结论：漫画 ch01（p5–42）= 小说 **序章 0–148 + 第一章 149–711（部分）**，
     `order: reordered`（漫画把序章后置成插叙）
   - 小说有、漫画没画：ch01 309–387（两周土木工/浴场/马厩）、562–619、620–711
   - 副产物：发现 `m1/v2/ch06–ch10` 目录名与 `chapter.json` 的 `id` 不一致
     （目录 ch06–ch10 / id ch01–ch05 / number 第六–十章），是 P0-08 的直接证据
-  - 审核口径（P0-REVIEW-04 定稿）：25 段 `drawn` 10 / `altered` 15；
-    `disposition` 为 `keep` 11 / `fix_pages` 1 / `rewrite` 13；高危 7 段
-  - **未签核**：`review_status: pending_human`、`reviewed_by: null`。
-    `m1 novel lint` 全过、`m1 novel check` 在第 3/4/5 步拦截（v1 讲稿 + beat 未确认 + 未签核）
+  - 审核口径（2026-11-17 复核修订后）：25 段 `drawn` 11 / `altered` 14；
+    `disposition` 为 `keep` 12 / `fix_pages` 1 / `rewrite` 12；高危 6 段；
+    `alteration_origin` 为 `narration` 10 / `manga` 2 / `mixed` 2
+  - 复核修订内容：b18/b19、b25/b26 段号边界修正（para 292 属阿克娅能力值、
+    para 480 属惠惠登场）；b01 扉页描述修正；`seg_0005/0016/0018/0023` 按裁定修订；
+    `novel_ref.json` 字节变化后 `novel_ref_sha256` 已重绑为 `48a97638…`
+  - **未签核**：`review_status: pending_human`、`reviewed_by: null`；34 beats 仍全部
+    `needs_review`。`m1 novel lint` 全过、`m1 novel check` 在第 3/4/5 步拦截
+    （v1 讲稿 + beat 未确认 + 未签核）
 
 - [ ] **P0-02 建立底稿 `novel_ref.json`**
   十章各一份，覆盖本章所有漫画页；每个 Beat 标 `drawn / omitted / altered / original`。

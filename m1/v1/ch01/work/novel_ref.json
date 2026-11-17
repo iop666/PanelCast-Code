@@ -36,11 +36,11 @@
     {
       "id": "b01",
       "para": null,
-      "gist": "章节扉页：标题与阿克娅立绘，无剧情",
+      "gist": "彩色扉页及章节标题、角色宣传立绘（阿克娅、惠惠、达克妮丝），无具体小说剧情事件。",
       "pages": ["page_0005"],
       "fidelity": "original",
       "mapping_confidence": "high",
-      "evidence": "p5 为扉页，无分格、无台词",
+      "evidence": "p5 为彩色扉页与章节标题、角色宣传立绘（阿克娅、惠惠、达克妮丝），无分格、无台词",
       "review_status": "needs_review",
       "note": "扉页单列为一个 beat，是为了让页→beat 覆盖不出现空洞；它不承载任何小说内容"
     },
@@ -222,7 +222,7 @@
     },
     {
       "id": "b18",
-      "para": [279, 292],
+      "para": [279, 291],
       "gist": "和真数值全普通、只有幸运极高，只能选基本职业「冒险者」",
       "pages": ["page_0025", "page_0026"],
       "fidelity": "drawn",
@@ -233,7 +233,7 @@
     },
     {
       "id": "b19",
-      "para": [293, 308],
+      "para": [292, 308],
       "gist": "阿克娅魔力爆表、智力偏低、幸运最低，登录为上级职业「大祭司」",
       "pages": ["page_0026", "page_0027"],
       "fidelity": "drawn",
@@ -299,18 +299,18 @@
     },
     {
       "id": "b25",
-      "para": [463, 480],
+      "para": [463, 479],
       "gist": "贴出征人告示，半天没人来，和真提议去掉「仅限上级职业」",
       "pages": ["page_0032"],
       "fidelity": "drawn",
       "mapping_confidence": "high",
-      "evidence": "小说 463–480「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
+      "evidence": "小说 463–479「都没人来耶」「『只招募上级职业』这种条件还是太严苛了」；p32 同",
       "review_status": "needs_review",
       "note": ""
     },
     {
       "id": "b26",
-      "para": [481, 497],
+      "para": [480, 497],
       "gist": "惠惠登场，自称红魔族首屈一指的大法师，用爆裂魔法，三天没吃饭",
       "pages": ["page_0033", "page_0034"],
       "fidelity": "drawn",
@@ -433,6 +433,6 @@
     "auto_confirmed": false,
     "prepared_by": "agent:panelcast-executor",
     "prepared_at": "2026-11-16T16:00:00+08:00",
-    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。"
+    "review_note": "本文件由执行 Agent 人工逐页比对写成，全部 beat 仍为 needs_review。候选匹配工具（m1 novel --align）的 para_candidates 未被采用，para 全部由读原文+读页面确定。2026-11-17 项目负责人复核裁定：修正 b18/b19（292 属阿克娅能力值）、b25/b26（480 属惠惠登场）段号边界，并按裁定修正 b01 扉页描述；修订后仍需人工确认。"
   }
 }

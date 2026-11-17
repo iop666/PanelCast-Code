@@ -1239,10 +1239,13 @@ python -m panelcast m1 novel lint --work m1/v1/ch01/work
 | 审核报告 | `m1/v1/ch01/work/script-audit.json` | 25 段全审，`review_status: pending_human` |
 | 审计明细 | `m1/audit/script-audit-ch01.md` | 逐段判据、反例回归、高危案例 |
 
-结论摘要：25 段中 `drawn` 10 / `altered` 15，`disposition` 为
-`keep` 11 / `fix_pages` 1 / `rewrite` 13；高危 7 段，其中三处属**改变了事实**——
+结论摘要：25 段中 `drawn` 11 / `altered` 14，`disposition` 为
+`keep` 12 / `fix_pages` 1 / `rewrite` 12；高危 6 段，其中三处属**改变了事实**——
 虚构柜台小姐姓名「露娜」（全书 `grep` 命中 0 次）、把「我还是当冒险者好了」
 改成「我要当大贤者」、把被推开的女生说的「好痛」归到和真身上。
+2026-11-17 项目负责人复核裁定 `REVIEW_RETURNED`，已按裁定修订
+（b18/b19、b25/b26 段号边界、b01 扉页描述、`seg_0005/0016/0018/0023` 判定），
+等待针对性复核，仍未签核。
 
 **其余九章未核**，不得据第一章的结果推断它们的状态。
 

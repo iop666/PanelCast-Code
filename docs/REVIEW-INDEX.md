@@ -188,7 +188,7 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 三者合起来才是完整证据。规范 §4.3.9 已按此边界改写。
 
-## 当前进度（2026-11-16）
+## 当前进度（2026-11-17）
 
 ### 已实现
 
@@ -203,16 +203,16 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 | **底稿对齐骨架 + 五步门禁** | `m1 novel align/check` |
 | **审核报告 Schema 校验** | `m1 novel lint`（只校格式、不要求签核） |
 | **章节身份强校验** | `m1 chapter --verify`（不一致就报错，不猜"最接近"） |
-| **第一章逐段来源审计** | 25 段 100% 审完，**未签核** |
+| **第一章逐段来源审计** | 25 段 100% 审完；2026-11-17 复核退回已修订，**未签核** |
 | 测试 | **430 tests OK (skipped=2)**（`test_novel.py` 105 例 / `test_identity.py` 68 例 / `test_lf.py` 6 例） |
 
 ### P0 任务状态
 
 | ID | 任务 | 状态 |
 | --- | --- | --- |
-| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**，其余九章未核 |
-| P0-02 | 十章各建 `novel_ref.json` | 🔄 **ch01 完成**（34 beats），其余九章未建 |
-| P0-03 | 讲稿来源 **100%** 复核 | 🔄 **ch01 完成**（13 段待改写 + 1 段改页映射），其余九章未审 |
+| P0-01 | 核实十章 ↔ 小说 ↔ 讲稿对应 | 🔄 **第一章样张完成**；2026-11-17 修订内容复核通过，`PENDING_COMMITTED_ARTIFACT_REVIEW`；其余九章未核 |
+| P0-02 | 十章各建 `novel_ref.json` | 🔄 **ch01 完成**（34 beats，段号边界已按复核修正），其余九章未建 |
+| P0-03 | 讲稿来源 **100%** 复核 | 🔄 **ch01 完成**（12 段待改写 + 1 段改页映射；未签核），其余九章未审 |
 | P0-04 | 改稿后重出受影响成片 | ⬜ 未开始（等 P0-03） |
 | P0-05 | `m1 novel --align/--check` | ✅ **已完成**（含验收第 5 条补修 + lint 拆分） |
 | P0-06 | 正式出片门禁（`--draft` + 审核报告） | ⬜ 未开始 |
@@ -236,9 +236,19 @@ Schema 用 `pattern: "\\S"` 表达"至少一个非空白字符"，与 Linter 的
 
 ### 现在卡在哪
 
-第一章样张等**人工签核**：把 `m1/v1/ch01/script-audit.json` 的
-`reviewed_by` 填 `human:<name>`、`review_status` 改 `approved`。
-签核前 `m1 novel check` 会一直卡在第 5 步——这是设计如此，不是 bug。
+第一章样张经项目负责人逐段复核后退回，修订方案与计数已复核通过
+（`REVISION_CONTENT_REVIEW_PASS`），当前状态为
+**`PENDING_COMMITTED_ARTIFACT_REVIEW`**：待对提交后的实际产物做针对性复核。
+修订内容：五条争议裁定落地（`seg_0016` 改判 `drawn/keep`、`seg_0005`
+改为 `mixed/中危`、`seg_0018` 改 `mixed`、`seg_0023` 补记表现性推断），
+b18/b19、b25/b26 段号边界修正，b01 扉页描述修正；`novel_ref.json` 字节变化后
+`novel_ref_sha256` 已重绑。**34 个 beat 仍全部 `needs_review`，样张仍未签核。**
+
+下一步是项目负责人对提交后的实际 diff、两个哈希绑定、最终清单与 clone 测试
+做**针对性复核**（不需重做 38 页审阅）。复核通过后，
+把 `m1/v1/ch01/script-audit.json` 的 `reviewed_by` 填 `human:<name>`、
+`review_status` 改 `approved`。签核前 `m1 novel check` 会一直卡在第 3/4/5 步——
+这是设计如此，不是 bug。
 
 ## 复核命令（新克隆即可复现）
 

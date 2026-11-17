@@ -438,8 +438,11 @@ P0-05 验收第 5 条写着「`--check` 对未确认的 beat **报错而不是�
 本节记录据此完成的修订；修订不改任何旁白，也不签核。
 
 **复核状态（2026-11-17）：`REVISION_CONTENT_REVIEW_PASS /
-PENDING_COMMITTED_ARTIFACT_REVIEW`。** 修订方案与计数经项目负责人复核通过；
-提交后的实际 diff、哈希绑定、最终清单与 clone 测试待针对性复核。
+COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`。**
+修订内容与提交后产物（实际 diff、两个哈希绑定、最终清单、clone 测试记录）
+均已复核通过。边界分开记：**第一章 P0-01 样张审计复核仅剩负责人签核；
+34 个 beat 的人工确认属于独立的 P0-02 工作，尚未完成。**
+`m1 novel check` 仍会同时拦截 v1 讲稿、未确认 beats 与未签核三项。
 
 ### M.1 对象与边界
 
@@ -488,12 +491,16 @@ PENDING_COMMITTED_ARTIFACT_REVIEW`。** 修订方案与计数经项目负责人�
 - `script.json` = `1ac90fae…`（未变），25 条逐段 `text_sha256` 仍有效。
 - `m1 novel lint` 通过（格式合法，不代表签核）。
 - `m1 novel check` 仍退出码 3，拦在第 3/4/5 步（script/v1、34 beat `needs_review`、未签核）——预期行为。
+- 提交后复核：`Ran 430 tests / OK (skipped=2)`，clone 测试实际执行并通过（2026-11-17）。
 
 ### M.6 下一步
 
-1. 提交后，项目负责人针对实际 diff、两个哈希绑定、最终清单与 clone 测试做
-   **针对性复核**（不需重做 38 页审阅）。
-2. 复核通过后再讨论签核；签核仍只能由项目负责人本人完成。
+1. 提交后针对性复核已于 2026-11-17 完成并通过；下一阶段命名为
+   `P0-01-CH01-OWNER-REVIEW-CLOSEOUT`。
+2. 剩余待办分开记，不得合并成一个 PASS：
+   ① 项目负责人对 `script-audit.json` 签核（P0-01 收尾）；
+   ② 34 个 beat 的人工确认（独立的 P0-02 工作，尚未完成）。
+   签核前 `m1 novel check` 仍会退出码 3，且同时因 v1 讲稿与未确认 beats 拦截。
 3. 冻结项维持不变。
 
 ---

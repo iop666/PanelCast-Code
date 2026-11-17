@@ -549,7 +549,7 @@ P0-06、P0-10、横版继续冻结；P0-08 最终签核仍待独立复审。
 4. 成片 hash 用 `sha256sum` 实测，不是抄 `delivery.md`。
 
 **进度（2026-11-16）：第一章样张已完成，其余九章未动。**
-**2026-11-17 复核状态：`REVISION_CONTENT_REVIEW_PASS / PENDING_COMMITTED_ARTIFACT_REVIEW`（修订方案已通过，提交后待针对性复核）。**
+**2026-11-17 复核状态：`REVISION_CONTENT_REVIEW_PASS / COMMITTED_ARTIFACT_REVIEW_PASS / OWNER_SIGN_OFF_PENDING`（修订内容与提交产物均已通过；第一章审计签核待负责人，34 beats 人工确认属 P0-02 尚未完成）。**
 
 - 产物：`m1/audit/chapter-map.md`（第一章 30 条段落锚点 + 十章总表）
 - 第一章结论：漫画 ch01 p5–42 = 小说 **序章 0–148 + 第一章 149–711（部分）**，
